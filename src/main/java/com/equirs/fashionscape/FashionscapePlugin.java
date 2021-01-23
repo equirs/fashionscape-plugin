@@ -1,6 +1,7 @@
 package com.equirs.fashionscape;
 
 import com.equirs.fashionscape.chatbox.ChatboxEquipmentSearch;
+import com.equirs.fashionscape.chatbox.ChatboxSprites;
 import com.equirs.fashionscape.data.IdleAnimationID;
 import com.equirs.fashionscape.data.ItemInteractions;
 import com.google.common.collect.ImmutableMap;
@@ -45,6 +46,7 @@ import net.runelite.client.chat.QueuedMessage;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.game.ItemManager;
+import net.runelite.client.game.SpriteManager;
 import net.runelite.client.input.KeyListener;
 import net.runelite.client.input.KeyManager;
 import net.runelite.client.plugins.Plugin;
@@ -106,6 +108,9 @@ public class FashionscapePlugin extends Plugin
 
 	@Inject
 	private ConfigManager configManager;
+
+	@Inject
+	private SpriteManager spriteManager;
 
 	// manually specified item ids to display on the local player
 	private final Map<KitType, Integer> swappedItemIds = new HashMap<>();
@@ -190,6 +195,7 @@ public class FashionscapePlugin extends Plugin
 	protected void startUp()
 	{
 		keyManager.registerKeyListener(keyListener);
+		spriteManager.addSpriteOverrides(ChatboxSprites.values());
 	}
 
 	@Override
@@ -202,6 +208,7 @@ public class FashionscapePlugin extends Plugin
 		savedKitIds.clear();
 		undoSnapshots.clear();
 		redoSnapshots.clear();
+		spriteManager.removeSpriteOverrides(ChatboxSprites.values());
 	}
 
 	@Subscribe
@@ -561,11 +568,8 @@ public class FashionscapePlugin extends Plugin
 				changes.put(KitType.SHIELD, oldId);
 			}
 			// check if weapon changes idle animation
-			if (ItemInteractions.WEAPON_TO_IDLE.containsKey(itemId))
-			{
-				int newAnimationId = ItemInteractions.WEAPON_TO_IDLE.get(itemId);
-				animationId = setIdleAnimationId(player, newAnimationId);
-			}
+			int newAnimationId = ItemInteractions.WEAPON_TO_IDLE.getOrDefault(itemId, IdleAnimationID.DEFAULT);
+			animationId = setIdleAnimationId(player, newAnimationId);
 		}
 		// check if already holding a 2h weapon. if so, un-equip it
 		if (slot == KitType.SHIELD)

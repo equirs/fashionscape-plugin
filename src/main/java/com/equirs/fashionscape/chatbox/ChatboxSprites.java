@@ -5,7 +5,7 @@ import lombok.RequiredArgsConstructor;
 import net.runelite.client.game.SpriteOverride;
 
 @RequiredArgsConstructor
-enum ChatboxSprites implements SpriteOverride
+public enum ChatboxSprites implements SpriteOverride
 {
 	LEFT_ARROW(-400, "arrow-left.png"),
 	RIGHT_ARROW(-401, "arrow-right.png");
