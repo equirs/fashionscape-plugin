@@ -40,6 +40,17 @@ public interface FashionscapeConfig extends Config
 //	}
 
 	@ConfigItem(
+		keyName = "idleAnimId",
+		name = "Idle ID",
+		description = "Debug idle ID",
+		position = 2
+	)
+	default int idleAnimId()
+	{
+		return 808;
+	}
+
+	@ConfigItem(
 		keyName = "savedProfile",
 		name = "Saved outfit profile",
 		description = "Imported/exported outfit (see import/export keys)",

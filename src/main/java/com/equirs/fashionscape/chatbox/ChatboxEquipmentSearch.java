@@ -37,7 +37,6 @@ import java.util.function.Function;
 import javax.inject.Singleton;
 import lombok.Getter;
 import lombok.Value;
-import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.ItemComposition;
 import net.runelite.api.widgets.ItemQuantityMode;

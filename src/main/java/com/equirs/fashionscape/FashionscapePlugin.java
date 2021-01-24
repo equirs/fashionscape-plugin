@@ -45,6 +45,7 @@ import net.runelite.client.chat.ChatMessageManager;
 import net.runelite.client.chat.QueuedMessage;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
+import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.game.SpriteManager;
 import net.runelite.client.input.KeyListener;
@@ -212,6 +213,17 @@ public class FashionscapePlugin extends Plugin
 	}
 
 	@Subscribe
+	public void onConfigChanged(ConfigChanged event)
+	{
+		Integer idleId = config.idleAnimId();
+		Player player = client.getLocalPlayer();
+		if (player != null && player.getIdlePoseAnimation() != idleId)
+		{
+			player.setIdlePoseAnimation(idleId);
+		}
+	}
+
+	@Subscribe
 	public void onPlayerChanged(PlayerChanged event)
 	{
 		Player player = event.getPlayer();
@@ -307,6 +319,7 @@ public class FashionscapePlugin extends Plugin
 						restoreSnapshot(hoverSnapshot);
 						hoverSnapshot = null;
 					}
+					refreshItemSwaps();
 				})
 				.build();
 		}
@@ -316,6 +329,7 @@ public class FashionscapePlugin extends Plugin
 			Integer originalItemId = equippedItemIdFor(slot);
 			if (originalItemId != null)
 			{
+				swappedItemIds.remove(slot);
 				swapItem(slot, originalItemId);
 			}
 		}
@@ -713,7 +727,7 @@ public class FashionscapePlugin extends Plugin
 	private ItemEquipmentStats equipmentStatsFor(int itemId)
 	{
 		ItemStats stats = itemManager.getItemStats(itemId, false);
-		if (stats != null)
+		if (stats != null && stats.isEquipable())
 		{
 			return stats.getEquipment();
 		}
@@ -925,6 +939,7 @@ public class FashionscapePlugin extends Plugin
 				KitType slot = stringMatch(slotStr);
 				if (slot != null)
 				{
+					swappedItemIds.put(slot, itemId);
 					swapItem(slot, itemId);
 				}
 				else

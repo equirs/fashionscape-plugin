@@ -12,6 +12,7 @@ public class IdleAnimationID
 	public static int BLUDGEON = 1652;
 	public static int GRANITE_MAUL = 1662;
 	public static int ZAMORAKIAN_SPEAR = 1713;
+	public static int ODDSKULL = 1824;
 	public static int RUBBER_CHICKEN = 1832;
 	public static int EASTER_BASKET = 1837;
 	public static int VERACS_FLAIL = 2061;
