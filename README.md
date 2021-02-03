@@ -1,46 +1,61 @@
 # Fashionscape
 Ever spend countless hours on a grind for an untradeable item, only to realize that it doesn't look good with literally 
-any other item in the game? This plugin was made for you. It allows the player to preview combinations of equipment to 
+any other item in the game? This plugin was made for you. It allows anyone to preview combinations of equipment to 
 plan out the perfect look quickly and efficiently.
 
-## How to use
-To swap individual items, first **equip any item** in the slot you're interested in. The right-click option **"Swap"** 
-should be added. After choosing an item to preview, it can be reverted with a right-click **"Revert"** option on the 
-same slot.
+## User guide
+All the UI lives in a dedicated side panel for now. If the plugin is on, you'll find it near the bottom of the list
+(beneath notes). Look for the dress form:
+ 
+![Panel icon](icon.png)
+ 
+There are two tabs in this panel: outfit and search. 
 
-The search box will filter out items that can't be equipped in the slot you've chosen. You can mouse over or use the
-arrow keys to highlight an item, which will temporarily show what it will look like on you.
+"Outfit" shows everything you're wearing via the plugin and has a few controls at the top row:
+* Undo and redo last action (these are only enabled if you can perform them)
+* A randomizer (dice) button that randomly assigns items to all your unlocked slots
+* Save and load buttons, which work with .txt files placed in the RuneLite folder, under `/outfits/`. You can open the
+outfit folder in your system file browser by right-clicking either save or load. Note that you can't save empty outfits,
+and anything you're actually wearing in-game isn't saved.
+* Clear button, which undoes everything you're wearing with the plugin, apart from locked slots. If you want to erase
+everything *including* locks, there's a right-click option to force clear.
 
-If you're feeling lucky, try using the **Shuffle** hotkey in the plugin config. For every checkbox that you've checked 
-in the "Shuffle slots" menu, a random piece of equipment will be assigned to that slot. Other hotkeys such as undo and 
-redo work how you might expect.
+You can "lock" individual slots with the lock icon next to the x button for that slot. This prevents that slot from 
+being cleared by anything (e.g., randomizing, loading a new outfit, clearing all). Clicking the lock again will unlock
+it. The locking feature is designed to work with the randomizer: as you find pieces that work together, you can lock
+them and randomize the remaining slots.
 
-Outfits can be imported or exported using the "Saved outfit profile" text field. Each line follows the format 
-`slot:###`. The slot name is lenient and accepts several variations of the slot name. The numeric portion is the 
-in-game item ID, which can be found within the search feature of this plugin, or by using an external tool like 
-[OSRSBox](https://www.osrsbox.com/tools/item-search/). Anything entered after the item ID will not be used and is for 
-human readability. The export shortcut will write all of swapped items to the profile, while the import shortcut will 
-update your character model from the profile.
+![Outfit tab](outfit_tab.png)
+
+The main feature of "search" is... what you expect. Leaving the search bar empty will show all the results for a selected
+slot (except the "all" tab, where too many results would be displayed). The results will update as you type. Hovering
+over an item will show a preview of what it looks like on your character. When clicked, the item will update and will
+display as part of your outfit. If the item is already worn, clicking it again removes it.
+
+![Search tab](search_tab.png)
 
 ## FAQ
 Q: Isn't this hacking? Am I gonna get banned?
 
-A: Your appearance only changes client-side; other players can't see your swapped items. Using this plugin is not 
+A: Your appearance only changes client-side; other players can't see your outfits. Using this plugin is not 
 functionally affecting the game for you, it's no different from using resource packs to reskin the game's base UI.
 
 Q: Why is it changing my character's arms / (facial) hair?
 
 A: The RuneLite client has no way of telling what your character's base models look like unless you reveal them, so 
-it's using some default models. The easiest fix is to un-equip and re-equip your head- and torso-slot items.
+it's using some default models. The easiest fix is to un-equip your head- and torso-slot items.
 
-Q: The export button cleared what I had entered there, is there any way to get it back?
+Q: My animations mess up when I equip (...). Why?
 
-A: If you were wearing the outfit previously, you could try using the undo shortcut and exporting. Other than that,
-not really. You will want to save multiple outfits to an external file for the time being. Multiple saved profiles
-might be possible in the future.
+Idle animations are currently the only scenario supported for now (after all, real fashionscapers are usually idle).
+There's not an automated way to tell which animation to use for which weapon, so unless your idle animation is wrong, 
+it's probably not going to be fixed anytime soon.
 
-Q: Such-and-such item isn't showing up or is not animating correctly, why?
+Q: Such-and-such item isn't showing up or looks janky, why?
 
-A: Most likely, it's a hidden or broken item. Eventually, these will all be documented, with the ability to
-filter them out in search results / shuffles. You will probably also notice many unobtainable items that don't look 
-right. These aren't a high priority to fix as the focus of the plugin is to create outfits that you can actually obtain.
+A: There are several hidden / broken / unobtainable items in the game, some of which don't render correctly. If you
+don't want to see these, you can go to the plugin settings and check "exclude non-standard items". This removes those 
+items from search / randomize.
+
+If you notice some items don't render your head or arms correctly, or don't have the correct idle animation, please
+let me know by saving the outfit and uploading / pasting the text so I can mark that item ID appropriately.
