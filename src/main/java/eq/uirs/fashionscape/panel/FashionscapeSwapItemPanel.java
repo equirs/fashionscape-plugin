@@ -16,8 +16,10 @@ import javax.swing.border.EmptyBorder;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.ItemComposition;
 import net.runelite.api.kit.KitType;
+import net.runelite.client.callback.ClientThread;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.ui.ColorScheme;
+import net.runelite.client.util.AsyncBufferedImage;
 import net.runelite.client.util.ImageUtil;
 
 @Slf4j
@@ -35,9 +37,10 @@ public class FashionscapeSwapItemPanel extends BaseItemPanel
 	private MouseAdapter hoverAdapter = null;
 
 	FashionscapeSwapItemPanel(@Nullable Integer itemId, BufferedImage icon, ItemManager itemManager,
-							  SwapManager swapManager, KitType slot, SearchOpener searchOpener)
+							  ClientThread clientThread, SwapManager swapManager, KitType slot,
+							  SearchOpener searchOpener)
 	{
-		super(itemId, icon, itemManager);
+		super(itemId, icon, itemManager, clientThread);
 		this.slot = slot;
 		this.itemId = itemId;
 		this.swapManager = swapManager;
@@ -90,9 +93,8 @@ public class FashionscapeSwapItemPanel extends BaseItemPanel
 			if (changedSlot == slot)
 			{
 				this.itemId = newId;
-				String itemName = itemNameFor(newId);
-				itemLabel.setText(itemName);
-				setItemIcon(imageFor(newId));
+				setItemName(newId);
+				setItemIcon(newId);
 				resetMouseListeners();
 				updateXButton();
 			}
@@ -168,16 +170,20 @@ public class FashionscapeSwapItemPanel extends BaseItemPanel
 		};
 	}
 
-	private BufferedImage imageFor(Integer itemId)
+	private void setItemIcon(Integer itemId)
 	{
 		if (itemId != null)
 		{
-			ItemComposition itemComposition = itemManager.getItemComposition(itemId);
-			return itemManager.getImage(itemComposition.getId());
+			clientThread.invokeLater(() -> {
+				ItemComposition itemComposition = itemManager.getItemComposition(itemId);
+				AsyncBufferedImage image = itemManager.getImage(itemComposition.getId());
+				image.addTo(itemIcon);
+			});
 		}
 		else
 		{
-			return ImageUtil.loadImageResource(getClass(), slot.name().toLowerCase() + ".png");
+			BufferedImage image = ImageUtil.loadImageResource(getClass(), slot.name().toLowerCase() + ".png");
+			setItemIcon(image);
 		}
 	}
 

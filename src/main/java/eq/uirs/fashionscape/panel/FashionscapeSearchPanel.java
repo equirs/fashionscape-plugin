@@ -178,6 +178,8 @@ public class FashionscapeSearchPanel extends JPanel
 		add(container, BorderLayout.NORTH);
 		add(centerPanel, BorderLayout.CENTER);
 
+		SwingUtilities.invokeLater(searchBar::requestFocusInWindow);
+
 		swapManager.addLockChangeListener(this::updateTabIcon);
 	}
 
@@ -190,6 +192,7 @@ public class FashionscapeSearchPanel extends JPanel
 	public void reloadResults()
 	{
 		updateSearchDebounced();
+		SwingUtilities.invokeLater(searchBar::requestFocusInWindow);
 	}
 
 	public void chooseSlot(KitType slot)
@@ -216,6 +219,7 @@ public class FashionscapeSearchPanel extends JPanel
 		SwingUtilities.invokeLater(() -> {
 			resultsPanel.removeAll();
 			resultsPanel.updateUI();
+			searchBar.requestFocusInWindow();
 		});
 	}
 
@@ -417,7 +421,7 @@ public class FashionscapeSearchPanel extends JPanel
 					{
 						Integer itemId = result.itemComposition.getId();
 						FashionscapeSearchItemPanel panel = new FashionscapeSearchItemPanel(itemId, result.icon,
-							result.slot, itemManager, swapManager, listener);
+							result.slot, itemManager, swapManager, clientThread, listener);
 						searchPanels.add(panel);
 						int topPadding = firstItem ? 0 : 5;
 						firstItem = false;

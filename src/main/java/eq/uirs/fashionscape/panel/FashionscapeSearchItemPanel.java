@@ -12,6 +12,7 @@ import javax.annotation.Nullable;
 import javax.swing.JPanel;
 import javax.swing.border.EmptyBorder;
 import net.runelite.api.kit.KitType;
+import net.runelite.client.callback.ClientThread;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.util.AsyncBufferedImage;
@@ -22,10 +23,10 @@ public class FashionscapeSearchItemPanel extends BaseItemPanel
 	private final KitType slot;
 
 	FashionscapeSearchItemPanel(@Nullable Integer itemId, AsyncBufferedImage icon, KitType slot,
-								ItemManager itemManager, SwapManager swapManager,
+								ItemManager itemManager, SwapManager swapManager, ClientThread clientThread,
 								OnSelectionChangingListener listener)
 	{
-		super(itemId, icon, itemManager);
+		super(itemId, icon, itemManager, clientThread);
 		this.swapManager = swapManager;
 		this.slot = slot;
 
@@ -59,15 +60,21 @@ public class FashionscapeSearchItemPanel extends BaseItemPanel
 			@Override
 			public void mouseReleased(MouseEvent e)
 			{
-				if (!swapManager.isLocked(itemId))
+				// pre-emptively set background
+				boolean isAlreadySelected = Objects.equals(swapManager.swappedItemIdIn(slot), itemId);
+				Color bg = isAlreadySelected ? nonHighlightColor : ColorScheme.MEDIUM_GRAY_COLOR;
+				for (JPanel panel : highlightPanels)
 				{
-					listener.onSearchSelectionChanging(slot);
-					swapManager.hoverSelect(itemId);
-					for (JPanel panel : highlightPanels)
-					{
-						matchComponentBackground(panel, defaultBackgroundColor());
-					}
+					matchComponentBackground(panel, bg);
 				}
+				// now swap it
+				clientThread.invokeLater(() -> {
+					if (!swapManager.isLocked(itemId))
+					{
+						listener.onSearchSelectionChanging(slot);
+						swapManager.hoverSelect(itemId);
+					}
+				});
 			}
 		};
 

@@ -13,6 +13,7 @@ import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.border.EmptyBorder;
 import net.runelite.api.ItemComposition;
+import net.runelite.client.callback.ClientThread;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.util.AsyncBufferedImage;
@@ -24,16 +25,17 @@ abstract class BaseItemPanel extends JPanel
 	public final Integer itemId;
 
 	protected final ItemManager itemManager;
+	protected final ClientThread clientThread;
 	protected final List<JPanel> highlightPanels;
 	protected final Color nonHighlightColor;
 	protected final JLabel itemLabel;
 	protected final JLabel itemIcon;
 
-	BaseItemPanel(@Nullable Integer itemId, BufferedImage icon, ItemManager itemManager)
+	BaseItemPanel(@Nullable Integer itemId, BufferedImage icon, ItemManager itemManager, ClientThread clientThread)
 	{
 		this.itemManager = itemManager;
+		this.clientThread = clientThread;
 		this.itemId = itemId;
-		String itemName = itemNameFor(itemId);
 
 		BorderLayout layout = new BorderLayout();
 		setLayout(layout);
@@ -56,11 +58,11 @@ abstract class BaseItemPanel extends JPanel
 		itemLabel.setForeground(Color.WHITE);
 		itemLabel.setMaximumSize(new Dimension(0, 0));
 		itemLabel.setPreferredSize(new Dimension(0, 0));
-		itemLabel.setText(itemName);
+		setItemName(itemId);
 		// subclasses will add the item label as needed
 	}
 
-	void setItemIcon(BufferedImage icon)
+	protected void setItemIcon(BufferedImage icon)
 	{
 		if (icon != null)
 		{
@@ -75,17 +77,17 @@ abstract class BaseItemPanel extends JPanel
 		}
 	}
 
-	String itemNameFor(Integer itemId)
+	protected void setItemName(Integer itemId)
 	{
-		if (itemId != null)
-		{
-			ItemComposition itemComposition = itemManager.getItemComposition(itemId);
-			return itemComposition.getName();
-		}
-		else
-		{
-			return "Nothing";
-		}
+		clientThread.invokeLater(() -> {
+			String itemName = "Nothing";
+			if (itemId != null)
+			{
+				ItemComposition itemComposition = itemManager.getItemComposition(itemId);
+				itemName = itemComposition.getName();
+			}
+			itemLabel.setText(itemName);
+		});
 	}
 
 	protected void matchComponentBackground(JPanel panel, Color color)

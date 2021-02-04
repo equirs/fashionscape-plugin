@@ -29,6 +29,7 @@ import net.runelite.api.ItemContainer;
 import net.runelite.api.Player;
 import net.runelite.api.PlayerComposition;
 import net.runelite.api.kit.KitType;
+import net.runelite.client.callback.ClientThread;
 import net.runelite.client.game.ItemManager;
 import net.runelite.http.api.item.ItemEquipmentStats;
 import net.runelite.http.api.item.ItemStats;
@@ -52,6 +53,9 @@ public class SwapManager
 
 	@Inject
 	private Client client;
+
+	@Inject
+	private ClientThread clientThread;
 
 	private final SavedSwaps savedSwaps = new SavedSwaps();
 	private final SnapshotQueues snapshotQueues = new SnapshotQueues(this::restoreSnapshot);
@@ -113,6 +117,7 @@ public class SwapManager
 	}
 
 	@Nullable
+	// this should only be called from the client thread
 	public Snapshot refreshItemSwaps()
 	{
 		return savedSwaps.entrySet().stream()
@@ -124,10 +129,12 @@ public class SwapManager
 
 	public void undoLastSwap()
 	{
-		if (client.getLocalPlayer() != null)
-		{
-			snapshotQueues.undoLast();
-		}
+		clientThread.invokeLater(() -> {
+			if (client.getLocalPlayer() != null)
+			{
+				snapshotQueues.undoLast();
+			}
+		});
 	}
 
 	public boolean canUndo()
@@ -137,10 +144,12 @@ public class SwapManager
 
 	public void redoLastSwap()
 	{
-		if (client.getLocalPlayer() != null)
-		{
-			snapshotQueues.redoLast();
-		}
+		clientThread.invokeLater(() -> {
+			if (client.getLocalPlayer() != null)
+			{
+				snapshotQueues.redoLast();
+			}
+		});
 	}
 
 	public boolean canRedo()
@@ -210,17 +219,20 @@ public class SwapManager
 
 	public void importSwaps(Map<KitType, Integer> newSwaps)
 	{
-		Map<KitType, Integer> unlockedSwaps = newSwaps.entrySet().stream()
-			.filter(e -> !savedSwaps.isLocked(e.getKey()))
-			.collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-		savedSwaps.replaceAll(unlockedSwaps);
-		unlockedSwaps.entrySet().stream()
-			.map(e -> swapItem(e.getKey(), e.getValue()))
-			.filter(Objects::nonNull)
-			.reduce(Snapshot::mergeWith)
-			.ifPresent(snapshotQueues::appendToUndo);
+		clientThread.invokeLater(() -> {
+			Map<KitType, Integer> unlockedSwaps = newSwaps.entrySet().stream()
+				.filter(e -> !savedSwaps.isLocked(e.getKey()))
+				.collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+			savedSwaps.replaceAll(unlockedSwaps);
+			unlockedSwaps.entrySet().stream()
+				.map(e -> swapItem(e.getKey(), e.getValue()))
+				.filter(Objects::nonNull)
+				.reduce(Snapshot::mergeWith)
+				.ifPresent(snapshotQueues::appendToUndo);
+		});
 	}
 
+	// this should only be called from the client thread
 	public List<String> stringifySwaps()
 	{
 		return savedSwaps.entrySet().stream()
@@ -241,61 +253,74 @@ public class SwapManager
 
 	public void revertSlot(KitType slot)
 	{
-		Snapshot s = doRevert(slot);
-		snapshotQueues.appendToUndo(s);
+		clientThread.invokeLater(() -> {
+			Snapshot s = doRevert(slot);
+			snapshotQueues.appendToUndo(s);
+		});
 	}
 
 	public void hoverOver(Integer itemId)
 	{
-		Snapshot snapshot = swapItem(itemId, false);
-		if (hoverSnapshot == null)
-		{
-			hoverSnapshot = snapshot;
-		}
-		else if (snapshot != null)
-		{
-			hoverSnapshot = snapshot.mergeWith(hoverSnapshot);
-		}
+		clientThread.invokeLater(() -> {
+			Snapshot snapshot = swapItem(itemId, false);
+			if (hoverSnapshot == null)
+			{
+				hoverSnapshot = snapshot;
+			}
+			else if (snapshot != null)
+			{
+				hoverSnapshot = snapshot.mergeWith(hoverSnapshot);
+			}
+		});
 	}
 
 	public void hoverSelect(Integer itemId)
 	{
-		KitType slot = slotForItem(itemId);
-		if (savedSwaps.isLocked(slot))
-		{
-			return;
-		}
-		Snapshot snapshot;
-		if (Objects.equals(savedSwaps.get(slot), itemId))
-		{
-			snapshot = doRevert(slot);
-		}
-		else
-		{
-			snapshot = swapItem(itemId, true);
-		}
-		if (snapshot != null)
-		{
-			if (hoverSnapshot != null)
+		clientThread.invokeLater(() -> {
+			KitType slot = slotForItem(itemId);
+			if (savedSwaps.isLocked(slot))
 			{
-				snapshot = hoverSnapshot.mergeWith(snapshot);
+				return;
 			}
-			snapshotQueues.appendToUndo(snapshot);
-		}
-		hoverSnapshot = null;
+			Snapshot snapshot;
+			if (Objects.equals(savedSwaps.get(slot), itemId))
+			{
+				snapshot = doRevert(slot);
+			}
+			else
+			{
+				snapshot = swapItem(itemId, true);
+			}
+			if (snapshot != null)
+			{
+				if (hoverSnapshot != null)
+				{
+					snapshot = hoverSnapshot.mergeWith(snapshot);
+				}
+				snapshotQueues.appendToUndo(snapshot);
+			}
+			hoverSnapshot = null;
+		});
 	}
 
 	public void hoverAway()
 	{
-		if (hoverSnapshot != null)
-		{
-			restoreSnapshot(hoverSnapshot);
-			hoverSnapshot = null;
-		}
-		refreshItemSwaps();
+		clientThread.invokeLater(() -> {
+			if (hoverSnapshot != null)
+			{
+				restoreSnapshot(hoverSnapshot);
+				hoverSnapshot = null;
+			}
+			refreshItemSwaps();
+		});
 	}
 
 	public void revertSwaps(boolean force)
+	{
+		clientThread.invokeLater(() -> performRevertSwaps(force));
+	}
+
+	private void performRevertSwaps(boolean force)
 	{
 		if (force)
 		{
@@ -327,6 +352,7 @@ public class SwapManager
 	}
 
 	@Nullable
+	// this should only be called from the client thread
 	public Integer slotIdFor(ItemComposition itemComposition)
 	{
 		ItemEquipmentStats equipStats = equipmentStatsFor(itemComposition.getId());
@@ -337,8 +363,12 @@ public class SwapManager
 		return null;
 	}
 
-
 	public void shuffle()
+	{
+		clientThread.invokeLater(this::performShuffle);
+	}
+
+	private void performShuffle()
 	{
 		Map<KitType, Boolean> slotsToRevert = Arrays.stream(PanelKitType.values())
 			.map(PanelKitType::getKitType)
@@ -416,6 +446,7 @@ public class SwapManager
 	}
 
 	@Nullable
+	// this should only be called from the client thread
 	public Snapshot swapItem(Integer itemId, boolean persist)
 	{
 		if (itemId == null)
@@ -430,9 +461,20 @@ public class SwapManager
 		KitType slot = KitType.values()[stats.getEquipment().getSlot()];
 		int equipmentId = itemId + 512;
 		Snapshot snapshot = swap(slot, equipmentId);
+		if (snapshot != null && hoverSnapshot != null)
+		{
+			snapshot = snapshot.mergeWith(hoverSnapshot);
+		}
 		if (persist)
 		{
 			savedSwaps.put(slot, itemId);
+			// only 1 item was swapped, so if the snapshot contains other slots, they must have been removed
+			if (snapshot != null)
+			{
+				snapshot.getChangedEquipmentIds().keySet().stream()
+					.filter(s -> !slot.equals(s))
+					.forEach(savedSwaps::remove);
+			}
 		}
 		return snapshot;
 	}

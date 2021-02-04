@@ -19,6 +19,7 @@ import net.runelite.api.Player;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.PlayerChanged;
 import net.runelite.client.RuneLite;
+import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ConfigChanged;
@@ -70,6 +71,9 @@ public class FashionscapePlugin extends Plugin
 	private Client client;
 
 	@Inject
+	private ClientThread clientThread;
+
+	@Inject
 	private ItemManager itemManager;
 
 	@Inject
@@ -102,7 +106,7 @@ public class FashionscapePlugin extends Plugin
 		clientToolbar.addNavigation(navButton);
 
 		swapManager.startUp();
-		populateDupes();
+		clientThread.invokeLater(this::populateDupes);
 	}
 
 	@Override

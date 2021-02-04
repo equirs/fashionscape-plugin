@@ -9,6 +9,7 @@ import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.kit.KitType;
+import net.runelite.client.callback.ClientThread;
 import net.runelite.client.chat.ChatMessageManager;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.ui.ColorScheme;
@@ -31,7 +32,7 @@ public class FashionscapePanel extends PluginPanel
 
 	@Inject
 	public FashionscapePanel(FashionscapeSearchPanel searchPanel, SwapManager swapManager, ItemManager itemManager,
-							 Client client, ChatMessageManager chatMessageManager)
+							 Client client, ClientThread clientThread, ChatMessageManager chatMessageManager)
 	{
 		super(false);
 		display = new DisplayPanel(searchPanel);
@@ -51,7 +52,8 @@ public class FashionscapePanel extends PluginPanel
 				// TODO maybe this should navigate back to the outfit tab after choosing?
 			}
 		};
-		this.swapsPanel = new FashionscapeSwapsPanel(swapManager, itemManager, client, chatMessageManager, searchOpener);
+		this.swapsPanel = new FashionscapeSwapsPanel(swapManager, itemManager, client, chatMessageManager,
+			searchOpener, clientThread);
 		this.searchPanel = searchPanel;
 
 		MaterialTab swapsTab = new MaterialTab("Outfit", tabGroup, swapsPanel);

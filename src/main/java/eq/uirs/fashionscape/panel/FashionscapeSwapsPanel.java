@@ -32,7 +32,9 @@ import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
+import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
+import lombok.Value;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
@@ -40,6 +42,7 @@ import net.runelite.api.GameState;
 import net.runelite.api.ItemComposition;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.kit.KitType;
+import net.runelite.client.callback.ClientThread;
 import net.runelite.client.chat.ChatColorType;
 import net.runelite.client.chat.ChatMessageBuilder;
 import net.runelite.client.chat.ChatMessageManager;
@@ -55,10 +58,12 @@ public class FashionscapeSwapsPanel extends JPanel
 	private final SwapManager swapManager;
 	private final ItemManager itemManager;
 	private final Client client;
+	private final ClientThread clientThread;
 	private final ChatMessageManager chatMessageManager;
 	private final SearchOpener searchOpener;
 	private final List<FashionscapeSwapItemPanel> itemPanels = new ArrayList<>();
 
+	private JPanel slotsPanel;
 	private JButton undo;
 	private JButton redo;
 	private JButton shuffle;
@@ -66,14 +71,24 @@ public class FashionscapeSwapsPanel extends JPanel
 	private JButton load;
 	private JButton clear;
 
+	@Value
+	private static class SlotResult
+	{
+		KitType slot;
+		Integer itemId;
+		BufferedImage image;
+	}
+
 	public FashionscapeSwapsPanel(SwapManager swapManager, ItemManager itemManager, Client client,
-								  ChatMessageManager chatMessageManager, SearchOpener searchOpener)
+								  ChatMessageManager chatMessageManager, SearchOpener searchOpener,
+								  ClientThread clientThread)
 	{
 		this.swapManager = swapManager;
 		this.itemManager = itemManager;
 		this.chatMessageManager = chatMessageManager;
 		this.searchOpener = searchOpener;
 		this.client = client;
+		this.clientThread = clientThread;
 
 		setLayout(new GridBagLayout());
 		setBackground(ColorScheme.DARK_GRAY_COLOR);
@@ -202,7 +217,11 @@ public class FashionscapeSwapsPanel extends JPanel
 		c.gridy++;
 		c.gridx = 0;
 		c.gridwidth = 6;
-		JPanel slotsPanel = setUpSlotsPanel();
+
+		slotsPanel = new JPanel();
+		slotsPanel.setLayout(new GridBagLayout());
+		slotsPanel.setBackground(ColorScheme.DARK_GRAY_COLOR);
+		populateSwapSlots();
 		buttonContainer.add(slotsPanel, c);
 
 		swapManager.addLockChangeListener((slot, locked) -> {
@@ -223,12 +242,36 @@ public class FashionscapeSwapsPanel extends JPanel
 		return buttonContainer;
 	}
 
-	private JPanel setUpSlotsPanel()
+	private void populateSwapSlots()
 	{
-		JPanel panel = new JPanel();
-		panel.setLayout(new GridBagLayout());
-		panel.setBackground(ColorScheme.DARK_GRAY_COLOR);
+		clientThread.invokeLater(() -> {
+			List<SlotResult> slotResults = new ArrayList<>();
+			for (PanelKitType panelSlot : PanelKitType.values())
+			{
+				KitType slot = panelSlot.getKitType();
+				if (slot == null)
+				{
+					continue;
+				}
+				Integer itemId = swapManager.swappedItemIdIn(slot);
+				BufferedImage image;
+				if (itemId != null)
+				{
+					ItemComposition itemComposition = itemManager.getItemComposition(itemId);
+					image = itemManager.getImage(itemComposition.getId());
+				}
+				else
+				{
+					image = ImageUtil.loadImageResource(getClass(), slot.name().toLowerCase() + ".png");
+				}
+				slotResults.add(new SlotResult(slot, itemId, image));
+			}
+			SwingUtilities.invokeLater(() -> addSlotItemPanels(slotResults));
+		});
+	}
 
+	private void addSlotItemPanels(List<SlotResult> results)
+	{
 		GridBagConstraints c = new GridBagConstraints();
 		c.fill = GridBagConstraints.HORIZONTAL;
 		c.anchor = GridBagConstraints.PAGE_START;
@@ -237,36 +280,18 @@ public class FashionscapeSwapsPanel extends JPanel
 		c.gridx = 0;
 		c.gridy = 0;
 
-		for (PanelKitType panelSlot : PanelKitType.values())
+		for (SlotResult s : results)
 		{
-			KitType slot = panelSlot.getKitType();
-			if (slot == null)
-			{
-				continue;
-			}
-			Integer itemId = swapManager.swappedItemIdIn(slot);
-			BufferedImage image;
-			if (itemId != null)
-			{
-				ItemComposition itemComposition = itemManager.getItemComposition(itemId);
-				image = itemManager.getImage(itemComposition.getId());
-			}
-			else
-			{
-				image = ImageUtil.loadImageResource(getClass(), slot.name().toLowerCase() + ".png");
-			}
-			FashionscapeSwapItemPanel itemPanel = new FashionscapeSwapItemPanel(itemId, image, itemManager, swapManager,
-				slot, searchOpener);
+			FashionscapeSwapItemPanel itemPanel = new FashionscapeSwapItemPanel(s.itemId, s.image, itemManager,
+				clientThread, swapManager, s.slot, searchOpener);
 			itemPanels.add(itemPanel);
 			JPanel marginWrapper = new JPanel(new BorderLayout());
 			marginWrapper.setBackground(ColorScheme.DARK_GRAY_COLOR);
 			marginWrapper.setBorder(new EmptyBorder(5, 0, 0, 0));
 			marginWrapper.add(itemPanel, BorderLayout.NORTH);
-			panel.add(marginWrapper, c);
+			slotsPanel.add(marginWrapper, c);
 			c.gridy++;
 		}
-
-		return panel;
 	}
 
 	@SuppressWarnings("ResultOfMethodCallIgnored")
@@ -320,22 +345,24 @@ public class FashionscapeSwapsPanel extends JPanel
 			{
 				selectedFile = new File(selectedFile.getPath() + ".txt");
 			}
-			try (PrintWriter out = new PrintWriter(selectedFile))
-			{
-				List<String> exports = swapManager.stringifySwaps();
-				for (String line : exports)
+			File finalSelectedFile = selectedFile;
+			clientThread.invokeLater(() -> {
+				try (PrintWriter out = new PrintWriter(finalSelectedFile))
 				{
-					out.println(line);
+					List<String> exports = swapManager.stringifySwaps();
+					for (String line : exports)
+					{
+						out.println(line);
+					}
+					sendHighlightedMessage("Outfit saved to " + finalSelectedFile.getName());
 				}
-				sendHighlightedMessage("Outfit saved to " + selectedFile.getName());
-			}
-			catch (FileNotFoundException e)
-			{
-				e.printStackTrace();
-			}
+				catch (FileNotFoundException e)
+				{
+					e.printStackTrace();
+				}
+			});
 		}
 	}
-
 
 	@SuppressWarnings("ResultOfMethodCallIgnored")
 	private void openLoadDialog()
