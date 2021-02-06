@@ -137,8 +137,10 @@ public class FashionscapePlugin extends Plugin
 			if (event.getKey().equals(FashionscapeConfig.KEY_EXCLUDE_NON_STANDARD))
 			{
 				// reload displayed results
-				populateDupes();
-				panel.getSearchPanel().reloadResults();
+				clientThread.invokeLater(() -> {
+					populateDupes();
+					panel.getSearchPanel().reloadResults();
+				});
 			}
 		}
 	}
