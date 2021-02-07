@@ -75,7 +75,7 @@ public class SwapManager
 		hoverSnapshot = null;
 		savedSwaps.clear();
 		savedSwaps.removeListeners();
-		clearKits();
+		savedKitIds.clear();
 		snapshotQueues.clear();
 		snapshotQueues.removeListeners();
 	}
@@ -791,13 +791,6 @@ public class SwapManager
 		}
 		savedSwaps.remove(slot);
 		return s;
-	}
-
-	private void clearKits()
-	{
-		Map<KitType, Integer> copy = new HashMap<>(savedKitIds);
-		savedKitIds.clear();
-		copy.forEach(this::swapKit);
 	}
 
 	@Nullable

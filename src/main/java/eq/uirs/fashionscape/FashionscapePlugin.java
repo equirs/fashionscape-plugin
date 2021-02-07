@@ -113,7 +113,7 @@ public class FashionscapePlugin extends Plugin
 	protected void shutDown()
 	{
 		swapManager.revertSwaps(true);
-		swapManager.shutDown();
+		clientThread.invokeLater(() -> swapManager.shutDown());
 		clientToolbar.removeNavigation(navButton);
 		ITEM_ID_DUPES.clear();
 	}
