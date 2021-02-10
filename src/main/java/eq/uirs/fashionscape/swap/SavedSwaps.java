@@ -48,6 +48,11 @@ class SavedSwaps
 		return swappedItemIds.get(slot);
 	}
 
+	boolean contains(KitType slot)
+	{
+		return swappedItemIds.containsKey(slot);
+	}
+
 	Integer getOrDefault(KitType slot, Integer fallback)
 	{
 		return swappedItemIds.getOrDefault(slot, fallback);

@@ -4,6 +4,7 @@ import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableMap;
 import eq.uirs.fashionscape.FashionscapeConfig;
 import eq.uirs.fashionscape.FashionscapePlugin;
+import eq.uirs.fashionscape.colors.ColorScorer;
 import eq.uirs.fashionscape.swap.SwapManager;
 import java.awt.BorderLayout;
 import java.awt.CardLayout;
@@ -16,6 +17,8 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -49,6 +52,7 @@ import net.runelite.client.ui.components.materialtabs.MaterialTab;
 import net.runelite.client.ui.components.materialtabs.MaterialTabGroup;
 import net.runelite.client.util.AsyncBufferedImage;
 import net.runelite.client.util.ImageUtil;
+import net.runelite.client.util.SwingUtil;
 import net.runelite.http.api.item.ItemStats;
 
 @Slf4j
@@ -69,6 +73,7 @@ public class FashionscapeSearchPanel extends JPanel
 	private final ClientThread clientThread;
 	private final FashionscapeConfig config;
 	private final ScheduledExecutorService executor;
+	private final ColorScorer colorScorer;
 
 	// constrain items in the list of results
 	private final GridBagConstraints itemConstraints = new GridBagConstraints();
@@ -79,6 +84,8 @@ public class FashionscapeSearchPanel extends JPanel
 	private final JPanel centerPanel = new JPanel(cardLayout);
 	private final PluginErrorPanel errorPanel = new PluginErrorPanel();
 	private final Map<PanelKitType, MaterialTab> tabMap;
+	private final List<FashionscapeSearchItemPanel> searchPanels = new ArrayList<>();
+
 	private final List<Result> results = new ArrayList<>();
 	private final AtomicBoolean searchInProgress = new AtomicBoolean();
 	private final OnSelectionChangingListener listener = new OnSelectionChangingListener()
@@ -99,9 +106,13 @@ public class FashionscapeSearchPanel extends JPanel
 	private Future<?> searchFuture = null;
 	private Function<ItemComposition, Boolean> filter;
 	private boolean allowShortQueries = false;
+	private SortBy sort = SortBy.SUGGESTED;
 	private KitType selectedSlot = null;
 	private boolean hasSearched = false;
-	private final List<FashionscapeSearchItemPanel> searchPanels = new ArrayList<>();
+	// TODO make local
+	private Map<Integer, Double> scores;
+
+	private final Comparator<Result> itemAlphaComparator = Comparator.comparing(o -> o.getItemComposition().getName());
 
 	@Value
 	private static class Result
@@ -114,7 +125,7 @@ public class FashionscapeSearchPanel extends JPanel
 	@Inject
 	public FashionscapeSearchPanel(Client client, SwapManager swapManager, ClientThread clientThread,
 								   ItemManager itemManager, ScheduledExecutorService executor,
-								   FashionscapeConfig config)
+								   FashionscapeConfig config, ColorScorer colorScorer)
 	{
 		this.client = client;
 		this.swapManager = swapManager;
@@ -122,6 +133,7 @@ public class FashionscapeSearchPanel extends JPanel
 		this.clientThread = clientThread;
 		this.executor = executor;
 		this.config = config;
+		this.colorScorer = colorScorer;
 
 		setLayout(new BorderLayout());
 		setBackground(ColorScheme.DARK_GRAY_COLOR);
@@ -186,7 +198,7 @@ public class FashionscapeSearchPanel extends JPanel
 	public void clearResults()
 	{
 		searchPanels.clear();
-		resultsPanel.removeAll();
+		SwingUtil.fastRemoveAll(resultsPanel);
 	}
 
 	public void reloadResults()
@@ -217,7 +229,7 @@ public class FashionscapeSearchPanel extends JPanel
 		results.clear();
 		searchPanels.clear();
 		SwingUtilities.invokeLater(() -> {
-			resultsPanel.removeAll();
+			SwingUtil.fastRemoveAll(resultsPanel);
 			resultsPanel.updateUI();
 			searchBar.requestFocusInWindow();
 		});
@@ -350,7 +362,7 @@ public class FashionscapeSearchPanel extends JPanel
 			{
 				searchPanels.clear();
 				SwingUtilities.invokeLater(() -> {
-					resultsPanel.removeAll();
+					SwingUtil.fastRemoveAll(resultsPanel);
 					resultsPanel.updateUI();
 					if (hasSearched)
 					{
@@ -378,9 +390,8 @@ public class FashionscapeSearchPanel extends JPanel
 					itemComposition = itemManager.getItemComposition(canonical);
 					stats = itemManager.getItemStats(canonical, false);
 				}
-				catch (Exception e)
+				catch (Exception ignored)
 				{
-					// log.error("exception getting item id {}", i);
 				}
 				// id might already be in results due to canonicalize
 				if (itemComposition != null && stats != null && stats.isEquipable() &&
@@ -393,52 +404,85 @@ public class FashionscapeSearchPanel extends JPanel
 						AsyncBufferedImage image = itemManager.getImage(itemComposition.getId());
 						results.add(new Result(itemComposition, image, slot));
 					}
-					catch (Exception e)
+					catch (Exception ignored)
 					{
-						// log.info("exception getting image for {}", i);
 					}
 				}
 			}
 
 			searchPanels.clear();
-			SwingUtilities.invokeLater(() -> {
-				resultsPanel.removeAll();
-				if (results.isEmpty())
-				{
-					String slotName = "any";
-					if (selectedSlot != null)
-					{
-						slotName = selectedSlot.name().toLowerCase();
-					}
-					errorPanel.setContent("No results",
-						"No items match \"" + searchBar.getText() + "\" in " + slotName + " slot");
-					cardLayout.show(centerPanel, ERROR_PANEL);
-				}
-				else
-				{
-					boolean firstItem = true;
-					for (Result result : results)
-					{
-						Integer itemId = result.itemComposition.getId();
-						FashionscapeSearchItemPanel panel = new FashionscapeSearchItemPanel(itemId, result.icon,
-							result.slot, itemManager, swapManager, clientThread, listener);
-						searchPanels.add(panel);
-						int topPadding = firstItem ? 0 : 5;
-						firstItem = false;
-						JPanel marginWrapper = new JPanel(new BorderLayout());
-						marginWrapper.setBackground(ColorScheme.DARK_GRAY_COLOR);
-						marginWrapper.setBorder(new EmptyBorder(topPadding, 10, 0, 10));
-						marginWrapper.add(panel, BorderLayout.NORTH);
-						resultsPanel.add(marginWrapper, itemConstraints);
-						itemConstraints.gridy++;
-					}
-					cardLayout.show(centerPanel, RESULTS_PANEL);
-					resultsPanel.updateUI();
-				}
-				searchInProgress.set(false);
-			});
+			// sort if we have to
+			switch (this.sort)
+			{
+				case RELEASE:
+					addPendingResults();
+				case ALPHABETICAL:
+					executor.submit(() -> {
+						results.sort(itemAlphaComparator);
+						addPendingResults();
+					});
+				case SUGGESTED:
+					executor.submit(() -> {
+						performSuggestedSort();
+						addPendingResults();
+					});
+			}
 		}
 		return willUpdate;
+	}
+
+	private void performSuggestedSort()
+	{
+		colorScorer.updatePlayerInfo();
+		scores = new HashMap<>();
+		for (Result result : results)
+		{
+			int itemId = result.getItemComposition().getId();
+			scores.put(itemId, colorScorer.score(itemId, selectedSlot));
+		}
+		results.sort(Comparator.comparing(r ->
+			-scores.getOrDefault(r.getItemComposition().getId(), 0.0)));
+	}
+
+	// only to be called from updateSearch
+	private void addPendingResults()
+	{
+		SwingUtilities.invokeLater(() -> {
+			SwingUtil.fastRemoveAll(resultsPanel);
+			if (results.isEmpty())
+			{
+				String slotName = "any";
+				if (selectedSlot != null)
+				{
+					slotName = selectedSlot.name().toLowerCase();
+				}
+				errorPanel.setContent("No results",
+					"No items match \"" + searchBar.getText() + "\" in " + slotName + " slot");
+				cardLayout.show(centerPanel, ERROR_PANEL);
+			}
+			else
+			{
+				boolean firstItem = true;
+				for (Result result : results)
+				{
+					Integer itemId = result.getItemComposition().getId();
+					FashionscapeSearchItemPanel panel = new FashionscapeSearchItemPanel(itemId, result.getIcon(),
+						result.getSlot(), itemManager, swapManager, clientThread, listener, scores.get(itemId));
+					searchPanels.add(panel);
+					int topPadding = firstItem ? 0 : 5;
+					firstItem = false;
+					JPanel marginWrapper = new JPanel(new BorderLayout());
+					marginWrapper.setBackground(ColorScheme.DARK_GRAY_COLOR);
+					marginWrapper.setBorder(new EmptyBorder(topPadding, 10, 0, 10));
+					marginWrapper.add(panel, BorderLayout.NORTH);
+					resultsPanel.add(marginWrapper, itemConstraints);
+					itemConstraints.gridy++;
+				}
+				cardLayout.show(centerPanel, RESULTS_PANEL);
+				resultsPanel.updateUI();
+			}
+			searchInProgress.set(false);
+		});
 	}
 
 	private boolean isValidSearch(ItemComposition itemComposition, String query)

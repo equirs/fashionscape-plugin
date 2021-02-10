@@ -5,28 +5,41 @@ import java.util.Map;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.ToString;
+import lombok.Value;
+import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.kit.KitType;
 
 @RequiredArgsConstructor
 @ToString
+@Slf4j
 class Snapshot
 {
+	@Value
+	public static class Change
+	{
+		int equipmentId;
+		/**
+		 * Indicates that the previous item was equipped via the plugin
+		 */
+		boolean unnatural;
+	}
+
 	@Getter
-	private final Map<KitType, Integer> changedEquipmentIds;
+	private final Map<KitType, Change> slotChanges;
 	@Getter
 	private final Integer changedIdleAnimationId;
 
 	boolean isEmpty()
 	{
-		return changedIdleAnimationId == null && changedEquipmentIds.isEmpty();
+		return changedIdleAnimationId == null && slotChanges.isEmpty();
 	}
 
 	// This snapshot will take priority of the other snapshot in the event of a collision.
-	Snapshot mergeWith(Snapshot other)
+	Snapshot mergeOver(Snapshot other)
 	{
-		Map<KitType, Integer> merged = new HashMap<>();
-		merged.putAll(other.changedEquipmentIds);
-		merged.putAll(this.changedEquipmentIds);
+		Map<KitType, Change> merged = new HashMap<>();
+		merged.putAll(other.slotChanges);
+		merged.putAll(this.slotChanges);
 		Integer idleId = this.changedIdleAnimationId;
 		if (idleId == null)
 		{

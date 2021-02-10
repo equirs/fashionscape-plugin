@@ -97,7 +97,7 @@ class SnapshotQueues
 			return;
 		}
 		Snapshot lastUndo = undoSnapshots.peekLast();
-		if (lastUndo != null && snapshot.getChangedEquipmentIds().equals(lastUndo.getChangedEquipmentIds()))
+		if (lastUndo != null && snapshot.getSlotChanges().equals(lastUndo.getSlotChanges()))
 		{
 			return;
 		}
@@ -116,7 +116,7 @@ class SnapshotQueues
 			return;
 		}
 		Snapshot lastRedo = redoSnapshots.peekLast();
-		if (lastRedo != null && snapshot.getChangedEquipmentIds().equals(lastRedo.getChangedEquipmentIds()))
+		if (lastRedo != null && snapshot.getSlotChanges().equals(lastRedo.getSlotChanges()))
 		{
 			return;
 		}

@@ -4,11 +4,13 @@ import eq.uirs.fashionscape.swap.SwapManager;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Cursor;
+import java.awt.Dimension;
 import java.awt.GridLayout;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.Objects;
 import javax.annotation.Nullable;
+import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.border.EmptyBorder;
 import net.runelite.api.kit.KitType;
@@ -24,7 +26,7 @@ public class FashionscapeSearchItemPanel extends BaseItemPanel
 
 	FashionscapeSearchItemPanel(@Nullable Integer itemId, AsyncBufferedImage icon, KitType slot,
 								ItemManager itemManager, SwapManager swapManager, ClientThread clientThread,
-								OnSelectionChangingListener listener)
+								OnSelectionChangingListener listener, Double score)
 	{
 		super(itemId, icon, itemManager, clientThread);
 		this.swapManager = swapManager;
@@ -81,10 +83,21 @@ public class FashionscapeSearchItemPanel extends BaseItemPanel
 		addMouseListener(itemPanelMouseListener);
 
 		// Item details panel
-		JPanel rightPanel = new JPanel(new GridLayout(1, 1));
+		JPanel rightPanel = new JPanel(new GridLayout(2, 1));
 		rightPanel.setBorder(new EmptyBorder(0, 5, 0, 5));
 		highlightPanels.add(rightPanel);
 		rightPanel.add(itemLabel);
+
+		JLabel scoreLabel = new JLabel();
+		scoreLabel.setForeground(Color.WHITE);
+		scoreLabel.setMaximumSize(new Dimension(0, 0));
+		scoreLabel.setPreferredSize(new Dimension(0, 0));
+		if (score != null)
+		{
+			scoreLabel.setText(score.toString());
+		}
+		rightPanel.add(scoreLabel);
+
 		for (JPanel panel : highlightPanels)
 		{
 			matchComponentBackground(panel, defaultBackgroundColor());

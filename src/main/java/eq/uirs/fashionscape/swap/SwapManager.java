@@ -7,6 +7,7 @@ import eq.uirs.fashionscape.data.ItemInteractions;
 import eq.uirs.fashionscape.panel.PanelKitType;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -121,9 +122,10 @@ public class SwapManager
 	public Snapshot refreshItemSwaps()
 	{
 		return savedSwaps.entrySet().stream()
+			.sorted(Comparator.comparingInt(e -> -e.getKey().getIndex()))
 			.map(e -> swapItem(e.getKey(), e.getValue()))
 			.filter(Objects::nonNull)
-			.reduce(Snapshot::mergeWith)
+			.reduce(Snapshot::mergeOver)
 			.orElse(null);
 	}
 
@@ -223,12 +225,13 @@ public class SwapManager
 			Map<KitType, Integer> unlockedSwaps = newSwaps.entrySet().stream()
 				.filter(e -> !savedSwaps.isLocked(e.getKey()))
 				.collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-			savedSwaps.replaceAll(unlockedSwaps);
 			unlockedSwaps.entrySet().stream()
+				.sorted(Comparator.comparingInt(e -> -e.getKey().getIndex()))
 				.map(e -> swapItem(e.getKey(), e.getValue()))
 				.filter(Objects::nonNull)
-				.reduce(Snapshot::mergeWith)
+				.reduce(Snapshot::mergeOver)
 				.ifPresent(snapshotQueues::appendToUndo);
+			savedSwaps.replaceAll(unlockedSwaps);
 		});
 	}
 
@@ -269,7 +272,7 @@ public class SwapManager
 			}
 			else if (snapshot != null)
 			{
-				hoverSnapshot = snapshot.mergeWith(hoverSnapshot);
+				hoverSnapshot = snapshot.mergeOver(hoverSnapshot);
 			}
 		});
 	}
@@ -295,7 +298,7 @@ public class SwapManager
 			{
 				if (hoverSnapshot != null)
 				{
-					snapshot = hoverSnapshot.mergeWith(snapshot);
+					snapshot = hoverSnapshot.mergeOver(snapshot);
 				}
 				snapshotQueues.appendToUndo(snapshot);
 			}
@@ -326,7 +329,6 @@ public class SwapManager
 		{
 			savedSwaps.removeLocks();
 		}
-		savedSwaps.clear();
 		Arrays.stream(KitType.values())
 			.map(slot -> {
 				if (savedSwaps.isLocked(slot))
@@ -347,8 +349,9 @@ public class SwapManager
 				}
 			})
 			.filter(Objects::nonNull)
-			.reduce(Snapshot::mergeWith)
+			.reduce(Snapshot::mergeOver)
 			.ifPresent(snapshotQueues::appendToUndo);
+		savedSwaps.clear();
 	}
 
 	@Nullable
@@ -440,9 +443,13 @@ public class SwapManager
 			.map(Map.Entry::getKey)
 			.collect(Collectors.toList());
 		removes.forEach(newSwaps::remove);
+		newSwaps.entrySet().stream()
+			.sorted(Comparator.comparingInt(e -> -e.getKey().getIndex()))
+			.map(e -> swapItem(e.getKey(), e.getValue()))
+			.filter(Objects::nonNull)
+			.reduce(Snapshot::mergeOver)
+			.ifPresent(snapshotQueues::appendToUndo);
 		savedSwaps.replaceAll(newSwaps);
-		Snapshot s = refreshItemSwaps();
-		snapshotQueues.appendToUndo(s);
 	}
 
 	@Nullable
@@ -461,21 +468,22 @@ public class SwapManager
 		KitType slot = KitType.values()[stats.getEquipment().getSlot()];
 		int equipmentId = itemId + 512;
 		Snapshot snapshot = swap(slot, equipmentId);
-		if (snapshot != null && hoverSnapshot != null)
+		if (snapshot != null)
 		{
-			snapshot = snapshot.mergeWith(hoverSnapshot);
-		}
-		if (persist)
-		{
-			savedSwaps.put(slot, itemId);
-			// only 1 item was swapped, so if the snapshot contains other slots, they must have been removed
-			if (snapshot != null)
+			if (hoverSnapshot != null)
 			{
-				snapshot.getChangedEquipmentIds().keySet().stream()
+				snapshot = snapshot.mergeOver(hoverSnapshot);
+			}
+			if (persist)
+			{
+				savedSwaps.put(slot, itemId);
+				// only 1 item was swapped, so if the snapshot contains other slots, they must have been removed
+				snapshot.getSlotChanges().keySet().stream()
 					.filter(s -> !slot.equals(s))
 					.forEach(savedSwaps::remove);
 			}
 		}
+
 		return snapshot;
 	}
 
@@ -502,7 +510,8 @@ public class SwapManager
 	}
 
 	/*
-	 * This is where most of the checks happen to make the swap look as expected, e.g., hiding hair, changing stance
+	 * This is where most of the checks happen to make the swap look as expected, e.g., hiding hair, changing stance.
+	 * If multiple slots are being swapped simultaneously, swap SHIELD before WEAPON.
 	 *
 	 * equipmentId follows `PlayerComposition::getEquipmentId`:
 	 * 0 for nothing
@@ -528,7 +537,7 @@ public class SwapManager
 		}
 
 		Integer animationId = null;
-		Map<KitType, Integer> changes = new HashMap<>();
+		Map<KitType, Snapshot.Change> changes = new HashMap<>();
 		if (equipmentId == 0)
 		{
 			// hide slot (check if we need to show kit types the item was hiding)
@@ -542,7 +551,7 @@ public class SwapManager
 					int oldId = setEquipmentId(composition, KitType.HAIR, hairEquipId);
 					if (oldId != hairEquipId)
 					{
-						changes.put(KitType.HAIR, oldId);
+						changes.put(KitType.HAIR, new Snapshot.Change(oldId, false));
 					}
 				}
 				if (equipId >= 512 && ItemInteractions.NO_JAW_HELMS.contains(equipId - 512))
@@ -552,7 +561,7 @@ public class SwapManager
 					int oldId = setEquipmentId(composition, KitType.JAW, jawEquipId);
 					if (oldId != jawEquipId)
 					{
-						changes.put(KitType.JAW, oldId);
+						changes.put(KitType.JAW, new Snapshot.Change(oldId, false));
 					}
 				}
 			}
@@ -566,7 +575,7 @@ public class SwapManager
 					int oldId = setEquipmentId(composition, KitType.ARMS, armsEquipId);
 					if (oldId != armsEquipId)
 					{
-						changes.put(KitType.ARMS, oldId);
+						changes.put(KitType.ARMS, new Snapshot.Change(oldId, false));
 					}
 				}
 			}
@@ -581,7 +590,7 @@ public class SwapManager
 			int oldId = setEquipmentId(composition, slot, 0);
 			if (oldId != 0)
 			{
-				changes.put(slot, oldId);
+				changes.put(slot, new Snapshot.Change(oldId, savedSwaps.contains(slot)));
 			}
 			return new Snapshot(changes, animationId);
 		}
@@ -623,14 +632,14 @@ public class SwapManager
 					int oldId = setEquipmentId(composition, KitType.ARMS, armsEquipId);
 					if (oldId != armsEquipId)
 					{
-						changes.put(KitType.ARMS, oldId);
+						changes.put(KitType.ARMS, new Snapshot.Change(oldId, false));
 					}
 				}
 			}
 			int oldId = setEquipmentId(composition, slot, equipmentId);
 			if (oldId != equipmentId)
 			{
-				changes.put(slot, oldId);
+				changes.put(slot, new Snapshot.Change(oldId, savedSwaps.contains(slot)));
 			}
 			return new Snapshot(changes, null);
 		}
@@ -645,7 +654,7 @@ public class SwapManager
 				int oldId = setEquipmentId(composition, KitType.SHIELD, 0);
 				if (oldId != 0)
 				{
-					changes.put(KitType.SHIELD, oldId);
+					changes.put(KitType.SHIELD, new Snapshot.Change(oldId, savedSwaps.contains(KitType.SHIELD)));
 				}
 			}
 			// check if weapon changes idle animation
@@ -668,7 +677,7 @@ public class SwapManager
 					int oldId = setEquipmentId(composition, KitType.WEAPON, 0);
 					if (oldId != 0)
 					{
-						changes.put(KitType.WEAPON, oldId);
+						changes.put(KitType.WEAPON, new Snapshot.Change(oldId, savedSwaps.contains(KitType.WEAPON)));
 					}
 					int oldAnimId = setIdleAnimationId(player, IdleAnimationID.DEFAULT);
 					if (oldAnimId != IdleAnimationID.DEFAULT)
@@ -689,7 +698,7 @@ public class SwapManager
 					int oldId = setEquipmentId(composition, KitType.HAIR, kitId + 256);
 					if (oldId != kitId + 256)
 					{
-						changes.put(KitType.HAIR, oldId);
+						changes.put(KitType.HAIR, new Snapshot.Change(oldId, false));
 					}
 				}
 			}
@@ -698,7 +707,7 @@ public class SwapManager
 				int oldId = setEquipmentId(composition, KitType.HAIR, 0);
 				if (oldId != 0)
 				{
-					changes.put(KitType.HAIR, oldId);
+					changes.put(KitType.HAIR, new Snapshot.Change(oldId, false));
 				}
 			}
 			// check if we need to show/hide jaw
@@ -710,7 +719,7 @@ public class SwapManager
 					int oldId = setEquipmentId(composition, KitType.JAW, kitId + 256);
 					if (oldId != kitId + 256)
 					{
-						changes.put(KitType.JAW, oldId);
+						changes.put(KitType.JAW, new Snapshot.Change(oldId, false));
 					}
 				}
 			}
@@ -719,7 +728,7 @@ public class SwapManager
 				int oldId = setEquipmentId(composition, KitType.JAW, 0);
 				if (oldId != 0)
 				{
-					changes.put(KitType.JAW, oldId);
+					changes.put(KitType.JAW, new Snapshot.Change(oldId, false));
 				}
 			}
 		}
@@ -734,7 +743,7 @@ public class SwapManager
 					int oldId = setEquipmentId(composition, KitType.ARMS, kitId + 256);
 					if (oldId != kitId + 256)
 					{
-						changes.put(KitType.ARMS, oldId);
+						changes.put(KitType.ARMS, new Snapshot.Change(oldId, false));
 					}
 				}
 			}
@@ -743,14 +752,14 @@ public class SwapManager
 				int oldId = setEquipmentId(composition, KitType.ARMS, 0);
 				if (oldId != 0)
 				{
-					changes.put(KitType.ARMS, oldId);
+					changes.put(KitType.ARMS, new Snapshot.Change(oldId, false));
 				}
 			}
 		}
 		int oldId = setEquipmentId(composition, slot, equipmentId);
 		if (oldId != equipmentId)
 		{
-			changes.put(slot, oldId);
+			changes.put(slot, new Snapshot.Change(oldId, savedSwaps.contains(slot)));
 		}
 		return new Snapshot(changes, animationId);
 	}
@@ -891,13 +900,15 @@ public class SwapManager
 	@Nullable
 	private Snapshot restoreSnapshot(Snapshot snapshot)
 	{
-		return snapshot.getChangedEquipmentIds().entrySet()
+		return snapshot.getSlotChanges().entrySet()
 			.stream()
+			.sorted(Comparator.comparingInt(e -> -e.getKey().getIndex()))
 			.map(e -> {
 				KitType slot = e.getKey();
-				Integer equipId = e.getValue();
+				Snapshot.Change change = e.getValue();
+				int equipId = change.getEquipmentId();
 				Snapshot s = swap(slot, equipId);
-				if (equipId >= 512)
+				if (equipId >= 512 && change.isUnnatural())
 				{
 					savedSwaps.put(slot, equipId - 512);
 				}
@@ -908,7 +919,7 @@ public class SwapManager
 				return s;
 			})
 			.filter(Objects::nonNull)
-			.reduce(Snapshot::mergeWith)
+			.reduce(Snapshot::mergeOver)
 			.orElse(null);
 	}
 
