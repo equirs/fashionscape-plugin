@@ -4,7 +4,7 @@ any other item in the game? This plugin was made for you. It allows anyone to pr
 plan out the perfect look quickly and efficiently.
 
 ## User guide
-All the UI lives in a dedicated side panel for now. If the plugin is on, you'll find it near the bottom of the list
+All the UI lives in a dedicated side panel. If the plugin is on, you'll find it near the bottom of the list
 (beneath notes). Look for the dress form:
  
 ![Panel icon](icon.png)
@@ -13,15 +13,17 @@ There are two tabs in this panel: outfit and search.
 
 "Outfit" shows everything you're wearing via the plugin and has a few controls at the top row:
 * Undo and redo last action (these are only enabled if you can perform them)
-* A randomizer (dice) button that randomly assigns items to all your unlocked slots
+* A randomizer (dice) button that randomly assigns items to all your unlocked slots. The randomizer has an 
+"intelligence" setting in the plugin config, which when set to anything other than `NONE`, will utilize the colour match
+algorithm to provide results.
 * Save and load buttons, which work with .txt files placed in the RuneLite folder, under `/outfits/`. You can open the
-outfit folder in your system file browser by right-clicking either save or load. Note that you can't save empty outfits,
+outfit folder in your system file browser by **right-clicking either save or load**. Note that you can't save empty outfits,
 and anything you're actually wearing in-game isn't saved.
-* Clear button, which undoes everything you're wearing with the plugin, apart from locked slots. If you want to erase
-everything *including* locks, there's a right-click option to force clear.
+* Clear button, which undoes everything you're wearing with the plugin, **including** locked slots. If you want to erase
+everything *except* locked slots, there's a right-click option to soft clear.
 
 You can "lock" individual slots with the lock icon next to the x button for that slot. This prevents that slot from 
-being cleared by anything (e.g., randomizing, loading a new outfit, clearing all). Clicking the lock again will unlock
+being cleared by most features (e.g., randomizing, loading a new outfit). Clicking the lock again will unlock
 it. The locking feature is designed to work with the randomizer: as you find pieces that work together, you can lock
 them and randomize the remaining slots.
 
@@ -31,6 +33,13 @@ The main feature of "search" is... what you expect. Leaving the search bar empty
 slot (except the "all" tab, where too many results would be displayed). The results will update as you type. Hovering
 over an item will show a preview of what it looks like on your character. When clicked, the item will update and will
 display as part of your outfit. If the item is already worn, clicking it again removes it.
+
+There are three sorting options: 
+* Release, which roughly orders results by release date (it actually just goes by item IDs; close enough)
+* Alphabetical, pretty self-explanatory
+* Colour match, which uses aggregated, area-weighted Euclidean colour distances of the "best-matching" colours for 
+that result compared to the colours of all the items currently worn (excluding the slot you're currently browsing). 
+With this option selected, you can also see the colour-coded percent match for that item.
 
 ![Search tab](search_tab.png)
 
@@ -59,3 +68,6 @@ items from search / randomize.
 
 If you notice some items don't render your head or arms correctly, or don't have the correct idle animation, please
 let me know by saving the outfit and uploading / pasting the text so I can mark that item ID appropriately.
+
+Feature suggestions, bug reports, and pull requests are all welcome. Please keep in mind that this plugin is intended
+to be a tool for discovery and planning, and features that extend beyond that will probably not be implemented.
