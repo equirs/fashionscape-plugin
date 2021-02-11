@@ -2,7 +2,23 @@ package eq.uirs.fashionscape.panel;
 
 public enum SortBy
 {
-	RELEASE,
+	COLOR_MATCH,
 	ALPHABETICAL,
-	SUGGESTED;
+	RELEASE;
+
+	@Override
+	public String toString()
+	{
+		switch (this)
+		{
+			case RELEASE:
+				return "Release";
+			case ALPHABETICAL:
+				return "Alphabetical";
+			case COLOR_MATCH:
+				return "Colour match";
+			default:
+				return "";
+		}
+	}
 }

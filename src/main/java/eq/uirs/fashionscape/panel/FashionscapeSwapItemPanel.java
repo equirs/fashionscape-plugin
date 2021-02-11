@@ -13,7 +13,6 @@ import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JPanel;
 import javax.swing.border.EmptyBorder;
-import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.ItemComposition;
 import net.runelite.api.kit.KitType;
 import net.runelite.client.callback.ClientThread;
@@ -22,7 +21,6 @@ import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.util.AsyncBufferedImage;
 import net.runelite.client.util.ImageUtil;
 
-@Slf4j
 public class FashionscapeSwapItemPanel extends BaseItemPanel
 {
 	private static final Dimension ICON_SIZE = new Dimension(20, 20);
@@ -77,7 +75,7 @@ public class FashionscapeSwapItemPanel extends BaseItemPanel
 		xButton.setContentAreaFilled(false);
 		xButton.setIcon(new ImageIcon(ImageUtil.loadImageResource(this.getClass(), "x.png")));
 		xButton.addActionListener(e -> {
-			swapManager.revertSlot(slot);
+			swapManager.revertSlot(slot, true);
 			updateXButton();
 		});
 		buttons.add(xButton);
@@ -128,12 +126,12 @@ public class FashionscapeSwapItemPanel extends BaseItemPanel
 			new ImageIcon(ImageUtil.loadImageResource(this.getClass(), lockIcon + ".png")));
 		String action = locked ? "Unlock" : "Lock";
 		lockButton.setToolTipText(action + " " + slot.name().toLowerCase() + " slot");
-		xButton.setEnabled(!locked && itemId != null);
+		xButton.setEnabled(itemId != null);
 	}
 
 	private void updateXButton()
 	{
-		xButton.setEnabled(!swapManager.isLocked(slot) && itemId != null);
+		xButton.setEnabled(itemId != null);
 		xButton.setToolTipText("Clear " + slot.name().toLowerCase() + " slot");
 	}
 

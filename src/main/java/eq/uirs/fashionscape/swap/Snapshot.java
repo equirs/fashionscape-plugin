@@ -6,12 +6,13 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.ToString;
 import lombok.Value;
-import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.kit.KitType;
 
+/**
+ * Holds onto information about equipment and animations before a swap occurred
+ */
 @RequiredArgsConstructor
 @ToString
-@Slf4j
 class Snapshot
 {
 	@Value

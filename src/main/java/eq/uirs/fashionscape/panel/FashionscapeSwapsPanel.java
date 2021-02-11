@@ -35,7 +35,6 @@ import javax.swing.JPopupMenu;
 import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
 import lombok.Value;
-import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
@@ -52,7 +51,6 @@ import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.util.ImageUtil;
 import net.runelite.client.util.LinkBrowser;
 
-@Slf4j
 public class FashionscapeSwapsPanel extends JPanel
 {
 	private final SwapManager swapManager;
@@ -193,23 +191,23 @@ public class FashionscapeSwapsPanel extends JPanel
 		buttonContainer.add(load, c);
 		c.gridx++;
 
-		JPopupMenu forceClearMenu = new JPopupMenu();
-		JMenuItem forceClear = new JMenuItem("Force clear");
-		forceClear.addActionListener(e -> {
-			swapManager.revertSwaps(true);
+		JPopupMenu softClearMenu = new JPopupMenu();
+		JMenuItem softClear = new JMenuItem("Soft clear");
+		softClear.addActionListener(e -> {
+			swapManager.revertSwaps(false);
 			for (FashionscapeSwapItemPanel itemPanel : itemPanels)
 			{
 				itemPanel.updateLockButton();
 			}
 		});
-		forceClearMenu.add(forceClear);
+		softClearMenu.add(softClear);
 
 		clear = new JButton(new ImageIcon(ImageUtil.loadImageResource(getClass(), "clear.png")));
 		clear.setToolTipText("Clear all");
-		clear.addActionListener(e -> swapManager.revertSwaps(false));
+		clear.addActionListener(e -> swapManager.revertSwaps(true));
 		clear.setFocusPainted(false);
 		clear.addMouseListener(createHoverListener(clear));
-		clear.setComponentPopupMenu(forceClearMenu);
+		clear.setComponentPopupMenu(softClearMenu);
 		checkButtonEnabled(clear, isLoggedIn, hasUnlocked, hasNonEmpty);
 		buttonContainer.add(clear, c);
 
@@ -518,7 +516,7 @@ public class FashionscapeSwapsPanel extends JPanel
 		else if (button == clear)
 		{
 			// can clear regardless of login state
-			enabled = nonEmpty && unlocked;
+			enabled = nonEmpty;
 		}
 		// note: load just requires login
 		button.setEnabled(enabled);

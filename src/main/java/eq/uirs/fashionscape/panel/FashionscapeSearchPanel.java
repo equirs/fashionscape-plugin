@@ -8,11 +8,13 @@ import eq.uirs.fashionscape.colors.ColorScorer;
 import eq.uirs.fashionscape.swap.SwapManager;
 import java.awt.BorderLayout;
 import java.awt.CardLayout;
+import java.awt.Color;
 import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.GridLayout;
+import java.awt.event.ItemEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.ArrayList;
@@ -32,6 +34,8 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.swing.ImageIcon;
+import javax.swing.JComboBox;
+import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.SwingUtilities;
@@ -39,7 +43,6 @@ import javax.swing.border.EmptyBorder;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import lombok.Value;
-import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.ItemComposition;
 import net.runelite.api.kit.KitType;
@@ -55,7 +58,6 @@ import net.runelite.client.util.ImageUtil;
 import net.runelite.client.util.SwingUtil;
 import net.runelite.http.api.item.ItemStats;
 
-@Slf4j
 public class FashionscapeSearchPanel extends JPanel
 {
 	private static final int DEBOUNCE_DELAY_MS = 200;
@@ -81,6 +83,7 @@ public class FashionscapeSearchPanel extends JPanel
 	private final IconTextField searchBar = new IconTextField();
 	private final MaterialTabGroup slotFilter = new MaterialTabGroup();
 	private final JPanel resultsPanel = new JPanel();
+	private final JScrollPane resultsScrollPane;
 	private final JPanel centerPanel = new JPanel(cardLayout);
 	private final PluginErrorPanel errorPanel = new PluginErrorPanel();
 	private final Map<PanelKitType, MaterialTab> tabMap;
@@ -106,11 +109,10 @@ public class FashionscapeSearchPanel extends JPanel
 	private Future<?> searchFuture = null;
 	private Function<ItemComposition, Boolean> filter;
 	private boolean allowShortQueries = false;
-	private SortBy sort = SortBy.SUGGESTED;
+	private SortBy sort = SortBy.values()[0];
 	private KitType selectedSlot = null;
 	private boolean hasSearched = false;
-	// TODO make local
-	private Map<Integer, Double> scores;
+	private final Map<Integer, Double> scores = new HashMap<>();
 
 	private final Comparator<Result> itemAlphaComparator = Comparator.comparing(o -> o.getItemComposition().getName());
 
@@ -167,24 +169,50 @@ public class FashionscapeSearchPanel extends JPanel
 		wrapper.setBackground(ColorScheme.DARK_GRAY_COLOR);
 		wrapper.add(resultsPanel, BorderLayout.NORTH);
 
-		JScrollPane resultsWrapper = new JScrollPane(wrapper);
-		resultsWrapper.setBackground(ColorScheme.DARK_GRAY_COLOR);
-		resultsWrapper.getVerticalScrollBar().setPreferredSize(new Dimension(10, 0));
-		resultsWrapper.setVisible(false);
+		resultsScrollPane = new JScrollPane(wrapper);
+		resultsScrollPane.setBackground(ColorScheme.DARK_GRAY_COLOR);
+		resultsScrollPane.getVerticalScrollBar().setPreferredSize(new Dimension(10, 0));
+		resultsScrollPane.setVisible(false);
 
 		JPanel infoWrapper = new JPanel(new BorderLayout());
 		infoWrapper.setBackground(ColorScheme.DARK_GRAY_COLOR);
 		errorPanel.setContent("Equipment Search", "Items you can try on will appear here.");
 		infoWrapper.add(errorPanel, BorderLayout.NORTH);
 
-		centerPanel.add(resultsWrapper, RESULTS_PANEL);
+		centerPanel.add(resultsScrollPane, RESULTS_PANEL);
 		centerPanel.add(infoWrapper, ERROR_PANEL);
 
 		cardLayout.show(centerPanel, ERROR_PANEL);
 
+		JPanel sortBar = new JPanel();
+		sortBar.setLayout(new GridLayout(1, 2));
+		sortBar.setBorder(new EmptyBorder(5, 0, 0, 0));
+		sortBar.setBackground(ColorScheme.DARK_GRAY_COLOR);
+
+		JLabel sortLabel = new JLabel("Sort by");
+		sortLabel.setForeground(Color.WHITE);
+		sortLabel.setMaximumSize(new Dimension(0, 0));
+		sortLabel.setPreferredSize(new Dimension(0, 0));
+		sortBar.add(sortLabel);
+
+		JComboBox<SortBy> sortBox = new JComboBox<>(SortBy.values());
+		sortBox.setPreferredSize(new Dimension(sortBox.getPreferredSize().width, 25));
+		sortBox.setForeground(Color.WHITE);
+		sortBox.setFocusable(false);
+		sortBox.addItemListener(e -> {
+			if (e.getStateChange() == ItemEvent.SELECTED)
+			{
+				sort = (SortBy) sortBox.getSelectedItem();
+				updateSearchDebounced();
+			}
+		});
+		sortBar.add(sortBox);
+
 		container.add(slotFilter, groupConstraints);
 		groupConstraints.gridy++;
 		container.add(searchBar, groupConstraints);
+		groupConstraints.gridy++;
+		container.add(sortBar, groupConstraints);
 		groupConstraints.gridy++;
 
 		add(container, BorderLayout.NORTH);
@@ -288,7 +316,8 @@ public class FashionscapeSearchPanel extends JPanel
 				};
 				// individual slots will show all results all the time
 				allowShortQueries = filterSlot.getKitType() != null;
-				updateSearchDebounced();
+				// reset scroll position
+				updateSearchDebounced(() -> resultsScrollPane.getVerticalScrollBar().setValue(0));
 				return true;
 			});
 			slotFilter.addTab(tab);
@@ -335,22 +364,27 @@ public class FashionscapeSearchPanel extends JPanel
 
 	private void updateSearchDebounced()
 	{
+		updateSearchDebounced(null);
+	}
+
+	private void updateSearchDebounced(Runnable postExec)
+	{
 		Future<?> future = searchFuture;
 		if (searchFuture != null)
 		{
 			future.cancel(false);
 		}
 		searchFuture = executor.schedule(() -> clientThread.invokeLater(() -> {
-			if (!updateSearch())
+			if (!updateSearch(postExec))
 			{
 				// search was in progress; try again later
-				updateSearchDebounced();
+				updateSearchDebounced(postExec);
 			}
 		}), DEBOUNCE_DELAY_MS, TimeUnit.MILLISECONDS);
 	}
 
 	// should only be called from debouncer and on client thread
-	private boolean updateSearch()
+	private boolean updateSearch(Runnable postExec)
 	{
 		boolean willUpdate = searchInProgress.compareAndSet(false, true);
 		if (willUpdate)
@@ -411,21 +445,24 @@ public class FashionscapeSearchPanel extends JPanel
 			}
 
 			searchPanels.clear();
-			// sort if we have to
+			scores.clear();
 			switch (this.sort)
 			{
 				case RELEASE:
-					addPendingResults();
+					addPendingResults(postExec);
+					break;
 				case ALPHABETICAL:
 					executor.submit(() -> {
 						results.sort(itemAlphaComparator);
-						addPendingResults();
+						addPendingResults(postExec);
 					});
-				case SUGGESTED:
+					break;
+				case COLOR_MATCH:
 					executor.submit(() -> {
 						performSuggestedSort();
-						addPendingResults();
+						addPendingResults(postExec);
 					});
+					break;
 			}
 		}
 		return willUpdate;
@@ -434,7 +471,6 @@ public class FashionscapeSearchPanel extends JPanel
 	private void performSuggestedSort()
 	{
 		colorScorer.updatePlayerInfo();
-		scores = new HashMap<>();
 		for (Result result : results)
 		{
 			int itemId = result.getItemComposition().getId();
@@ -445,7 +481,7 @@ public class FashionscapeSearchPanel extends JPanel
 	}
 
 	// only to be called from updateSearch
-	private void addPendingResults()
+	private void addPendingResults(Runnable postExec)
 	{
 		SwingUtilities.invokeLater(() -> {
 			SwingUtil.fastRemoveAll(resultsPanel);
@@ -463,11 +499,21 @@ public class FashionscapeSearchPanel extends JPanel
 			else
 			{
 				boolean firstItem = true;
+				boolean showScores = true;
 				for (Result result : results)
 				{
 					Integer itemId = result.getItemComposition().getId();
+					Double score = scores.get(itemId);
+					if (firstItem)
+					{
+						showScores = score != null && score != 0.0;
+					}
+					if (!showScores)
+					{
+						score = null;
+					}
 					FashionscapeSearchItemPanel panel = new FashionscapeSearchItemPanel(itemId, result.getIcon(),
-						result.getSlot(), itemManager, swapManager, clientThread, listener, scores.get(itemId));
+						result.getSlot(), itemManager, swapManager, clientThread, listener, score);
 					searchPanels.add(panel);
 					int topPadding = firstItem ? 0 : 5;
 					firstItem = false;
@@ -482,6 +528,9 @@ public class FashionscapeSearchPanel extends JPanel
 				resultsPanel.updateUI();
 			}
 			searchInProgress.set(false);
+			if (postExec != null) {
+				postExec.run();
+			}
 		});
 	}
 

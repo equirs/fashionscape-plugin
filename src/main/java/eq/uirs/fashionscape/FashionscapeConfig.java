@@ -1,5 +1,6 @@
 package eq.uirs.fashionscape;
 
+import eq.uirs.fashionscape.swap.RandomizerIntelligence;
 import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
@@ -19,6 +20,17 @@ public interface FashionscapeConfig extends Config
 	default boolean excludeNonStandardItems()
 	{
 		return false;
+	}
+
+	@ConfigItem(
+		position = 2,
+		keyName = "randomizerIntelligence",
+		name = "Randomizer intelligence",
+		description = "Higher intelligence utilizes colour matching"
+	)
+	default RandomizerIntelligence randomizerIntelligence()
+	{
+		return RandomizerIntelligence.LOW;
 	}
 
 }

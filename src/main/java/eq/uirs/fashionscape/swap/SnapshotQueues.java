@@ -6,11 +6,11 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import javax.annotation.Nullable;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 
-// observable wrapper for user's undo / redo history
+/**
+ * Observable wrapper for user's undo / redo history
+ */
 @RequiredArgsConstructor
-@Slf4j
 class SnapshotQueues
 {
 	private final Function<Snapshot, Snapshot> snapshotRestore;

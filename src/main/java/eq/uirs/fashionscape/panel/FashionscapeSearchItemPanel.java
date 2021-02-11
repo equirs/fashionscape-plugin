@@ -8,6 +8,7 @@ import java.awt.Dimension;
 import java.awt.GridLayout;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.text.DecimalFormat;
 import java.util.Objects;
 import javax.annotation.Nullable;
 import javax.swing.JLabel;
@@ -83,20 +84,23 @@ public class FashionscapeSearchItemPanel extends BaseItemPanel
 		addMouseListener(itemPanelMouseListener);
 
 		// Item details panel
-		JPanel rightPanel = new JPanel(new GridLayout(2, 1));
+		int rows = score == null ? 1 : 2;
+		JPanel rightPanel = new JPanel(new GridLayout(rows, 1));
 		rightPanel.setBorder(new EmptyBorder(0, 5, 0, 5));
 		highlightPanels.add(rightPanel);
 		rightPanel.add(itemLabel);
 
-		JLabel scoreLabel = new JLabel();
-		scoreLabel.setForeground(Color.WHITE);
-		scoreLabel.setMaximumSize(new Dimension(0, 0));
-		scoreLabel.setPreferredSize(new Dimension(0, 0));
 		if (score != null)
 		{
-			scoreLabel.setText(score.toString());
+			DecimalFormat format = new DecimalFormat("#.#");
+			JLabel scoreLabel = new JLabel();
+			scoreLabel.setForeground(Color.WHITE);
+			scoreLabel.setMaximumSize(new Dimension(0, 0));
+			scoreLabel.setPreferredSize(new Dimension(0, 0));
+			scoreLabel.setText(format.format(score * 100.0) + "%");
+			scoreLabel.setForeground(getScoreColor(score));
+			rightPanel.add(scoreLabel);
 		}
-		rightPanel.add(scoreLabel);
 
 		for (JPanel panel : highlightPanels)
 		{
@@ -124,5 +128,12 @@ public class FashionscapeSearchItemPanel extends BaseItemPanel
 		{
 			return nonHighlightColor;
 		}
+	}
+
+	private Color getScoreColor(Double score)
+	{
+		int red = (int) (255.0 * (1 - Math.pow(score, 2)));
+		int green = (int) (255.0 * Math.pow(score, 2));
+		return new Color(red, green, 0);
 	}
 }

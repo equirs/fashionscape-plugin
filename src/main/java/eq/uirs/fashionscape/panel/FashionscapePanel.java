@@ -5,7 +5,6 @@ import java.awt.BorderLayout;
 import javax.inject.Inject;
 import javax.swing.border.EmptyBorder;
 import lombok.Getter;
-import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.kit.KitType;
@@ -17,7 +16,6 @@ import net.runelite.client.ui.PluginPanel;
 import net.runelite.client.ui.components.materialtabs.MaterialTab;
 import net.runelite.client.ui.components.materialtabs.MaterialTabGroup;
 
-@Slf4j
 public class FashionscapePanel extends PluginPanel
 {
 

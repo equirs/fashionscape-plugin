@@ -10,12 +10,12 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.BiConsumer;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.kit.KitType;
 
-// observable wrapper for user's item swaps
+/**
+ * observable wrapper for user's item swaps
+ */
 @RequiredArgsConstructor
-@Slf4j
 class SavedSwaps
 {
 	private final Map<KitType, Integer> swappedItemIds = new HashMap<>();
@@ -133,4 +133,9 @@ class SavedSwaps
 		lockListeners.forEach(listener -> clears.forEach(slot -> listener.accept(slot, false)));
 	}
 
+	void removeLock(KitType slot)
+	{
+		lockedSlots.remove(slot);
+		lockListeners.forEach(listener -> listener.accept(slot, false));
+	}
 }

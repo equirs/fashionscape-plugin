@@ -11,7 +11,6 @@ import java.util.Set;
 import java.util.regex.Pattern;
 import javax.inject.Inject;
 import lombok.Value;
-import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
 import net.runelite.api.ItemComposition;
@@ -35,7 +34,6 @@ import net.runelite.http.api.item.ItemStats;
 	name = "Fashionscape",
 	description = "Previews combinations of equipment by changing the player's local appearance"
 )
-@Slf4j
 public class FashionscapePlugin extends Plugin
 {
 	public static final File OUTFITS_DIR = new File(RuneLite.RUNELITE_DIR, "outfits");
@@ -82,7 +80,7 @@ public class FashionscapePlugin extends Plugin
 	@Inject
 	private FashionscapeConfig config;
 
-	// Panel stuff
+	private String lastKnownPlayerName;
 	private FashionscapePanel panel;
 	private NavigationButton navButton;
 
@@ -124,6 +122,15 @@ public class FashionscapePlugin extends Plugin
 		Player player = event.getPlayer();
 		if (player != null && player == client.getLocalPlayer())
 		{
+			if (lastKnownPlayerName == null)
+			{
+				lastKnownPlayerName = player.getName();
+			}
+			else if (!lastKnownPlayerName.equals(player.getName()))
+			{
+				lastKnownPlayerName = player.getName();
+				swapManager.clear();
+			}
 			swapManager.checkForKitIds();
 			swapManager.refreshItemSwaps();
 		}

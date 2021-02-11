@@ -2,9 +2,11 @@ package eq.uirs.fashionscape.swap;
 
 import eq.uirs.fashionscape.FashionscapeConfig;
 import eq.uirs.fashionscape.FashionscapePlugin;
+import eq.uirs.fashionscape.colors.ColorScorer;
 import eq.uirs.fashionscape.data.IdleAnimationID;
 import eq.uirs.fashionscape.data.ItemInteractions;
 import eq.uirs.fashionscape.panel.PanelKitType;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
@@ -21,7 +23,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Singleton;
-import lombok.extern.slf4j.Slf4j;
+import lombok.Value;
 import net.runelite.api.Client;
 import net.runelite.api.InventoryID;
 import net.runelite.api.Item;
@@ -35,8 +37,10 @@ import net.runelite.client.game.ItemManager;
 import net.runelite.http.api.item.ItemEquipmentStats;
 import net.runelite.http.api.item.ItemStats;
 
+/**
+ * Singleton class that maintains the memory and logic of swapping items through the plugin
+ */
 @Singleton
-@Slf4j
 public class SwapManager
 {
 
@@ -58,12 +62,22 @@ public class SwapManager
 	@Inject
 	private ClientThread clientThread;
 
+	@Inject
+	private ColorScorer colorScorer;
+
 	private final SavedSwaps savedSwaps = new SavedSwaps();
 	private final SnapshotQueues snapshotQueues = new SnapshotQueues(this::restoreSnapshot);
 	// player's kit ids, e.g., hairstyles, base clothing
 	private final Map<KitType, Integer> savedKitIds = new HashMap<>();
 
 	private Snapshot hoverSnapshot;
+
+	@Value
+	private static class Candidate
+	{
+		public int itemId;
+		public KitType slot;
+	}
 
 	public void startUp()
 	{
@@ -73,12 +87,17 @@ public class SwapManager
 
 	public void shutDown()
 	{
+		savedSwaps.removeListeners();
+		snapshotQueues.removeListeners();
+		clear();
+	}
+
+	public void clear()
+	{
 		hoverSnapshot = null;
 		savedSwaps.clear();
-		savedSwaps.removeListeners();
 		savedKitIds.clear();
 		snapshotQueues.clear();
-		snapshotQueues.removeListeners();
 	}
 
 	public void addItemChangeListener(BiConsumer<KitType, Integer> listener)
@@ -161,58 +180,63 @@ public class SwapManager
 
 	public void checkForKitIds()
 	{
+		Player player = client.getLocalPlayer();
+		if (player == null)
+		{
+			return;
+		}
+		PlayerComposition playerComposition = player.getPlayerComposition();
+		if (playerComposition.isFemale())
+		{
+			savedKitIds.remove(KitType.JAW);
+		}
 		for (KitType kitType : KitType.values())
 		{
 			Integer kitId = kitIdFor(kitType);
 			if (kitId != null)
 			{
-				if (kitId > 0)
+				if (kitId >= 0)
 				{
 					savedKitIds.put(kitType, kitId);
 				}
 				else if (!savedKitIds.containsKey(kitType))
 				{
 					// fall back to pre-filling a slot with a default model (better than nothing)
-					Player player = client.getLocalPlayer();
-					if (player != null)
+					Integer defaultKitId = null;
+					if (playerComposition.isFemale())
 					{
-						Integer defaultKitId = null;
-						PlayerComposition playerComposition = player.getPlayerComposition();
-						if (playerComposition.isFemale())
+						switch (kitType)
 						{
-							switch (kitType)
-							{
-								case ARMS:
-									defaultKitId = DEFAULT_FEMALE_KIT_ARMS;
-									break;
-								case HAIR:
-									defaultKitId = DEFAULT_FEMALE_KIT_HAIR;
-									break;
-								default:
-									break;
-							}
+							case ARMS:
+								defaultKitId = DEFAULT_FEMALE_KIT_ARMS;
+								break;
+							case HAIR:
+								defaultKitId = DEFAULT_FEMALE_KIT_HAIR;
+								break;
+							default:
+								break;
 						}
-						else
+					}
+					else
+					{
+						switch (kitType)
 						{
-							switch (kitType)
-							{
-								case ARMS:
-									defaultKitId = DEFAULT_MALE_KIT_ARMS;
-									break;
-								case HAIR:
-									defaultKitId = DEFAULT_MALE_KIT_HAIR;
-									break;
-								case JAW:
-									defaultKitId = DEFAULT_MALE_KIT_JAW;
-									break;
-								default:
-									break;
-							}
+							case ARMS:
+								defaultKitId = DEFAULT_MALE_KIT_ARMS;
+								break;
+							case HAIR:
+								defaultKitId = DEFAULT_MALE_KIT_HAIR;
+								break;
+							case JAW:
+								defaultKitId = DEFAULT_MALE_KIT_JAW;
+								break;
+							default:
+								break;
 						}
-						if (defaultKitId != null)
-						{
-							savedKitIds.put(kitType, defaultKitId);
-						}
+					}
+					if (defaultKitId != null)
+					{
+						savedKitIds.put(kitType, defaultKitId);
 					}
 				}
 			}
@@ -254,8 +278,12 @@ public class SwapManager
 		return savedSwaps.getOrDefault(slot, null);
 	}
 
-	public void revertSlot(KitType slot)
+	public void revertSlot(KitType slot, boolean force)
 	{
+		if (force)
+		{
+			savedSwaps.removeLock(slot);
+		}
 		clientThread.invokeLater(() -> {
 			Snapshot s = doRevert(slot);
 			snapshotQueues.appendToUndo(s);
@@ -330,13 +358,14 @@ public class SwapManager
 			savedSwaps.removeLocks();
 		}
 		Arrays.stream(KitType.values())
+			.sorted(Comparator.comparingInt(s -> -s.getIndex()))
 			.map(slot -> {
 				if (savedSwaps.isLocked(slot))
 				{
 					return null;
 				}
 				Integer itemId = equippedItemIdFor(slot);
-				if (itemId != null && itemId != 0)
+				if (itemId != null && itemId >= 0)
 				{
 					// revert to the player's actual equipped item
 					return swapItem(slot, itemId);
@@ -344,7 +373,7 @@ public class SwapManager
 				else
 				{
 					// revert to the kit model if we have it, otherwise erase this slot
-					int kitId = savedKitIds.getOrDefault(slot, 0);
+					int kitId = savedKitIds.getOrDefault(slot, -256);
 					return swapKit(slot, kitId);
 				}
 			})
@@ -368,11 +397,20 @@ public class SwapManager
 
 	public void shuffle()
 	{
-		clientThread.invokeLater(this::performShuffle);
+		clientThread.invokeLater(this::determineShuffle);
 	}
 
-	private void performShuffle()
+	private void determineShuffle()
 	{
+		RandomizerIntelligence intelligence = config.randomizerIntelligence();
+		int size = intelligence.getDepth();
+		if (size > 1)
+		{
+			Map<KitType, Integer> lockedSwaps = Arrays.stream(KitType.values())
+				.filter(s -> savedSwaps.isLocked(s) && savedSwaps.contains(s))
+				.collect(Collectors.toMap(s -> s, savedSwaps::get));
+			colorScorer.setPlayerInfo(lockedSwaps);
+		}
 		Map<KitType, Boolean> slotsToRevert = Arrays.stream(PanelKitType.values())
 			.map(PanelKitType::getKitType)
 			.filter(Objects::nonNull)
@@ -386,9 +424,10 @@ public class SwapManager
 		Map<KitType, Integer> newSwaps = Arrays.stream(KitType.values())
 			.filter(slotsToRevert::get)
 			.collect(Collectors.toMap(slot -> slot, slot -> savedSwaps.getOrDefault(slot, -1)));
+		Set<Integer> skips = FashionscapePlugin.getItemIdsToExclude(config);
+		List<Candidate> candidates = new ArrayList<>(size);
 		List<Integer> randomOrder = IntStream.range(0, client.getItemCount()).boxed().collect(Collectors.toList());
 		Collections.shuffle(randomOrder);
-		Set<Integer> skips = FashionscapePlugin.getItemIdsToExclude(config);
 		for (Integer i : randomOrder)
 		{
 			int canonical = itemManager.canonicalize(i);
@@ -430,11 +469,29 @@ public class SwapManager
 						}
 					}
 				}
-				newSwaps.put(slot, itemComposition.getId());
+				candidates.add(new Candidate(itemComposition.getId(), slot));
+			}
+
+			if (!candidates.isEmpty() && candidates.size() >= size)
+			{
+				Candidate best;
+				if (size > 1)
+				{
+					best = candidates.stream()
+						.max(Comparator.comparingDouble(c -> colorScorer.score(c.itemId, c.slot)))
+						.get();
+					colorScorer.addPlayerInfo(best.slot, best.itemId);
+				}
+				else
+				{
+					best = candidates.get(0);
+				}
+				newSwaps.put(best.slot, best.itemId);
 				if (newSwaps.size() >= KitType.values().length)
 				{
 					break;
 				}
+				candidates.clear();
 			}
 		}
 		// slots filled with -1 were placeholders that need to be removed
@@ -494,7 +551,7 @@ public class SwapManager
 		{
 			return null;
 		}
-		int equipmentId = itemId == 0 ? 0 : itemId + 512;
+		int equipmentId = itemId < 0 ? 0 : itemId + 512;
 		return swap(slot, equipmentId);
 	}
 
@@ -505,7 +562,7 @@ public class SwapManager
 		{
 			return null;
 		}
-		int equipmentId = kitId == 0 ? 0 : kitId + 256;
+		int equipmentId = kitId < 0 ? 0 : kitId + 256;
 		return swap(slot, equipmentId);
 	}
 
@@ -546,8 +603,7 @@ public class SwapManager
 				int equipId = equipmentIdInSlot(KitType.HEAD);
 				if (equipId >= 512 && !ItemInteractions.HAIR_HELMS.contains(equipId - 512))
 				{
-					int hairKitId = savedKitIds.getOrDefault(KitType.HAIR, 0);
-					int hairEquipId = hairKitId > 0 ? hairKitId + 256 : 0;
+					int hairEquipId = savedKitIds.getOrDefault(KitType.HAIR, -256) + 256;
 					int oldId = setEquipmentId(composition, KitType.HAIR, hairEquipId);
 					if (oldId != hairEquipId)
 					{
@@ -556,8 +612,7 @@ public class SwapManager
 				}
 				if (equipId >= 512 && ItemInteractions.NO_JAW_HELMS.contains(equipId - 512))
 				{
-					int jawKitId = savedKitIds.getOrDefault(KitType.JAW, 0);
-					int jawEquipId = jawKitId > 0 ? jawKitId + 256 : 0;
+					int jawEquipId = savedKitIds.getOrDefault(KitType.JAW, -256) + 256;
 					int oldId = setEquipmentId(composition, KitType.JAW, jawEquipId);
 					if (oldId != jawEquipId)
 					{
@@ -570,8 +625,7 @@ public class SwapManager
 				int equipId = equipmentIdInSlot(KitType.TORSO);
 				if (equipId >= 512 && !ItemInteractions.ARMS_TORSOS.contains(equipId - 512))
 				{
-					int armsKitId = savedKitIds.getOrDefault(KitType.ARMS, 0);
-					int armsEquipId = armsKitId > 0 ? armsKitId + 256 : 0;
+					int armsEquipId = savedKitIds.getOrDefault(KitType.ARMS, -256) + 256;
 					int oldId = setEquipmentId(composition, KitType.ARMS, armsEquipId);
 					if (oldId != armsEquipId)
 					{
@@ -625,10 +679,9 @@ public class SwapManager
 			else if (slot == KitType.TORSO)
 			{
 				int equipId = equipmentIdInSlot(slot);
-				Integer armsKitId = savedKitIds.get(KitType.ARMS);
-				if (equipId >= 512 && !ItemInteractions.ARMS_TORSOS.contains(equipId - 512) && armsKitId != null)
+				int armsEquipId = savedKitIds.getOrDefault(KitType.ARMS, -256) + 256;
+				if (equipId >= 512 && !ItemInteractions.ARMS_TORSOS.contains(equipId - 512) && armsEquipId != 0)
 				{
-					int armsEquipId = armsKitId + 256;
 					int oldId = setEquipmentId(composition, KitType.ARMS, armsEquipId);
 					if (oldId != armsEquipId)
 					{
@@ -693,7 +746,7 @@ public class SwapManager
 			if (ItemInteractions.HAIR_HELMS.contains(itemId))
 			{
 				Integer kitId = savedKitIds.get(KitType.HAIR);
-				if (kitId != null && kitId != 0)
+				if (kitId != null && kitId >= 0)
 				{
 					int oldId = setEquipmentId(composition, KitType.HAIR, kitId + 256);
 					if (oldId != kitId + 256)
@@ -714,7 +767,7 @@ public class SwapManager
 			if (!ItemInteractions.NO_JAW_HELMS.contains(itemId))
 			{
 				Integer kitId = savedKitIds.get(KitType.JAW);
-				if (kitId != null && kitId != 0)
+				if (kitId != null && kitId >= 0)
 				{
 					int oldId = setEquipmentId(composition, KitType.JAW, kitId + 256);
 					if (oldId != kitId + 256)
@@ -738,7 +791,7 @@ public class SwapManager
 			if (ItemInteractions.ARMS_TORSOS.contains(itemId))
 			{
 				Integer kitId = savedKitIds.get(KitType.ARMS);
-				if (kitId != null && kitId != 0)
+				if (kitId != null && kitId >= 0)
 				{
 					int oldId = setEquipmentId(composition, KitType.ARMS, kitId + 256);
 					if (oldId != kitId + 256)
@@ -841,12 +894,12 @@ public class SwapManager
 	private int equipmentIdInSlot(KitType kitType)
 	{
 		Integer itemId = savedSwaps.getOrDefault(kitType, equippedItemIdFor(kitType));
-		if (itemId != null && itemId != 0)
+		if (itemId != null && itemId >= 0)
 		{
 			return itemId + 512;
 		}
 		Integer kitId = kitIdFor(kitType);
-		if (kitId != null && kitId != 0)
+		if (kitId != null && kitId >= 0)
 		{
 			return kitId + 256;
 		}
@@ -873,7 +926,7 @@ public class SwapManager
 			return null;
 		}
 		Item item = inventory.getItem(kitType.getIndex());
-		if (item != null && item.getId() != 0)
+		if (item != null && item.getId() >= 0)
 		{
 			return item.getId();
 		}

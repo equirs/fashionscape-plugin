@@ -19,14 +19,12 @@ import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import lombok.Value;
-import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.Player;
 import net.runelite.api.PlayerComposition;
 import net.runelite.api.kit.KitType;
 
 @Singleton
-@Slf4j
 public class ColorScorer
 {
 	private final Client client;
@@ -55,7 +53,7 @@ public class ColorScorer
 		gson = builder.create();
 	}
 
-	// this should be called before scoring
+	// this should be called before scoring if relying on current player swaps
 	public void updatePlayerInfo()
 	{
 		playerColors.clear();
@@ -65,6 +63,10 @@ public class ColorScorer
 			return;
 		}
 		PlayerComposition composition = player.getPlayerComposition();
+		if (composition == null)
+		{
+			return;
+		}
 		isFemale = composition.isFemale();
 		for (KitType slot : KitType.values())
 		{
@@ -73,6 +75,30 @@ public class ColorScorer
 			{
 				playerColors.put(slot, colorsFor(itemId));
 			}
+		}
+	}
+
+	public void setPlayerInfo(Map<KitType, Integer> itemIds)
+	{
+		playerColors.clear();
+		Player player = client.getLocalPlayer();
+		if (player == null)
+		{
+			return;
+		}
+		PlayerComposition composition = player.getPlayerComposition();
+		isFemale = composition.isFemale();
+		for (Map.Entry<KitType, Integer> entry : itemIds.entrySet())
+		{
+			playerColors.put(entry.getKey(), colorsFor(entry.getValue()));
+		}
+	}
+
+	public void addPlayerInfo(KitType slot, Integer itemId)
+	{
+		if (itemId != null)
+		{
+			playerColors.put(slot, colorsFor(itemId));
 		}
 	}
 
@@ -156,7 +182,7 @@ public class ColorScorer
 			.map(Map.Entry::getValue)
 			.flatMap(List::stream)
 			.collect(Collectors.toMap(ItemColorInfo::getRgb, ItemColorInfo::getPct, Double::sum));
-		Double scale = unscaled.values().stream().mapToDouble(d -> d).sum();
+		final Double scale = unscaled.values().stream().mapToDouble(d -> d).sum();
 		return unscaled.entrySet().stream()
 			.collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue() / scale));
 	}
