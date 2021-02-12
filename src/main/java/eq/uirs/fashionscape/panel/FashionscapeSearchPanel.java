@@ -32,6 +32,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import javax.annotation.Nonnull;
 import javax.inject.Inject;
 import javax.swing.ImageIcon;
 import javax.swing.JComboBox;
@@ -364,7 +365,9 @@ public class FashionscapeSearchPanel extends JPanel
 
 	private void updateSearchDebounced()
 	{
-		updateSearchDebounced(null);
+		updateSearchDebounced(() -> {
+			// no-op
+		});
 	}
 
 	private void updateSearchDebounced(Runnable postExec)
@@ -528,9 +531,7 @@ public class FashionscapeSearchPanel extends JPanel
 				resultsPanel.updateUI();
 			}
 			searchInProgress.set(false);
-			if (postExec != null) {
-				postExec.run();
-			}
+			postExec.run();
 		});
 	}
 

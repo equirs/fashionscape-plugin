@@ -2,14 +2,14 @@ package eq.uirs.fashionscape.colors;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import eq.uirs.fashionscape.data.ItemColorInfo;
-import eq.uirs.fashionscape.data.ItemColors;
+import com.google.gson.reflect.TypeToken;
 import eq.uirs.fashionscape.swap.SwapManager;
 import java.awt.Color;
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
+import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -29,10 +29,11 @@ public class ColorScorer
 {
 	private final Client client;
 	private final SwapManager swapManager;
-	private final Gson gson;
+
+	private final Map<Integer, GenderItemColors> allColors;
+	private final Map<KitType, List<ItemColorInfo>> playerColors = new HashMap<>();
 
 	private boolean isFemale;
-	private final Map<KitType, List<ItemColorInfo>> playerColors = new HashMap<>();
 
 	@Value
 	private static class Score
@@ -50,7 +51,20 @@ public class ColorScorer
 		this.swapManager = swapManager;
 		GsonBuilder builder = new GsonBuilder()
 			.registerTypeAdapter(ItemColors.class, new ItemColors.Deserializer());
-		gson = builder.create();
+		Gson gson = builder.create();
+		InputStream stream = this.getClass().getResourceAsStream("colors.json");
+		if (stream != null)
+		{
+			Reader reader = new BufferedReader(new InputStreamReader(stream));
+			Type type = new TypeToken<Map<Integer, GenderItemColors>>()
+			{
+			}.getType();
+			allColors = gson.fromJson(reader, type);
+		}
+		else
+		{
+			allColors = new HashMap<>();
+		}
 	}
 
 	// this should be called before scoring if relying on current player swaps
@@ -155,20 +169,20 @@ public class ColorScorer
 
 	private List<ItemColorInfo> colorsFor(int itemId)
 	{
-		InputStream stream = this.getClass().getResourceAsStream(itemId + "-a.json");
-		if (stream != null)
+		GenderItemColors genderColors = allColors.get(itemId);
+		if (genderColors != null)
 		{
-			Reader reader = new BufferedReader(new InputStreamReader(stream));
-			return gson.fromJson(reader, ItemColors.class).getItemColorInfo();
-		}
-		else
-		{
-			String suffix = isFemale ? "-f.json" : "-m.json";
-			InputStream mfStream = this.getClass().getResourceAsStream(itemId + suffix);
-			if (mfStream != null)
+			if (genderColors.any != null)
 			{
-				Reader reader = new BufferedReader(new InputStreamReader(mfStream));
-				return gson.fromJson(reader, ItemColors.class).getItemColorInfo();
+				return genderColors.any.itemColorInfo;
+			}
+			else if (isFemale)
+			{
+				return genderColors.female.itemColorInfo;
+			}
+			else
+			{
+				return genderColors.male.itemColorInfo;
 			}
 		}
 		return new ArrayList<>();
