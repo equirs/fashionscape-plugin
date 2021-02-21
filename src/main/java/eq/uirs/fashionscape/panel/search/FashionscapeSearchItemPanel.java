@@ -1,5 +1,6 @@
-package eq.uirs.fashionscape.panel;
+package eq.uirs.fashionscape.panel.search;
 
+import eq.uirs.fashionscape.panel.AbsItemPanel;
 import eq.uirs.fashionscape.swap.SwapManager;
 import java.awt.BorderLayout;
 import java.awt.Color;
@@ -20,7 +21,7 @@ import net.runelite.client.game.ItemManager;
 import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.util.AsyncBufferedImage;
 
-public class FashionscapeSearchItemPanel extends BaseItemPanel
+public class FashionscapeSearchItemPanel extends AbsItemPanel
 {
 	private final SwapManager swapManager;
 	private final KitType slot;

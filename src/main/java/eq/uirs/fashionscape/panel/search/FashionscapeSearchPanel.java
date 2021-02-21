@@ -1,4 +1,4 @@
-package eq.uirs.fashionscape.panel;
+package eq.uirs.fashionscape.panel.search;
 
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableMap;
@@ -32,7 +32,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import javax.annotation.Nonnull;
 import javax.inject.Inject;
 import javax.swing.ImageIcon;
 import javax.swing.JComboBox;
@@ -64,8 +63,8 @@ public class FashionscapeSearchPanel extends JPanel
 	private static final int DEBOUNCE_DELAY_MS = 200;
 	private static final String ERROR_PANEL = "ERROR_PANEL";
 	private static final String RESULTS_PANEL = "RESULTS_PANEL";
-	private static final Set<Integer> VALID_SLOT_IDS = Arrays.stream(PanelKitType.values())
-		.map(PanelKitType::getKitType)
+	private static final Set<Integer> VALID_SLOT_IDS = Arrays.stream(PanelEquipSlot.values())
+		.map(PanelEquipSlot::getKitType)
 		.filter(Objects::nonNull)
 		.map(KitType::getIndex)
 		.collect(Collectors.toSet());
@@ -87,7 +86,7 @@ public class FashionscapeSearchPanel extends JPanel
 	private final JScrollPane resultsScrollPane;
 	private final JPanel centerPanel = new JPanel(cardLayout);
 	private final PluginErrorPanel errorPanel = new PluginErrorPanel();
-	private final Map<PanelKitType, MaterialTab> tabMap;
+	private final Map<PanelEquipSlot, MaterialTab> tabMap;
 	private final List<FashionscapeSearchItemPanel> searchPanels = new ArrayList<>();
 
 	private final List<Result> results = new ArrayList<>();
@@ -238,10 +237,10 @@ public class FashionscapeSearchPanel extends JPanel
 
 	public void chooseSlot(KitType slot)
 	{
-		PanelKitType panelSlot = Arrays.stream(PanelKitType.values())
+		PanelEquipSlot panelSlot = Arrays.stream(PanelEquipSlot.values())
 			.filter(p -> p.getKitType() == slot)
 			.findFirst()
-			.orElse(PanelKitType.ALL);
+			.orElse(PanelEquipSlot.ALL);
 		MaterialTab tab = tabMap.get(panelSlot);
 		if (tab != null)
 		{
@@ -264,13 +263,13 @@ public class FashionscapeSearchPanel extends JPanel
 		});
 	}
 
-	private Map<PanelKitType, MaterialTab> setUpSlotFilters()
+	private Map<PanelEquipSlot, MaterialTab> setUpSlotFilters()
 	{
-		ImmutableMap.Builder<PanelKitType, MaterialTab> builder = new ImmutableMap.Builder<>();
+		ImmutableMap.Builder<PanelEquipSlot, MaterialTab> builder = new ImmutableMap.Builder<>();
 		slotFilter.setLayout(new GridLayout(2, 5, 5, 5));
 		slotFilter.setBorder(new EmptyBorder(0, 0, 10, 0));
 		MaterialTab allTab = null;
-		for (PanelKitType filterSlot : PanelKitType.values())
+		for (PanelEquipSlot filterSlot : PanelEquipSlot.values())
 		{
 			MaterialTab tab = new MaterialTab(new ImageIcon(), slotFilter, null);
 			builder.put(filterSlot, tab);
@@ -285,7 +284,7 @@ public class FashionscapeSearchPanel extends JPanel
 			}
 			ImageIcon icon = iconFor(filterSlot, isLocked);
 			tab.setIcon(icon);
-			tab.setToolTipText(filterSlot.readableName());
+			tab.setToolTipText(filterSlot.getDisplayName());
 			tab.addMouseListener(new MouseAdapter()
 			{
 				@Override
@@ -548,13 +547,13 @@ public class FashionscapeSearchPanel extends JPanel
 
 	private void updateTabIcon(KitType slot, boolean isLocked)
 	{
-		Arrays.stream(PanelKitType.values())
+		Arrays.stream(PanelEquipSlot.values())
 			.filter(p -> Objects.equals(p.getKitType(), slot))
 			.findFirst()
-			.ifPresent(panelKitType -> updateTabIcon(panelKitType, isLocked));
+			.ifPresent(panelEquipSlot -> updateTabIcon(panelEquipSlot, isLocked));
 	}
 
-	private void updateTabIcon(PanelKitType panelSlot, boolean isLocked)
+	private void updateTabIcon(PanelEquipSlot panelSlot, boolean isLocked)
 	{
 		MaterialTab tab = tabMap.get(panelSlot);
 		if (tab != null)
@@ -563,10 +562,10 @@ public class FashionscapeSearchPanel extends JPanel
 		}
 	}
 
-	private ImageIcon iconFor(PanelKitType panelSlot, boolean isLocked)
+	private ImageIcon iconFor(PanelEquipSlot panelSlot, boolean isLocked)
 	{
 		String lockStr = isLocked ? "-lock" : "";
-		String iconName = panelSlot.readableName().toLowerCase() + lockStr + ".png";
+		String iconName = panelSlot.getDisplayName().toLowerCase() + lockStr + ".png";
 		return new ImageIcon(ImageUtil.loadImageResource(getClass(), iconName));
 	}
 

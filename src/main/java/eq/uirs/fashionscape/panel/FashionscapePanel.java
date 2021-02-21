@@ -1,10 +1,15 @@
 package eq.uirs.fashionscape.panel;
 
+import eq.uirs.fashionscape.panel.search.FashionscapeSearchPanel;
+import eq.uirs.fashionscape.panel.swap.FashionscapeSwapsPanel;
+import eq.uirs.fashionscape.panel.swap.SearchOpener;
 import eq.uirs.fashionscape.swap.SwapManager;
 import java.awt.BorderLayout;
 import javax.inject.Inject;
+import javax.swing.JPanel;
 import javax.swing.border.EmptyBorder;
 import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 import net.runelite.api.Client;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.kit.KitType;
@@ -19,7 +24,7 @@ import net.runelite.client.ui.components.materialtabs.MaterialTabGroup;
 public class FashionscapePanel extends PluginPanel
 {
 
-	private final DisplayPanel display;
+	private final SearchClearingPanel tabDisplayPanel;
 	private final MaterialTabGroup tabGroup;
 	private final MaterialTab searchTab;
 
@@ -28,13 +33,30 @@ public class FashionscapePanel extends PluginPanel
 	@Getter
 	private final FashionscapeSearchPanel searchPanel;
 
+	@RequiredArgsConstructor
+	static class SearchClearingPanel extends JPanel
+	{
+		boolean shouldClearSearch = true;
+		private final FashionscapeSearchPanel searchPanel;
+
+		@Override
+		public void removeAll()
+		{
+			if (shouldClearSearch)
+			{
+				searchPanel.clearResults();
+			}
+			super.removeAll();
+		}
+	}
+
 	@Inject
 	public FashionscapePanel(FashionscapeSearchPanel searchPanel, SwapManager swapManager, ItemManager itemManager,
 							 Client client, ClientThread clientThread, ChatMessageManager chatMessageManager)
 	{
 		super(false);
-		display = new DisplayPanel(searchPanel);
-		tabGroup = new MaterialTabGroup(display);
+		tabDisplayPanel = new SearchClearingPanel(searchPanel);
+		tabGroup = new MaterialTabGroup(tabDisplayPanel);
 
 		setLayout(new BorderLayout());
 		setBackground(ColorScheme.DARK_GRAY_COLOR);
@@ -59,12 +81,12 @@ public class FashionscapePanel extends PluginPanel
 
 		// need some hacky listeners set up to clear search results when changing tabs
 		searchTab.setOnSelectEvent(() -> {
-			display.shouldClearSearch = false;
+			tabDisplayPanel.shouldClearSearch = false;
 			searchPanel.reloadResults();
 			return true;
 		});
 		swapsTab.setOnSelectEvent(() -> {
-			display.shouldClearSearch = true;
+			tabDisplayPanel.shouldClearSearch = true;
 			return true;
 		});
 
@@ -74,7 +96,7 @@ public class FashionscapePanel extends PluginPanel
 		tabGroup.select(swapsTab);
 
 		add(tabGroup, BorderLayout.NORTH);
-		add(display, BorderLayout.CENTER);
+		add(tabDisplayPanel, BorderLayout.CENTER);
 	}
 
 	public void onGameStateChanged(GameStateChanged event)
@@ -84,6 +106,5 @@ public class FashionscapePanel extends PluginPanel
 			swapsPanel.onGameStateChanged(event);
 		}
 	}
-
 }
 

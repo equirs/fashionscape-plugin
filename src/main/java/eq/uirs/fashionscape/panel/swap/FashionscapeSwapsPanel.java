@@ -1,6 +1,7 @@
-package eq.uirs.fashionscape.panel;
+package eq.uirs.fashionscape.panel.swap;
 
 import eq.uirs.fashionscape.FashionscapePlugin;
+import eq.uirs.fashionscape.panel.search.PanelEquipSlot;
 import eq.uirs.fashionscape.swap.SwapManager;
 import java.awt.BorderLayout;
 import java.awt.Cursor;
@@ -244,7 +245,7 @@ public class FashionscapeSwapsPanel extends JPanel
 	{
 		clientThread.invokeLater(() -> {
 			List<SlotResult> slotResults = new ArrayList<>();
-			for (PanelKitType panelSlot : PanelKitType.values())
+			for (PanelEquipSlot panelSlot : PanelEquipSlot.values())
 			{
 				KitType slot = panelSlot.getKitType();
 				if (slot == null)
@@ -467,8 +468,8 @@ public class FashionscapeSwapsPanel extends JPanel
 
 	private boolean hasNonEmpty()
 	{
-		long numNonEmpty = Arrays.stream(PanelKitType.values())
-			.map(PanelKitType::getKitType)
+		long numNonEmpty = Arrays.stream(PanelEquipSlot.values())
+			.map(PanelEquipSlot::getKitType)
 			.filter(Objects::nonNull)
 			.map(swapManager::swappedItemIdIn)
 			.filter(Objects::nonNull)
@@ -478,8 +479,8 @@ public class FashionscapeSwapsPanel extends JPanel
 
 	private boolean hasUnlocked()
 	{
-		long numUnlocked = Arrays.stream(PanelKitType.values())
-			.map(PanelKitType::getKitType)
+		long numUnlocked = Arrays.stream(PanelEquipSlot.values())
+			.map(PanelEquipSlot::getKitType)
 			.filter(Objects::nonNull)
 			.map(swapManager::isLocked)
 			.filter(b -> !b)

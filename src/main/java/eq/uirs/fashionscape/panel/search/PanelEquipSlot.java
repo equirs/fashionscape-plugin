@@ -1,4 +1,4 @@
-package eq.uirs.fashionscape.panel;
+package eq.uirs.fashionscape.panel.search;
 
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
@@ -6,7 +6,7 @@ import net.runelite.api.kit.KitType;
 import net.runelite.client.util.Text;
 
 @RequiredArgsConstructor
-public enum PanelKitType
+public enum PanelEquipSlot
 {
 	ALL(null),
 	HEAD(KitType.HEAD),
@@ -22,7 +22,7 @@ public enum PanelKitType
 	@Getter
 	private final KitType kitType;
 
-	public String readableName()
+	public String getDisplayName()
 	{
 		return Text.titleCase(this);
 	}

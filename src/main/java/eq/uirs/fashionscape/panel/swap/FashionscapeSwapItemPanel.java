@@ -1,5 +1,6 @@
-package eq.uirs.fashionscape.panel;
+package eq.uirs.fashionscape.panel.swap;
 
+import eq.uirs.fashionscape.panel.AbsItemPanel;
 import eq.uirs.fashionscape.swap.SwapManager;
 import java.awt.BorderLayout;
 import java.awt.Cursor;
@@ -21,7 +22,7 @@ import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.util.AsyncBufferedImage;
 import net.runelite.client.util.ImageUtil;
 
-public class FashionscapeSwapItemPanel extends BaseItemPanel
+public class FashionscapeSwapItemPanel extends AbsItemPanel
 {
 	private static final Dimension ICON_SIZE = new Dimension(20, 20);
 

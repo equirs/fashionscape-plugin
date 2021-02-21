@@ -1,4 +1,4 @@
-package eq.uirs.fashionscape.panel;
+package eq.uirs.fashionscape.panel.search;
 
 import net.runelite.api.kit.KitType;
 

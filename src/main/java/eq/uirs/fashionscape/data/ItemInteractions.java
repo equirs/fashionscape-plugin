@@ -538,6 +538,8 @@ public class ItemInteractions
 		WEAPON_TO_IDLE.put(ItemID.TRAILBLAZER_BANNER, IdleAnimationID.BANNER);
 		WEAPON_TO_IDLE.put(ItemID.SLED_25282, IdleAnimationID.SLED);
 		WEAPON_TO_IDLE.put(ItemID.GIANT_BOULDER, IdleAnimationID.HEAVY_ITEM);
+		// TODO replace with ItemID.CURSED_BANANA
+		WEAPON_TO_IDLE.put(25500, IdleAnimationID.CURSED_BANANA);
 	}
 
 	// endregion

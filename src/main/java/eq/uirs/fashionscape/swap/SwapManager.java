@@ -5,7 +5,7 @@ import eq.uirs.fashionscape.FashionscapePlugin;
 import eq.uirs.fashionscape.colors.ColorScorer;
 import eq.uirs.fashionscape.data.IdleAnimationID;
 import eq.uirs.fashionscape.data.ItemInteractions;
-import eq.uirs.fashionscape.panel.PanelKitType;
+import eq.uirs.fashionscape.panel.search.PanelEquipSlot;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -67,8 +67,9 @@ public class SwapManager
 
 	private final SavedSwaps savedSwaps = new SavedSwaps();
 	private final SnapshotQueues snapshotQueues = new SnapshotQueues(this::restoreSnapshot);
-	// player's kit ids, e.g., hairstyles, base clothing
+	// player's real kit ids, e.g., hairstyles, base clothing
 	private final Map<KitType, Integer> savedKitIds = new HashMap<>();
+	private final Map<KitType, Integer> swappedKitIds = new HashMap<>();
 
 	private Snapshot hoverSnapshot;
 
@@ -411,8 +412,8 @@ public class SwapManager
 				.collect(Collectors.toMap(s -> s, savedSwaps::get));
 			colorScorer.setPlayerInfo(lockedSwaps);
 		}
-		Map<KitType, Boolean> slotsToRevert = Arrays.stream(PanelKitType.values())
-			.map(PanelKitType::getKitType)
+		Map<KitType, Boolean> slotsToRevert = Arrays.stream(PanelEquipSlot.values())
+			.map(PanelEquipSlot::getKitType)
 			.filter(Objects::nonNull)
 			.collect(Collectors.toMap(slot -> slot, savedSwaps::isLocked));
 		slotsToRevert.put(KitType.JAW, true);
@@ -534,6 +535,35 @@ public class SwapManager
 			if (persist)
 			{
 				savedSwaps.put(slot, itemId);
+				// only 1 item was swapped, so if the snapshot contains other slots, they must have been removed
+				snapshot.getSlotChanges().keySet().stream()
+					.filter(s -> !slot.equals(s))
+					.forEach(savedSwaps::remove);
+			}
+		}
+
+		return snapshot;
+	}
+
+	@Nullable
+	// this should only be called from the client thread
+	public Snapshot swapKit(KitType slot, Integer kitId, boolean persist)
+	{
+		if (kitId == null)
+		{
+			return null;
+		}
+		int equipmentId = kitId + 256;
+		Snapshot snapshot = swap(slot, equipmentId);
+		if (snapshot != null)
+		{
+			if (hoverSnapshot != null)
+			{
+				snapshot = snapshot.mergeOver(hoverSnapshot);
+			}
+			if (persist)
+			{
+				swappedKitIds.put(slot, kitId);
 				// only 1 item was swapped, so if the snapshot contains other slots, they must have been removed
 				snapshot.getSlotChanges().keySet().stream()
 					.filter(s -> !slot.equals(s))
@@ -908,7 +938,7 @@ public class SwapManager
 
 	// returns the item id of the actual item equipped in the given slot (swaps ignored)
 	@Nullable
-	private Integer equippedItemIdFor(KitType kitType)
+	public Integer equippedItemIdFor(KitType kitType)
 	{
 		Player player = client.getLocalPlayer();
 		if (player == null)

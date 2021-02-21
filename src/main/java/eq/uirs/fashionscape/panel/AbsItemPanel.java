@@ -18,7 +18,7 @@ import net.runelite.client.game.ItemManager;
 import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.util.AsyncBufferedImage;
 
-abstract class BaseItemPanel extends JPanel
+public abstract class AbsItemPanel extends JPanel
 {
 	private static final Dimension ICON_SIZE = new Dimension(32, 32);
 
@@ -31,7 +31,7 @@ abstract class BaseItemPanel extends JPanel
 	protected final JLabel itemLabel;
 	protected final JLabel itemIcon;
 
-	BaseItemPanel(@Nullable Integer itemId, BufferedImage icon, ItemManager itemManager, ClientThread clientThread)
+	AbsItemPanel(@Nullable Integer itemId, BufferedImage icon, ItemManager itemManager, ClientThread clientThread)
 	{
 		this.itemManager = itemManager;
 		this.clientThread = clientThread;

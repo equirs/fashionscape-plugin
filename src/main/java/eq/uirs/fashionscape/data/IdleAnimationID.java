@@ -29,6 +29,7 @@ public class IdleAnimationID
 	public static int HEAVY_ITEM = 4193;
 	public static int NIGHTMARE_STAFF = 4504;
 	public static int CROSSBOW = 4591;
+	public static int CURSED_BANANA = 4646;
 	public static int FALCON = 5160;
 	public static int SALAMANDER = 5246;
 	public static int NOOSE_WAND = 5254;
