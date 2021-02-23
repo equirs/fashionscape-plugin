@@ -1,8 +1,5 @@
 package eq.uirs.fashionscape.panel;
 
-import eq.uirs.fashionscape.panel.search.FashionscapeSearchPanel;
-import eq.uirs.fashionscape.panel.swap.FashionscapeSwapsPanel;
-import eq.uirs.fashionscape.panel.swap.SearchOpener;
 import eq.uirs.fashionscape.swap.SwapManager;
 import java.awt.BorderLayout;
 import javax.inject.Inject;
@@ -12,6 +9,7 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import net.runelite.api.Client;
 import net.runelite.api.events.GameStateChanged;
+import net.runelite.api.events.PlayerChanged;
 import net.runelite.api.kit.KitType;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.chat.ChatMessageManager;
@@ -29,15 +27,17 @@ public class FashionscapePanel extends PluginPanel
 	private final MaterialTab searchTab;
 
 	@Getter
-	private final FashionscapeSwapsPanel swapsPanel;
+	private final SwapsPanel swapsPanel;
 	@Getter
-	private final FashionscapeSearchPanel searchPanel;
+	private final SearchPanel searchPanel;
+	@Getter
+	private final KitsPanel kitsPanel;
 
 	@RequiredArgsConstructor
 	static class SearchClearingPanel extends JPanel
 	{
 		boolean shouldClearSearch = true;
-		private final FashionscapeSearchPanel searchPanel;
+		private final SearchPanel searchPanel;
 
 		@Override
 		public void removeAll()
@@ -51,8 +51,9 @@ public class FashionscapePanel extends PluginPanel
 	}
 
 	@Inject
-	public FashionscapePanel(FashionscapeSearchPanel searchPanel, SwapManager swapManager, ItemManager itemManager,
-							 Client client, ClientThread clientThread, ChatMessageManager chatMessageManager)
+	public FashionscapePanel(SearchPanel searchPanel, KitsPanel kitsPanel,
+							 SwapManager swapManager, ItemManager itemManager, Client client,
+							 ClientThread clientThread, ChatMessageManager chatMessageManager)
 	{
 		super(false);
 		tabDisplayPanel = new SearchClearingPanel(searchPanel);
@@ -69,20 +70,25 @@ public class FashionscapePanel extends PluginPanel
 				tabGroup.select(searchTab);
 				searchPanel.chooseSlot(slot);
 				searchPanel.clearSearch();
-				// TODO maybe this should navigate back to the outfit tab after choosing?
 			}
 		};
-		this.swapsPanel = new FashionscapeSwapsPanel(swapManager, itemManager, client, chatMessageManager,
+		this.swapsPanel = new SwapsPanel(swapManager, itemManager, client, chatMessageManager,
 			searchOpener, clientThread);
 		this.searchPanel = searchPanel;
+		this.kitsPanel = kitsPanel;
 
 		MaterialTab swapsTab = new MaterialTab("Outfit", tabGroup, swapsPanel);
+		MaterialTab kitsTab = new MaterialTab("Base", tabGroup, kitsPanel);
 		searchTab = new MaterialTab("Search", tabGroup, searchPanel);
 
 		// need some hacky listeners set up to clear search results when changing tabs
 		searchTab.setOnSelectEvent(() -> {
 			tabDisplayPanel.shouldClearSearch = false;
 			searchPanel.reloadResults();
+			return true;
+		});
+		kitsTab.setOnSelectEvent(() -> {
+			tabDisplayPanel.shouldClearSearch = true;
 			return true;
 		});
 		swapsTab.setOnSelectEvent(() -> {
@@ -92,6 +98,7 @@ public class FashionscapePanel extends PluginPanel
 
 		tabGroup.setBorder(new EmptyBorder(5, 0, 0, 0));
 		tabGroup.addTab(swapsTab);
+		tabGroup.addTab(kitsTab);
 		tabGroup.addTab(searchTab);
 		tabGroup.select(swapsTab);
 
@@ -104,6 +111,22 @@ public class FashionscapePanel extends PluginPanel
 		if (swapsPanel != null)
 		{
 			swapsPanel.onGameStateChanged(event);
+		}
+	}
+
+	public void onPlayerChanged(PlayerChanged event)
+	{
+		if (kitsPanel != null)
+		{
+			kitsPanel.onPlayerChanged(event);
+		}
+	}
+
+	public void reloadResults()
+	{
+		if (searchPanel != null)
+		{
+			searchPanel.reloadResults();
 		}
 	}
 }

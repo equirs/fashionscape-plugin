@@ -3,9 +3,10 @@ package eq.uirs.fashionscape.data;
 import java.awt.Color;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import net.runelite.client.util.Text;
 
 @RequiredArgsConstructor
-public enum SkinColor
+public enum SkinColor implements Colorable
 {
 	PALE(0, new Color(187, 143, 106)),
 	NORMAL(1, new Color(164, 127, 93)),
@@ -26,4 +27,16 @@ public enum SkinColor
 
 	@Getter
 	private final Color color;
+
+	@Override
+	public String getDisplayName()
+	{
+		return Text.titleCase(this);
+	}
+
+	@Override
+	public int getColorId(ColorType type)
+	{
+		return this.colorId;
+	}
 }

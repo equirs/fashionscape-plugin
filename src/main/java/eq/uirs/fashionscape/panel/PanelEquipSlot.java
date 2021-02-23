@@ -1,4 +1,4 @@
-package eq.uirs.fashionscape.panel.search;
+package eq.uirs.fashionscape.panel;
 
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;

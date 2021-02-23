@@ -1,4 +1,4 @@
-package eq.uirs.fashionscape.panel.search;
+package eq.uirs.fashionscape.panel;
 
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableMap;
@@ -58,7 +58,10 @@ import net.runelite.client.util.ImageUtil;
 import net.runelite.client.util.SwingUtil;
 import net.runelite.http.api.item.ItemStats;
 
-public class FashionscapeSearchPanel extends JPanel
+/**
+ * Tab panel that houses the search UI: bar, filters, sort, results, etc.
+ */
+class SearchPanel extends JPanel
 {
 	private static final int DEBOUNCE_DELAY_MS = 200;
 	private static final String ERROR_PANEL = "ERROR_PANEL";
@@ -87,7 +90,7 @@ public class FashionscapeSearchPanel extends JPanel
 	private final JPanel centerPanel = new JPanel(cardLayout);
 	private final PluginErrorPanel errorPanel = new PluginErrorPanel();
 	private final Map<PanelEquipSlot, MaterialTab> tabMap;
-	private final List<FashionscapeSearchItemPanel> searchPanels = new ArrayList<>();
+	private final List<SearchItemPanel> searchPanels = new ArrayList<>();
 
 	private final List<Result> results = new ArrayList<>();
 	private final AtomicBoolean searchInProgress = new AtomicBoolean();
@@ -96,7 +99,7 @@ public class FashionscapeSearchPanel extends JPanel
 		@Override
 		public void onSearchSelectionChanging(KitType slot)
 		{
-			for (FashionscapeSearchItemPanel item : searchPanels)
+			for (SearchItemPanel item : searchPanels)
 			{
 				if (Objects.equals(item.itemId, swapManager.swappedItemIdIn(slot)))
 				{
@@ -125,9 +128,9 @@ public class FashionscapeSearchPanel extends JPanel
 	}
 
 	@Inject
-	public FashionscapeSearchPanel(Client client, SwapManager swapManager, ClientThread clientThread,
-								   ItemManager itemManager, ScheduledExecutorService executor,
-								   FashionscapeConfig config, ColorScorer colorScorer)
+	public SearchPanel(Client client, SwapManager swapManager, ClientThread clientThread,
+					   ItemManager itemManager, ScheduledExecutorService executor,
+					   FashionscapeConfig config, ColorScorer colorScorer)
 	{
 		this.client = client;
 		this.swapManager = swapManager;
@@ -514,7 +517,7 @@ public class FashionscapeSearchPanel extends JPanel
 					{
 						score = null;
 					}
-					FashionscapeSearchItemPanel panel = new FashionscapeSearchItemPanel(itemId, result.getIcon(),
+					SearchItemPanel panel = new SearchItemPanel(itemId, result.getIcon(),
 						result.getSlot(), itemManager, swapManager, clientThread, listener, score);
 					searchPanels.add(panel);
 					int topPadding = firstItem ? 0 : 5;

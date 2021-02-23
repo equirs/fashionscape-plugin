@@ -6,8 +6,6 @@ import eq.uirs.fashionscape.panel.FashionscapePanel;
 import eq.uirs.fashionscape.swap.SwapManager;
 import java.awt.image.BufferedImage;
 import java.io.File;
-import java.lang.reflect.Field;
-import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -18,7 +16,6 @@ import net.runelite.api.Client;
 import net.runelite.api.GameState;
 import net.runelite.api.ItemComposition;
 import net.runelite.api.Player;
-import net.runelite.api.PlayerComposition;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.PlayerChanged;
 import net.runelite.client.RuneLite;
@@ -136,8 +133,12 @@ public class FashionscapePlugin extends Plugin
 				lastKnownPlayerName = player.getName();
 				swapManager.clear();
 			}
-			swapManager.checkForKitIds();
+			swapManager.checkForBaseIds();
 			swapManager.refreshItemSwaps();
+		}
+		if (panel != null)
+		{
+			panel.onPlayerChanged(event);
 		}
 	}
 
@@ -151,37 +152,7 @@ public class FashionscapePlugin extends Plugin
 				// reload displayed results
 				clientThread.invokeLater(() -> {
 					populateDupes();
-					panel.getSearchPanel().reloadResults();
-				});
-			}
-			if (event.getKey().startsWith("color"))
-			{
-				clientThread.invokeLater(() -> {
-					Player p = client.getLocalPlayer();
-					if (p != null)
-					{
-						PlayerComposition c = p.getPlayerComposition();
-						try
-						{
-							Field colorsField = c.getClass().getDeclaredField("h");
-							colorsField.setAccessible(true);
-							int[] bodyColors = (int[]) colorsField.get(c);
-							if (bodyColors.length == 5)
-							{
-								bodyColors[0] = config.color0();
-								bodyColors[1] = config.color1();
-								bodyColors[2] = config.color2();
-								bodyColors[3] = config.color3();
-								bodyColors[4] = config.color4();
-							}
-
-							c.setHash();
-						}
-						catch (NoSuchFieldException | IllegalAccessException e)
-						{
-							e.printStackTrace();
-						}
-					}
+					panel.reloadResults();
 				});
 			}
 		}

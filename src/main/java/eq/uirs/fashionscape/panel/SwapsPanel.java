@@ -1,7 +1,6 @@
-package eq.uirs.fashionscape.panel.swap;
+package eq.uirs.fashionscape.panel;
 
 import eq.uirs.fashionscape.FashionscapePlugin;
-import eq.uirs.fashionscape.panel.search.PanelEquipSlot;
 import eq.uirs.fashionscape.swap.SwapManager;
 import java.awt.BorderLayout;
 import java.awt.Cursor;
@@ -52,7 +51,10 @@ import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.util.ImageUtil;
 import net.runelite.client.util.LinkBrowser;
 
-public class FashionscapeSwapsPanel extends JPanel
+/**
+ * Tab panel that houses all equipment swaps and the main controls
+ */
+class SwapsPanel extends JPanel
 {
 	private final SwapManager swapManager;
 	private final ItemManager itemManager;
@@ -60,7 +62,7 @@ public class FashionscapeSwapsPanel extends JPanel
 	private final ClientThread clientThread;
 	private final ChatMessageManager chatMessageManager;
 	private final SearchOpener searchOpener;
-	private final List<FashionscapeSwapItemPanel> itemPanels = new ArrayList<>();
+	private final List<SwapItemPanel> itemPanels = new ArrayList<>();
 
 	private JPanel slotsPanel;
 	private JButton undo;
@@ -78,9 +80,9 @@ public class FashionscapeSwapsPanel extends JPanel
 		BufferedImage image;
 	}
 
-	public FashionscapeSwapsPanel(SwapManager swapManager, ItemManager itemManager, Client client,
-								  ChatMessageManager chatMessageManager, SearchOpener searchOpener,
-								  ClientThread clientThread)
+	public SwapsPanel(SwapManager swapManager, ItemManager itemManager, Client client,
+					  ChatMessageManager chatMessageManager, SearchOpener searchOpener,
+					  ClientThread clientThread)
 	{
 		this.swapManager = swapManager;
 		this.itemManager = itemManager;
@@ -196,7 +198,7 @@ public class FashionscapeSwapsPanel extends JPanel
 		JMenuItem softClear = new JMenuItem("Soft clear");
 		softClear.addActionListener(e -> {
 			swapManager.revertSwaps(false);
-			for (FashionscapeSwapItemPanel itemPanel : itemPanels)
+			for (SwapItemPanel itemPanel : itemPanels)
 			{
 				itemPanel.updateLockButton();
 			}
@@ -281,7 +283,7 @@ public class FashionscapeSwapsPanel extends JPanel
 
 		for (SlotResult s : results)
 		{
-			FashionscapeSwapItemPanel itemPanel = new FashionscapeSwapItemPanel(s.itemId, s.image, itemManager,
+			SwapItemPanel itemPanel = new SwapItemPanel(s.itemId, s.image, itemManager,
 				clientThread, swapManager, s.slot, searchOpener);
 			itemPanels.add(itemPanel);
 			JPanel marginWrapper = new JPanel(new BorderLayout());

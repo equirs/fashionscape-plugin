@@ -1,6 +1,5 @@
-package eq.uirs.fashionscape.panel.search;
+package eq.uirs.fashionscape.panel;
 
-import eq.uirs.fashionscape.panel.AbsItemPanel;
 import eq.uirs.fashionscape.swap.SwapManager;
 import java.awt.BorderLayout;
 import java.awt.Color;
@@ -21,14 +20,14 @@ import net.runelite.client.game.ItemManager;
 import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.util.AsyncBufferedImage;
 
-public class FashionscapeSearchItemPanel extends AbsItemPanel
+class SearchItemPanel extends AbsItemPanel
 {
 	private final SwapManager swapManager;
 	private final KitType slot;
 
-	FashionscapeSearchItemPanel(@Nullable Integer itemId, AsyncBufferedImage icon, KitType slot,
-								ItemManager itemManager, SwapManager swapManager, ClientThread clientThread,
-								OnSelectionChangingListener listener, Double score)
+	public SearchItemPanel(@Nullable Integer itemId, AsyncBufferedImage icon, KitType slot,
+						   ItemManager itemManager, SwapManager swapManager, ClientThread clientThread,
+						   OnSelectionChangingListener listener, Double score)
 	{
 		super(itemId, icon, itemManager, clientThread);
 		this.swapManager = swapManager;
@@ -47,7 +46,7 @@ public class FashionscapeSearchItemPanel extends AbsItemPanel
 					}
 					setCursor(new Cursor(Cursor.HAND_CURSOR));
 				}
-				swapManager.hoverOver(itemId);
+				swapManager.hoverOverItem(itemId);
 			}
 
 			@Override
@@ -76,7 +75,7 @@ public class FashionscapeSearchItemPanel extends AbsItemPanel
 					if (!swapManager.isLocked(itemId))
 					{
 						listener.onSearchSelectionChanging(slot);
-						swapManager.hoverSelect(itemId);
+						swapManager.hoverSelectItem(itemId);
 					}
 				});
 			}
@@ -89,7 +88,7 @@ public class FashionscapeSearchItemPanel extends AbsItemPanel
 		JPanel rightPanel = new JPanel(new GridLayout(rows, 1));
 		rightPanel.setBorder(new EmptyBorder(0, 5, 0, 5));
 		highlightPanels.add(rightPanel);
-		rightPanel.add(itemLabel);
+		rightPanel.add(label);
 
 		if (score != null)
 		{

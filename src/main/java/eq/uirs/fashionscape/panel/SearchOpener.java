@@ -1,8 +1,8 @@
-package eq.uirs.fashionscape.panel.swap;
+package eq.uirs.fashionscape.panel;
 
 import net.runelite.api.kit.KitType;
 
-public interface SearchOpener
+interface SearchOpener
 {
 	void openSearchFor(KitType slot);
 }

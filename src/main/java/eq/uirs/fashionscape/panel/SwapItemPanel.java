@@ -1,6 +1,5 @@
-package eq.uirs.fashionscape.panel.swap;
+package eq.uirs.fashionscape.panel;
 
-import eq.uirs.fashionscape.panel.AbsItemPanel;
 import eq.uirs.fashionscape.swap.SwapManager;
 import java.awt.BorderLayout;
 import java.awt.Cursor;
@@ -22,7 +21,7 @@ import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.util.AsyncBufferedImage;
 import net.runelite.client.util.ImageUtil;
 
-public class FashionscapeSwapItemPanel extends AbsItemPanel
+class SwapItemPanel extends AbsItemPanel
 {
 	private static final Dimension ICON_SIZE = new Dimension(20, 20);
 
@@ -35,9 +34,9 @@ public class FashionscapeSwapItemPanel extends AbsItemPanel
 	private MouseAdapter mouseAdapter = null;
 	private MouseAdapter hoverAdapter = null;
 
-	FashionscapeSwapItemPanel(@Nullable Integer itemId, BufferedImage icon, ItemManager itemManager,
-							  ClientThread clientThread, SwapManager swapManager, KitType slot,
-							  SearchOpener searchOpener)
+	public SwapItemPanel(@Nullable Integer itemId, BufferedImage icon, ItemManager itemManager,
+						 ClientThread clientThread, SwapManager swapManager, KitType slot,
+						 SearchOpener searchOpener)
 	{
 		super(itemId, icon, itemManager, clientThread);
 		this.slot = slot;
@@ -49,7 +48,7 @@ public class FashionscapeSwapItemPanel extends AbsItemPanel
 		rightPanel.setBackground(nonHighlightColor);
 		rightPanel.setBorder(new EmptyBorder(0, 5, 0, 0));
 		highlightPanels.add(rightPanel);
-		rightPanel.add(itemLabel, BorderLayout.CENTER);
+		rightPanel.add(label, BorderLayout.CENTER);
 		JPanel buttons = new JPanel(new GridLayout(1, 2, 2, 0));
 		buttons.setBackground(ColorScheme.DARKER_GRAY_COLOR);
 
@@ -105,16 +104,16 @@ public class FashionscapeSwapItemPanel extends AbsItemPanel
 	private void resetMouseListeners()
 	{
 		// Somehow these listeners clear when the item changes, so they're refreshed like this (ugh)
-		itemIcon.removeMouseListener(mouseAdapter);
+		icon.removeMouseListener(mouseAdapter);
 		mouseAdapter = createOpenSearchClickListener();
-		itemIcon.addMouseListener(mouseAdapter);
-		itemIcon.setToolTipText("Open " + slot.name().toLowerCase() + " slot search");
+		icon.addMouseListener(mouseAdapter);
+		icon.setToolTipText("Open " + slot.name().toLowerCase() + " slot search");
 
-		itemIcon.removeMouseListener(hoverAdapter);
+		icon.removeMouseListener(hoverAdapter);
 		xButton.removeMouseListener(hoverAdapter);
 		lockButton.removeMouseListener(hoverAdapter);
 		hoverAdapter = createHoverListener();
-		itemIcon.addMouseListener(hoverAdapter);
+		icon.addMouseListener(hoverAdapter);
 		xButton.addMouseListener(hoverAdapter);
 		lockButton.addMouseListener(hoverAdapter);
 	}
@@ -176,13 +175,13 @@ public class FashionscapeSwapItemPanel extends AbsItemPanel
 			clientThread.invokeLater(() -> {
 				ItemComposition itemComposition = itemManager.getItemComposition(itemId);
 				AsyncBufferedImage image = itemManager.getImage(itemComposition.getId());
-				image.addTo(itemIcon);
+				image.addTo(icon);
 			});
 		}
 		else
 		{
 			BufferedImage image = ImageUtil.loadImageResource(getClass(), slot.name().toLowerCase() + ".png");
-			setItemIcon(image);
+			setIcon(image);
 		}
 	}
 

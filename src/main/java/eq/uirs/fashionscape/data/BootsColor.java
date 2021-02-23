@@ -6,7 +6,7 @@ import lombok.RequiredArgsConstructor;
 import net.runelite.client.util.Text;
 
 @RequiredArgsConstructor
-public enum BootsColor
+public enum BootsColor implements Colorable
 {
 	BROWN(0, new Color(111, 89, 61)),
 	KHAKI(1, new Color(88, 88, 8)),
@@ -24,5 +24,11 @@ public enum BootsColor
 	public String getDisplayName()
 	{
 		return Text.titleCase(this);
+	}
+
+	@Override
+	public int getColorId(ColorType type)
+	{
+		return this.colorId;
 	}
 }

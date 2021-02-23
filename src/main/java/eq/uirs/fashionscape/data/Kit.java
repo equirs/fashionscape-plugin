@@ -102,7 +102,7 @@ public enum Kit
 	PLAIN_F(KitType.TORSO, "Plain", true, 56),
 	CROP_TOP(KitType.TORSO, "Crop-top", true, 57),
 	POLO_NECK(KitType.TORSO, "Polo-neck", true, 58),
-	SIMPLE(KitType.TORSO, "Plain", true, 59),
+	SIMPLE(KitType.TORSO, "Simple", true, 59),
 	TORN_F(KitType.TORSO, "Torn", true, 60),
 	SWEATER_F(KitType.TORSO, "Sweater", true, 89),
 	SHIRT_F(KitType.TORSO, "Shirt", true, 90),
@@ -179,8 +179,8 @@ public enum Kit
 	PLAIN_H(KitType.HANDS, "Plain", false, 34),
 	BRACERS(KitType.HANDS, "Bracers", false, 35),
 
-	PLAIN_HF(KitType.HANDS, "Plain", false, 68),
-	BRACERS_F(KitType.HANDS, "Bracers", false, 69),
+	PLAIN_HF(KitType.HANDS, "Plain", true, 68),
+	BRACERS_F(KitType.HANDS, "Bracers", true, 69),
 
 	// endregion Hands
 
@@ -189,8 +189,8 @@ public enum Kit
 	SMALL(KitType.BOOTS, "Small", false, 42),
 	LARGE(KitType.BOOTS, "Large", false, 43),
 
-	SMALL_F(KitType.BOOTS, "Small", false, 79),
-	LARGE_F(KitType.BOOTS, "Large", false, 80);
+	SMALL_F(KitType.BOOTS, "Small", true, 79),
+	LARGE_F(KitType.BOOTS, "Large", true, 80);
 
 	// endregion Boots
 

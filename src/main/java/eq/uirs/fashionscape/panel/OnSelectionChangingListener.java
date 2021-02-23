@@ -1,8 +1,8 @@
-package eq.uirs.fashionscape.panel.search;
+package eq.uirs.fashionscape.panel;
 
 import net.runelite.api.kit.KitType;
 
-public interface OnSelectionChangingListener
+interface OnSelectionChangingListener
 {
 	void onSearchSelectionChanging(KitType slot);
 }

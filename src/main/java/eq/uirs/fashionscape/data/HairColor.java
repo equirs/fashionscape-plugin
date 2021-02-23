@@ -6,7 +6,7 @@ import lombok.RequiredArgsConstructor;
 import net.runelite.client.util.Text;
 
 @RequiredArgsConstructor
-public enum HairColor
+public enum HairColor implements Colorable
 {
 	DARK_BROWN(0, new Color(93, 65, 29)),
 	WHITE(1, new Color(227, 224, 224)),
@@ -19,7 +19,7 @@ public enum HairColor
 	TURQUOISE(8, new Color(18, 156, 161)),
 	GREEN(9, new Color(18, 161, 24)),
 	GINGER(10, new Color(179, 80, 21)),
-	MAGENTA(11, new Color(1989, 24, 207)),
+	MAGENTA(11, new Color(198, 24, 207)),
 	BLACK(12, new Color(44, 42, 42)),
 	GREY(13, new Color(121, 109, 96)),
 	BEIGE(14, new Color(187, 186, 149)),
@@ -43,5 +43,11 @@ public enum HairColor
 	public String getDisplayName()
 	{
 		return Text.titleCase(this);
+	}
+
+	@Override
+	public int getColorId(ColorType type)
+	{
+		return this.colorId;
 	}
 }

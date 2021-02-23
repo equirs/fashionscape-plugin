@@ -6,7 +6,7 @@ import lombok.RequiredArgsConstructor;
 import net.runelite.client.util.Text;
 
 @RequiredArgsConstructor
-public enum ClothingColor
+public enum ClothingColor implements Colorable
 {
 	KHAKI(0, 1, new Color(123, 110, 50)),
 	CHARCOAL(1, 2, new Color(38, 35, 35)),
@@ -36,7 +36,7 @@ public enum ClothingColor
 	PALE_GREEN(25, 25, new Color(200, 255, 200)),
 	TURQUOISE(26, 26, new Color(0, 120, 120)),
 	DEEP_PURPLE(27, 27, new Color(150, 0, 150)),
-	LIGHT_PURPLE(28, 2, new Color(255, 150, 255));
+	LIGHT_PURPLE(28, 28, new Color(255, 150, 255));
 
 	@Getter
 	private final int torsoColorId;
@@ -50,5 +50,18 @@ public enum ClothingColor
 	public String getDisplayName()
 	{
 		return Text.titleCase(this);
+	}
+
+	@Override
+	public int getColorId(ColorType type)
+	{
+		if (type == ColorType.TORSO)
+		{
+			return torsoColorId;
+		}
+		else
+		{
+			return legsColorId;
+		}
 	}
 }
