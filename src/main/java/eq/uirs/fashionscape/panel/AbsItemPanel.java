@@ -8,7 +8,7 @@ import net.runelite.client.game.ItemManager;
 
 abstract class AbsItemPanel extends AbsIconLabelPanel
 {
-	public final Integer itemId;
+	public Integer itemId;
 
 	protected final ItemManager itemManager;
 

@@ -19,10 +19,15 @@ import net.runelite.api.GameState;
 import net.runelite.api.InventoryID;
 import net.runelite.api.ItemComposition;
 import net.runelite.api.MenuAction;
+import net.runelite.api.NPC;
 import net.runelite.api.Player;
+import net.runelite.api.events.ClientTick;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.ItemContainerChanged;
 import net.runelite.api.events.MenuOptionClicked;
+import net.runelite.api.events.NpcChanged;
+import net.runelite.api.events.NpcDespawned;
+import net.runelite.api.events.NpcSpawned;
 import net.runelite.api.events.PlayerChanged;
 import net.runelite.client.RuneLite;
 import net.runelite.client.callback.ClientThread;
@@ -45,12 +50,21 @@ import net.runelite.http.api.item.ItemStats;
 @Slf4j
 public class FashionscapePlugin extends Plugin
 {
+	@Value
+	private static class ItemDupeData
+	{
+		int modelId;
+		short[] colorsToReplace;
+		short[] texturesToReplace;
+		String strippedName;
+	}
+
 	public static final File OUTFITS_DIR = new File(RuneLite.RUNELITE_DIR, "outfits");
 	public static final Pattern PROFILE_PATTERN = Pattern.compile("^(\\w+):(-?\\d+).*");
-	private static final Pattern PAREN_REPLACE = Pattern.compile("\\(.*\\)");
 
 	private static final String COPY_PLAYER = "Copy-outfit";
 	private static final Set<Integer> ITEM_ID_DUPES = new HashSet<>();
+	private static final Pattern PAREN_REPLACE = Pattern.compile("\\(.*\\)");
 
 	// combined set of all items to skip when searching (bad items, dupes, non-standard if applicable)
 	public static Set<Integer> getItemIdsToExclude(FashionscapeConfig config)
@@ -67,16 +81,10 @@ public class FashionscapePlugin extends Plugin
 	private static String stripName(String name)
 	{
 		String noParens = PAREN_REPLACE.matcher(name).replaceAll("");
-		return noParens.replaceAll("[^A-Za-z]+", "");
-	}
-
-	@Value
-	private static class ItemDupeData
-	{
-		int modelId;
-		short[] colorsToReplace;
-		short[] texturesToReplace;
-		String strippedName;
+		String onlyAlpha = noParens.replaceAll("[^A-Za-z]+", "");
+		return onlyAlpha
+			.replaceFirst("\\s+$", "")
+			.replaceFirst("^\\s+", "");
 	}
 
 	@Inject
@@ -148,6 +156,11 @@ public class FashionscapePlugin extends Plugin
 			{
 				panel.onPlayerChanged(player);
 			}
+			// TODO?
+			clientThread.invokeLater(() ->
+				client.getNpcs().forEach(npc -> {
+					swapManager.onNpcSpawned(npc);
+				}));
 		}
 	}
 
@@ -158,6 +171,33 @@ public class FashionscapePlugin extends Plugin
 		{
 			swapManager.onEquipmentChanged();
 		}
+	}
+
+	@Subscribe
+	public void onNpcSpawned(NpcSpawned event)
+	{
+		NPC npc = event.getNpc();
+		swapManager.onNpcSpawned(npc);
+	}
+
+	@Subscribe
+	public void onNpcChanged(NpcChanged event)
+	{
+		NPC npc = event.getNpc();
+		swapManager.onNpcChanged(npc);
+	}
+
+	@Subscribe
+	public void onNpcDespawned(NpcDespawned event)
+	{
+		NPC npc = event.getNpc();
+		swapManager.onNpcDespawned(npc);
+	}
+
+	@Subscribe
+	public void onClientTick(ClientTick event)
+	{
+		swapManager.refreshPetAnimations();
 	}
 
 	@Subscribe
@@ -221,7 +261,7 @@ public class FashionscapePlugin extends Plugin
 			{
 				return;
 			}
-			swapManager.copyOutfit(p.getPlayerComposition());
+			swapManager.copyOutfit(p);
 			panel.reloadResults();
 		}
 	}

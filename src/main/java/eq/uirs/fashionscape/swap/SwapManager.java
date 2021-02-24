@@ -12,6 +12,7 @@ import eq.uirs.fashionscape.data.Colorable;
 import eq.uirs.fashionscape.data.HairColor;
 import eq.uirs.fashionscape.data.IdleAnimationID;
 import eq.uirs.fashionscape.data.ItemInteractions;
+import eq.uirs.fashionscape.data.Pet;
 import eq.uirs.fashionscape.data.SkinColor;
 import eq.uirs.fashionscape.data.kit.JawIcon;
 import eq.uirs.fashionscape.data.kit.JawKit;
@@ -21,6 +22,7 @@ import eq.uirs.fashionscape.swap.event.SwapEventListener;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.PrintWriter;
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -46,14 +48,18 @@ import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import lombok.Setter;
+import lombok.Getter;
 import lombok.Value;
 import lombok.extern.slf4j.Slf4j;
+import net.runelite.api.Actor;
 import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
 import net.runelite.api.InventoryID;
 import net.runelite.api.Item;
 import net.runelite.api.ItemComposition;
 import net.runelite.api.ItemContainer;
+import net.runelite.api.NPC;
+import net.runelite.api.NPCComposition;
 import net.runelite.api.Player;
 import net.runelite.api.PlayerComposition;
 import net.runelite.api.kit.KitType;
@@ -73,7 +79,15 @@ import net.runelite.http.api.item.ItemStats;
 @Slf4j
 public class SwapManager
 {
+	@Value
+	private static class Candidate
+	{
+		public int itemId;
+		public KitType slot;
+	}
+
 	public static final Map<Integer, Kit> KIT_ID_TO_KIT = new HashMap<>();
+	public static final Map<Integer, Pet> PET_MAP = new HashMap<>();
 	// item-only slots that can always contain an equipment id of 0
 	public static final List<KitType> ALLOWS_NOTHING = ImmutableList.of(KitType.HEAD, KitType.CAPE, KitType.AMULET,
 		KitType.WEAPON, KitType.SHIELD);
@@ -83,8 +97,10 @@ public class SwapManager
 		KitType.HAIR, KitType.HANDS, KitType.BOOTS);
 	private static final List<KitType> NEVER_ZERO_SLOTS_MALE = ImmutableList.of(KitType.TORSO, KitType.LEGS,
 		KitType.HAIR, KitType.HANDS, KitType.BOOTS, KitType.JAW);
+	private static final Set<Integer> PET_WALKING_IDS = new HashSet<>();
 	private static final String KIT_SUFFIX = "_KIT";
 	private static final String COLOR_SUFFIX = "_COLOR";
+	private static final String PET_KEY = "PET";
 	private static final String ICON_KEY = "ICON";
 
 	static
@@ -98,6 +114,17 @@ public class SwapManager
 				KIT_ID_TO_KIT.put(value.getKitId(), value);
 			}
 		}
+		for (Pet pet : Pet.values())
+		{
+			PET_MAP.put(pet.getNpcId(), pet);
+			if (pet.getWalkingId() > 0)
+			{
+				PET_WALKING_IDS.add(pet.getWalkingId());
+			}
+		}
+		// also add cat and kitten walking ids
+		PET_WALKING_IDS.add(314);
+		PET_WALKING_IDS.add(2662);
 	}
 
 	@Inject
@@ -127,17 +154,16 @@ public class SwapManager
 	private Boolean isFemale;
 	private String lastKnownPlayerName = null;
 	private SwapDiff hoverSwapDiff;
+	private Integer realPetId = null;
+	private Integer realPetIdleId = null;
 	// slot -> override equipment id, used to disable the plugin's functionality per slot
 	private final Map<KitType, Integer> disabledSlots = new HashMap<>();
 	// idle anim id to switch to when weapon slot is disabled (sometimes sourced from non-weapons like minecart)
 	private Integer disabledAnimationId = null;
 
-	@Value
-	private static class Candidate
-	{
-		public int itemId;
-		public KitType slot;
-	}
+	@Setter
+	@Getter
+	private NPC follower;
 
 	public void startUp()
 	{
@@ -158,6 +184,41 @@ public class SwapManager
 		doPreRefreshCheck();
 		savedSwaps.loadFromConfig();
 		refreshAllSwaps();
+	}
+
+	// TODO
+	public void onNpcSpawned(NPC npc)
+	{
+		if (isPet(npc))
+		{
+//			log.info("got pet {} {}", npc.getName(), npc.getId());
+			follower = npc;
+			realPetId = npc.getId();
+			realPetIdleId = npc.getIdlePoseAnimation();
+			savedSwaps.petSpawned();
+		}
+	}
+
+	// TODO
+	public void onNpcChanged(NPC npc)
+	{
+		if (isPet(npc))
+		{
+			// refresh pet swap
+//			log.info("pet changed");
+			refreshPetSwap();
+		}
+	}
+
+	// TODO
+	public void onNpcDespawned(NPC npc)
+	{
+		if (isPet(npc))
+		{
+//			log.info("bye pet {} {}", npc.getName(), realPetId);
+			follower = null;
+			savedSwaps.petDespawned();
+		}
 	}
 
 	public void addEventListener(SwapEventListener<? extends SwapEvent> listener)
@@ -195,6 +256,11 @@ public class SwapManager
 		return savedSwaps.isColorLocked(type);
 	}
 
+	public boolean isPetLocked()
+	{
+		return savedSwaps.isPetLocked();
+	}
+
 	public boolean isIconLocked()
 	{
 		return savedSwaps.isIconLocked();
@@ -213,6 +279,11 @@ public class SwapManager
 	public void toggleColorLocked(ColorType type)
 	{
 		savedSwaps.toggleColorLocked(type);
+	}
+
+	public void togglePetLocked()
+	{
+		savedSwaps.togglePetLocked();
 	}
 
 	public void toggleIconLocked()
@@ -234,6 +305,9 @@ public class SwapManager
 		);
 		savedEquipmentIds.putAll(savedKitEquipIds);
 		savedEquipmentIds.putAll(hiddenEquipIds);
+
+		refreshPetSwap();
+
 		for (CompoundSwap c : CompoundSwap.fromMap(sanitize(savedEquipmentIds), savedSwaps.getSwappedIcon()))
 		{
 			swap(c, SwapMode.PREVIEW);
@@ -242,6 +316,25 @@ public class SwapManager
 		{
 			swap(e.getKey(), e.getValue(), SwapMode.PREVIEW);
 		}
+	}
+
+	private SwapDiff refreshPetSwap()
+	{
+		if (follower == null)
+		{
+			return SwapDiff.blank();
+		}
+		return swapPet(savedSwaps.getSwappedPetId(), SwapMode.PREVIEW);
+	}
+
+	public void refreshPetAnimations()
+	{
+		if (follower == null)
+		{
+			return;
+		}
+		int petId = follower.getId();
+		setPetAnimations(petId);
 	}
 
 	/**
@@ -440,10 +533,15 @@ public class SwapManager
 		}
 	}
 
+	/**
+	 * Imports items (by item id), kits (by kit id), colors (by color id), and pet id onto the local player.
+	 * Should only call this from the client thread.
+	 */
 	public void importSwaps(
 		Map<KitType, Integer> newItems,
 		Map<KitType, Integer> newKits,
 		Map<ColorType, Integer> newColors,
+		@Nullable Integer newPet,
 		JawIcon icon,
 		Set<KitType> slotsToRemove)
 	{
@@ -491,11 +589,15 @@ public class SwapManager
 				.map(e -> this.swapColor(e.getKey(), e.getValue(), true))
 				.reduce(SwapDiff::mergeOver)
 				.orElse(SwapDiff.blank());
+
+			SwapDiff pet = newPet != null ? swapPet(newPet, SwapMode.SAVE) : SwapDiff.blank();
+
 			SwapDiff total = iconRevert
 				.mergeOver(kitRevert)
 				.mergeOver(colorRevert)
 				.mergeOver(equips)
-				.mergeOver(colors);
+				.mergeOver(colors)
+				.mergeOver(pet);
 			swapDiffHistory.appendToUndo(total);
 		});
 	}
@@ -548,9 +650,22 @@ public class SwapManager
 		{
 			icons.add(ICON_KEY + ":" + icon.getId() + " (" + icon.getDisplayName() + ")");
 		}
+		String petStr = null;
+		if (savedSwaps.containsPet())
+		{
+			Pet pet = PET_MAP.get(savedSwaps.getSwappedPetId());
+			if (pet != null)
+			{
+				petStr = PET_KEY + ":" + pet.getNpcId() + " (" + pet.getDisplayName() + ")";
+			}
+		}
 		items.addAll(kits);
 		items.addAll(colors);
 		items.addAll(icons);
+		if (petStr != null)
+		{
+			items.add(petStr);
+		}
 		return items;
 	}
 
@@ -606,6 +721,12 @@ public class SwapManager
 			.collect(Collectors.toMap(t -> t, t -> getColor.apply(t, savedSwaps.getColor(t))));
 	}
 
+	@Nullable
+	public Integer swappedPetId()
+	{
+		return savedSwaps.getSwappedPetId();
+	}
+
 	// this should only be called from the client thread
 	public void revert(KitType slot, ColorType type)
 	{
@@ -638,6 +759,13 @@ public class SwapManager
 		swapDiffHistory.appendToUndo(s);
 	}
 
+	public void revertPet()
+	{
+		savedSwaps.removePetLock();
+		SwapDiff s = doRevertPet();
+		swapDiffHistory.appendToUndo(s);
+	}
+
 	public void hoverOverItem(KitType slot, Integer itemId)
 	{
 		hoverOver(() -> {
@@ -654,6 +782,11 @@ public class SwapManager
 	public void hoverOverColor(ColorType type, Integer colorId)
 	{
 		hoverOver(() -> swapColor(type, colorId, false));
+	}
+
+	public void hoverOverPet(Integer npcId)
+	{
+		hoverOver(() -> swapPet(npcId, SwapMode.PREVIEW));
 	}
 
 	public void hoverOverIcon(JawIcon icon)
@@ -721,6 +854,19 @@ public class SwapManager
 			return Objects.equals(savedSwaps.getColor(type), colorId) ?
 				doRevert(type) :
 				swapColor(type, colorId, true);
+		});
+	}
+
+	public void hoverSelectPet(Integer npcId)
+	{
+		hoverSelect(() -> {
+			if (savedSwaps.isPetLocked())
+			{
+				return SwapDiff.blank();
+			}
+			return Objects.equals(savedSwaps.getSwappedPetId(), npcId) ?
+				doRevertPet() :
+				swapPet(npcId, SwapMode.SAVE);
 		});
 	}
 
@@ -838,6 +984,7 @@ public class SwapManager
 		Map<KitType, Integer> kitImports = new HashMap<>();
 		Map<ColorType, Integer> colorImports = new HashMap<>();
 		JawIcon icon = null;
+		Integer petImport = null;
 		Set<KitType> removes = new HashSet<>();
 		for (String line : allLines)
 		{
@@ -873,6 +1020,10 @@ public class SwapManager
 				{
 					colorImports.put(colorType, id);
 				}
+				else if (slotStr.equals(PET_KEY))
+				{
+					petImport = id;
+				}
 				else if (slotStr.equals(ICON_KEY))
 				{
 					icon = JawIcon.fromId(id);
@@ -890,9 +1041,10 @@ public class SwapManager
 				removes.add(slot);
 			}
 		});
-		if (!itemImports.isEmpty() || !kitImports.isEmpty() || !colorImports.isEmpty())
+		if (!itemImports.isEmpty() || !kitImports.isEmpty() || !colorImports.isEmpty() || petImport != null ||
+			icon != null)
 		{
-			importSwaps(itemImports, kitImports, colorImports, icon, removes);
+			importSwaps(itemImports, kitImports, colorImports, petImport, icon, removes);
 		}
 	}
 
@@ -915,9 +1067,14 @@ public class SwapManager
 		});
 	}
 
-	public void copyOutfit(PlayerComposition other)
+	public void copyOutfit(Player other)
 	{
-		int[] equipmentIds = other.getEquipmentIds();
+		PlayerComposition otherComposition = other.getPlayerComposition();
+		if (otherComposition == null)
+		{
+			return;
+		}
+		int[] equipmentIds = otherComposition.getEquipmentIds();
 		KitType[] slots = KitType.values();
 		Map<KitType, Integer> equipIdImports = IntStream.range(0, equipmentIds.length).boxed()
 			.collect(Collectors.toMap(i -> slots[i], i -> equipmentIds[i]));
@@ -933,7 +1090,7 @@ public class SwapManager
 			.map(Map.Entry::getKey)
 			.collect(Collectors.toSet());
 
-		int[] colors = other.getColors();
+		int[] colors = otherComposition.getColors();
 		ColorType[] types = ColorType.values();
 		Map<ColorType, Integer> colorImports = IntStream.range(0, colors.length).boxed()
 			.collect(Collectors.toMap(i -> types[i], i -> colors[i]));
@@ -946,9 +1103,16 @@ public class SwapManager
 			itemImports.remove(KitType.JAW);
 		}
 
-		if (!itemImports.isEmpty() || !kitImports.isEmpty() || !colorImports.isEmpty() || !removals.isEmpty())
+		Integer otherPet = client.getNpcs().stream()
+			.filter(npc -> isPet(npc, other))
+			.map(NPC::getId)
+			.findAny()
+			.orElse(null);
+
+		if (!itemImports.isEmpty() || !kitImports.isEmpty() || !colorImports.isEmpty() || otherPet != null ||
+			icon != null || !removals.isEmpty())
 		{
-			importSwaps(itemImports, kitImports, colorImports, icon, removals);
+			importSwaps(itemImports, kitImports, colorImports, otherPet, icon, removals);
 		}
 	}
 
@@ -1040,7 +1204,8 @@ public class SwapManager
 			Map<ColorType, Colorable> lockedColors = swappedColorsMap().entrySet().stream()
 				.filter(e -> savedSwaps.isColorLocked(e.getKey()) && savedSwaps.containsColor(e.getKey()))
 				.collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-			colorScorer.setPlayerInfo(lockedItems, lockedColors);
+			Integer lockedPet = savedSwaps.isPetLocked() ? savedSwaps.getSwappedPetId() : null;
+			colorScorer.setPlayerInfo(lockedItems, lockedColors, lockedPet);
 		}
 		Map<KitType, Boolean> itemSlotsToRevert = Arrays.stream(KitType.values())
 			.collect(Collectors.toMap(slot -> slot, savedSwaps::isItemLocked));
@@ -1049,6 +1214,106 @@ public class SwapManager
 		Map<KitType, Integer> newSwaps = Arrays.stream(KitType.values())
 			.filter(itemSlotsToRevert::get)
 			.collect(Collectors.toMap(s -> s, s -> -1));
+		Map<ColorType, Integer> newColors = new HashMap<>();
+		Integer[] newPets = new Integer[]{null};
+
+		List<Runnable> shuffleOps = new ArrayList<>();
+		shuffleOps.add(() -> shuffleItems(newSwaps, size));
+		shuffleOps.add(() -> shuffleColors(newColors, intelligence));
+		shuffleOps.add(() -> shufflePet(newPets, intelligence));
+		Collections.shuffle(shuffleOps);
+		shuffleOps.forEach(Runnable::run);
+
+		// slots filled with -1 were placeholders that need to be removed
+		List<KitType> removes = newSwaps.entrySet().stream()
+			.filter(e -> e.getValue() < 0)
+			.map(Map.Entry::getKey)
+			.collect(Collectors.toList());
+		removes.forEach(newSwaps::remove);
+
+		SwapDiff totalDiff = SwapDiff.blank();
+
+		// convert to equipment ids
+		Map<KitType, Integer> newEquipSwaps = newSwaps.entrySet().stream()
+			.collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue() + 512));
+
+		// swap items now before moving on to kits
+		SwapDiff itemsDiff = CompoundSwap.fromMap(newEquipSwaps, null).stream()
+			.map(c -> this.swap(c, SwapMode.SAVE))
+			.reduce(SwapDiff::mergeOver)
+			.orElse(SwapDiff.blank());
+		totalDiff = totalDiff.mergeOver(itemsDiff);
+
+		// See if remaining slots can be kit-swapped
+		if (isFemale != null && !config.excludeBaseModels())
+		{
+			Map<KitType, Integer> kitSwaps = Arrays.stream(KitType.values())
+				.filter(slot -> !newSwaps.containsKey(slot) && isOpen(slot))
+				.map(slot -> {
+					List<Kit> kits = KIT_TYPE_TO_KITS.getOrDefault(slot, new ArrayList<>()).stream()
+						.filter(k -> k.isFemale() == isFemale)
+						.collect(Collectors.toList());
+					return kits.isEmpty() ? null : kits.get(r.nextInt(kits.size()));
+				})
+				.filter(Objects::nonNull)
+				.collect(Collectors.toMap(Kit::getKitType, Kit::getKitId));
+
+			Map<KitType, Integer> kitEquipSwaps = kitSwaps.entrySet().stream()
+				.collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue() + 256));
+
+			SwapDiff kitsDiff = CompoundSwap.fromMap(kitEquipSwaps, null)
+				.stream()
+				.map(c -> this.swap(c, SwapMode.SAVE))
+				.reduce(SwapDiff::mergeOver)
+				.orElse(SwapDiff.blank());
+
+			totalDiff = totalDiff.mergeOver(kitsDiff);
+		}
+
+		if (!config.excludeNonStandardItems() && !config.excludeMembersItems() && !savedSwaps.isIconLocked())
+		{
+			List<JawIcon> icons = Arrays.asList(JawIcon.values());
+			Collections.shuffle(icons);
+			int limit = icons.size();
+			if (intelligence == RandomizerIntelligence.NONE)
+			{
+				limit = 1;
+			}
+			Map<JawIcon, Double> scores = icons.stream()
+				.limit(limit)
+				.collect(Collectors.toMap(i -> i, i -> {
+					Integer itemId = JawKit.NO_JAW.getIconItemId(i);
+					return itemId != null ? colorScorer.scoreItem(itemId, null) : 0;
+				}));
+			// only icon swap if >75% match (if intelligence is > NONE)
+			JawIcon icon = scores.entrySet().stream()
+				.filter(e -> intelligence == RandomizerIntelligence.NONE || e.getValue() > 0.75)
+				.max(Comparator.comparingDouble(Map.Entry::getValue))
+				.map(Map.Entry::getKey)
+				.orElse(JawIcon.NOTHING);
+			SwapDiff iconDiff = swap(CompoundSwap.fromIcon(icon), SwapMode.PREVIEW, SwapMode.SAVE);
+			totalDiff = totalDiff.mergeOver(iconDiff);
+		}
+
+		SwapDiff colorsDiff = newColors.entrySet().stream()
+			.filter(e -> e.getValue() >= 0)
+			.map(e -> swap(e.getKey(), e.getValue(), SwapMode.SAVE))
+			.reduce(SwapDiff::mergeOver)
+			.orElse(SwapDiff.blank());
+		totalDiff = totalDiff.mergeOver(colorsDiff);
+
+		SwapDiff petsDiff = Arrays.stream(newPets)
+			.filter(Objects::nonNull)
+			.map(id -> swapPet(id, SwapMode.SAVE))
+			.reduce(SwapDiff::mergeOver)
+			.orElse(SwapDiff.blank());
+		totalDiff = totalDiff.mergeOver(petsDiff);
+
+		swapDiffHistory.appendToUndo(totalDiff);
+	}
+
+	private void shuffleItems(Map<KitType, Integer> newSwaps, int size)
+	{
 		Set<Integer> skips = FashionscapePlugin.getItemIdsToExclude(config);
 		List<Candidate> candidates = new ArrayList<>(size);
 		List<Integer> randomOrder = IntStream.range(0, client.getItemCount()).boxed().collect(Collectors.toList());
@@ -1120,7 +1385,7 @@ public class SwapManager
 				if (size > 1)
 				{
 					best = candidates.stream()
-						.max(Comparator.comparingDouble(c -> colorScorer.score(c.itemId, c.slot)))
+						.max(Comparator.comparingDouble(c -> colorScorer.scoreItem(c.itemId, c.slot)))
 						.get();
 					colorScorer.addPlayerInfo(best.slot, best.itemId);
 				}
@@ -1132,15 +1397,12 @@ public class SwapManager
 				candidates.clear();
 			}
 		}
-		// slots filled with -1 were placeholders that need to be removed
-		List<KitType> removes = newSwaps.entrySet().stream()
-			.filter(e -> e.getValue() < 0)
-			.map(Map.Entry::getKey)
-			.collect(Collectors.toList());
-		removes.forEach(newSwaps::remove);
+	}
 
-		// shuffle colors
-		Map<ColorType, Integer> newColors = new HashMap<>();
+	private void shuffleColors(
+		Map<ColorType, Integer> newColors,
+		RandomizerIntelligence intelligence)
+	{
 		List<ColorType> allColorTypes = Arrays.asList(ColorType.values().clone());
 		Collections.shuffle(allColorTypes);
 		for (ColorType type : allColorTypes)
@@ -1177,80 +1439,36 @@ public class SwapManager
 			colorScorer.addPlayerColor(type, best);
 			newColors.put(type, best.getColorId(type));
 		}
+	}
 
-		SwapDiff totalDiff = SwapDiff.blank();
-
-		// convert to equipment ids
-		Map<KitType, Integer> newEquipSwaps = newSwaps.entrySet().stream()
-			.collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue() + 512));
-
-		// swap items now before moving on to kits
-		SwapDiff itemsDiff = CompoundSwap.fromMap(newEquipSwaps, null).stream()
-			.map(c -> this.swap(c, SwapMode.SAVE))
-			.reduce(SwapDiff::mergeOver)
-			.orElse(SwapDiff.blank());
-		totalDiff = totalDiff.mergeOver(itemsDiff);
-
-		// See if remaining slots can be kit-swapped
-		if (isFemale != null && !config.excludeBaseModels())
+	private void shufflePet(Integer[] newPets, RandomizerIntelligence intelligence)
+	{
+		if (savedSwaps.isPetLocked())
 		{
-			Map<KitType, Integer> kitSwaps = Arrays.stream(KitType.values())
-				.filter(slot -> !newSwaps.containsKey(slot) && isOpen(slot))
-				.map(slot -> {
-					List<Kit> kits = KIT_TYPE_TO_KITS.getOrDefault(slot, new ArrayList<>()).stream()
-						.filter(k -> k.isFemale() == isFemale)
-						.collect(Collectors.toList());
-					return kits.isEmpty() ? null : kits.get(r.nextInt(kits.size()));
-				})
-				.filter(Objects::nonNull)
-				.collect(Collectors.toMap(Kit::getKitType, Kit::getKitId));
-
-			Map<KitType, Integer> kitEquipSwaps = kitSwaps.entrySet().stream()
-				.collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue() + 256));
-
-			SwapDiff kitsDiff = CompoundSwap.fromMap(kitEquipSwaps, null)
-				.stream()
-				.map(c -> this.swap(c, SwapMode.SAVE))
-				.reduce(SwapDiff::mergeOver)
-				.orElse(SwapDiff.blank());
-
-			totalDiff = totalDiff.mergeOver(kitsDiff);
+			return;
 		}
-
-		if (!config.excludeNonStandardItems() && !config.excludeMembersItems() && !savedSwaps.isIconLocked())
+		List<Pet> allPets = Arrays.asList(Pet.values().clone());
+		Collections.shuffle(allPets);
+		int limit;
+		switch (intelligence)
 		{
-			List<JawIcon> icons = Arrays.asList(JawIcon.values());
-			Collections.shuffle(icons);
-			int limit = icons.size();
-			if (intelligence == RandomizerIntelligence.NONE)
-			{
+			case LOW:
+				limit = Math.max(1, allPets.size() / 4);
+				break;
+			case MODERATE:
+				limit = Math.max(1, allPets.size() / 2);
+				break;
+			case HIGH:
+				limit = Math.max(1, 3 * allPets.size() / 4);
+				break;
+			default:
 				limit = 1;
-			}
-			Map<JawIcon, Double> scores = icons.stream()
-				.limit(limit)
-				.collect(Collectors.toMap(i -> i, i -> {
-					Integer itemId = JawKit.NO_JAW.getIconItemId(i);
-					return itemId != null ? colorScorer.score(itemId, null) : 0;
-				}));
-			// only icon swap if >75% match (if intelligence is > NONE)
-			JawIcon icon = scores.entrySet().stream()
-				.filter(e -> intelligence == RandomizerIntelligence.NONE || e.getValue() > 0.75)
-				.max(Comparator.comparingDouble(Map.Entry::getValue))
-				.map(Map.Entry::getKey)
-				.orElse(JawIcon.NOTHING);
-			SwapDiff iconDiff = swap(CompoundSwap.fromIcon(icon), SwapMode.PREVIEW, SwapMode.SAVE);
-			totalDiff = totalDiff.mergeOver(iconDiff);
 		}
-
-		SwapDiff colorsDiff = newColors.entrySet().stream()
-			.filter(e -> e.getValue() >= 0)
-			.map(e -> swap(e.getKey(), e.getValue(), SwapMode.SAVE))
-			.reduce(SwapDiff::mergeOver)
-			.orElse(SwapDiff.blank());
-
-		totalDiff = totalDiff.mergeOver(colorsDiff);
-
-		swapDiffHistory.appendToUndo(totalDiff);
+		Pet best = allPets.stream()
+			.limit(limit)
+			.max(Comparator.comparingDouble(p -> colorScorer.scorePet(p.getItemId())))
+			.orElse(allPets.get(0));
+		newPets[0] = best.getNpcId();
 	}
 
 	// this should only be called from the client thread
@@ -1355,12 +1573,72 @@ public class SwapManager
 				case PREVIEW:
 					break;
 			}
-			return new SwapDiff(new HashMap<>(), changes, null, null);
+			return new SwapDiff(new HashMap<>(), changes, null, null, null);
 		}
 		catch (Exception e)
 		{
 			return SwapDiff.blank();
 		}
+	}
+
+	private SwapDiff swapPet(Integer petNpcId, SwapMode swapMode)
+	{
+		if (petNpcId == null || follower == null)
+		{
+			return SwapDiff.blank();
+		}
+		int changedId = follower.getId();
+		// TODO editing messes with cache, should save fields before they're set
+		NPCComposition targetComp = client.getNpcDefinition(petNpcId);
+		NPCComposition currentComp = follower.getComposition();
+		if (targetComp != null)
+		{
+//			log.info("target {} current {}", targetComp.getId(), currentComp.getId());
+			try
+			{
+				for (Field field : targetComp.getClass().getDeclaredFields())
+				{
+					if (field.getType().equals(int.class))
+					{
+						field.setAccessible(true);
+						int i = (int) field.get(targetComp);
+						field.set(currentComp, i);
+					}
+					else if (field.getType().equals(int[].class))
+					{
+						field.setAccessible(true);
+						int[] intArr = (int[]) field.get(targetComp);
+						field.set(currentComp, intArr);
+					}
+					else if (field.getType().equals(short[].class))
+					{
+						field.setAccessible(true);
+						short[] shortArr = (short[]) field.get(targetComp);
+						field.set(currentComp, shortArr);
+					}
+				}
+			}
+			catch (IllegalAccessException e)
+			{
+				e.printStackTrace();
+				return SwapDiff.blank();
+			}
+		}
+		setPetAnimations(petNpcId);
+		SwapDiff.Change change = new SwapDiff.Change(changedId, savedSwaps.containsPet());
+		switch (swapMode)
+		{
+			case SAVE:
+				savedSwaps.putPet(petNpcId);
+				break;
+			case REVERT:
+				savedSwaps.removePet();
+				break;
+			case PREVIEW:
+				break;
+		}
+//		log.info("changes {}", change);
+		return new SwapDiff(new HashMap<>(), new HashMap<>(), null, change, null);
 	}
 
 	/**
@@ -1422,7 +1700,7 @@ public class SwapManager
 		{
 			changes.put(slot, results.get(SwapDiff.Change.Type.EQUIPMENT));
 		}
-		return new SwapDiff(changes, new HashMap<>(), iconChange, null);
+		return new SwapDiff(changes, new HashMap<>(), iconChange, null, null);
 	}
 
 	/**
@@ -1628,7 +1906,7 @@ public class SwapManager
 		attemptChange.accept(KitType.HEAD, finalHeadId);
 		attemptChange.accept(KitType.HAIR, finalHairId);
 		attemptChange.accept(KitType.JAW, finalJawId);
-		return new SwapDiff(changes, new HashMap<>(), iconChange[0], null);
+		return new SwapDiff(changes, new HashMap<>(), iconChange[0], null, null);
 	}
 
 	/**
@@ -1739,7 +2017,7 @@ public class SwapManager
 		};
 		attemptChange.accept(KitType.TORSO, finalTorsoId);
 		attemptChange.accept(KitType.ARMS, finalArmsId);
-		return new SwapDiff(changes, new HashMap<>(), null, null);
+		return new SwapDiff(changes, new HashMap<>(), null, null, null);
 	}
 
 	/**
@@ -1832,7 +2110,7 @@ public class SwapManager
 				}
 			}
 		}
-		return new SwapDiff(changes, new HashMap<>(), null, changedAnim);
+		return new SwapDiff(changes, new HashMap<>(), null, null, changedAnim);
 	}
 
 	/**
@@ -2003,6 +2281,49 @@ public class SwapManager
 		return previousId;
 	}
 
+	private void setPetAnimations(Integer petNpcId)
+	{
+		if (follower == null)
+		{
+			return;
+		}
+		Pet petInfo = PET_MAP.get(petNpcId);
+		if (petInfo == null)
+		{
+			if (realPetIdleId != null)
+			{
+				follower.setIdlePoseAnimation(realPetIdleId);
+				follower.setPoseAnimation(realPetIdleId);
+			}
+			return;
+		}
+		if (!Objects.equals(petInfo.getIdleId(), follower.getIdlePoseAnimation()))
+		{
+			follower.setIdlePoseAnimation(petInfo.getIdleId());
+			follower.setPoseAnimation(petInfo.getIdleId());
+		}
+		if (petInfo.getWalkingId() <= 0)
+		{
+			follower.setPoseAnimation(petInfo.getIdleId());
+		}
+		else if (!Objects.equals(petInfo.getWalkingId(), follower.getPoseAnimation()) &&
+			PET_WALKING_IDS.contains(follower.getPoseAnimation()))
+		{
+			follower.setPoseAnimation(petInfo.getWalkingId());
+		}
+	}
+
+	// TODO remove
+	public void setPetPoseAnimation(Integer animId)
+	{
+		if (follower == null)
+		{
+			return;
+		}
+		follower.setIdlePoseAnimation(animId);
+		follower.setPoseAnimation(animId);
+	}
+
 	/**
 	 * Performs a revert back to an "original" state for the given slot.
 	 * In most cases, this swaps to whatever was actually equipped in the slot. Some exceptions:
@@ -2077,7 +2398,7 @@ public class SwapManager
 			Map<SwapDiff.Change.Type, SwapDiff.Change> changes = swap(KitType.JAW, kit.getKitId() + 256,
 				SwapMode.PREVIEW, SwapMode.REVERT, false);
 			SwapDiff.Change iconChange = changes.get(SwapDiff.Change.Type.ICON);
-			return new SwapDiff(new HashMap<>(), new HashMap<>(), iconChange, null);
+			return new SwapDiff(new HashMap<>(), new HashMap<>(), iconChange, null, null);
 		}
 		return SwapDiff.blank();
 	}
@@ -2132,6 +2453,16 @@ public class SwapManager
 			}
 		}
 		return finalJawId;
+	}
+
+	private SwapDiff doRevertPet()
+	{
+		if (realPetId == null)
+		{
+			return SwapDiff.blank();
+		}
+		Integer originalPetId = realPetId;
+		return swapPet(originalPetId, SwapMode.REVERT);
 	}
 
 	@Nullable
@@ -2312,11 +2643,16 @@ public class SwapManager
 	// restores diff and returns a new diff with reverted changes (allows redo)
 	private SwapDiff restore(SwapDiff swapDiff, boolean save)
 	{
+		Function<SwapDiff.Change, SwapMode> modeFromChange = (change) -> {
+			if (!save)
+			{
+				return SwapMode.PREVIEW;
+			}
+			return change != null && change.isUnnatural() ? SwapMode.SAVE : SwapMode.REVERT;
+		};
 		Function<KitType, SwapMode> swapModeProvider = (slot) -> {
 			SwapDiff.Change change = swapDiff.getSlotChanges().get(slot);
-			return !save ? SwapMode.PREVIEW : change != null && change.isUnnatural() ?
-				SwapMode.SAVE :
-				SwapMode.REVERT;
+			return modeFromChange.apply(change);
 		};
 		SwapDiff.Change iconChange = swapDiff.getIconChange();
 		SwapMode iconSwapMode = (!save || iconChange == null) ? SwapMode.PREVIEW :
@@ -2338,20 +2674,22 @@ public class SwapManager
 				ColorType type = e.getKey();
 				SwapDiff.Change change = e.getValue();
 				int colorId = change.getId();
-				SwapMode mode;
-				if (save)
-				{
-					mode = change.isUnnatural() ? SwapMode.SAVE : SwapMode.REVERT;
-				}
-				else
-				{
-					mode = SwapMode.PREVIEW;
-				}
-				return swap(type, colorId, mode);
+				SwapMode swapMode = modeFromChange.apply(change);
+				return swap(type, colorId, swapMode);
 			})
 			.reduce(SwapDiff::mergeOver)
 			.orElse(SwapDiff.blank());
-		return slotRestore.mergeOver(colorRestore);
+		SwapDiff.Change changedPet = swapDiff.getChangedPet();
+		SwapDiff petRestore = SwapDiff.blank();
+		if (changedPet != null)
+		{
+			SwapMode mode = modeFromChange.apply(changedPet);
+//			log.info("restoring pet {} mode {}", changedPet, mode);
+			petRestore = swapPet(changedPet.getId(), mode);
+		}
+		return slotRestore
+			.mergeOver(colorRestore)
+			.mergeOver(petRestore);
 	}
 
 	@Nullable
@@ -2393,6 +2731,31 @@ public class SwapManager
 		{
 			return null;
 		}
+	}
+
+	private boolean isPet(NPC npc)
+	{
+		return isPet(npc, client.getLocalPlayer());
+	}
+
+	private boolean isPet(NPC npc, Player player)
+	{
+		if (npc == null || player == null)
+		{
+			return false;
+		}
+		Actor interacting = npc.getInteracting();
+		if (interacting == null || interacting.getName() == null || !interacting.getName().equals(player.getName()))
+		{
+			return false;
+		}
+		NPCComposition composition = npc.getComposition();
+		if (composition == null || composition.getActions() == null)
+		{
+			return false;
+		}
+		return Arrays.stream(composition.getActions())
+			.anyMatch(s -> s != null && s.toLowerCase().equals("pick-up"));
 	}
 
 	private void sendHighlightedMessage(String message)

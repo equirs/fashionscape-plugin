@@ -1,5 +1,6 @@
 package eq.uirs.fashionscape.panel;
 
+import eq.uirs.fashionscape.data.Pet;
 import eq.uirs.fashionscape.swap.SwapManager;
 import java.awt.BorderLayout;
 import java.awt.Color;
@@ -11,36 +12,33 @@ import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
 import java.text.DecimalFormat;
 import java.util.Objects;
-import javax.annotation.Nullable;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.border.EmptyBorder;
-import lombok.extern.slf4j.Slf4j;
-import net.runelite.api.kit.KitType;
 import net.runelite.client.callback.ClientThread;
-import net.runelite.client.game.ItemManager;
 import net.runelite.client.ui.ColorScheme;
 
-@Slf4j
-class SearchItemPanel extends AbsItemPanel
+public class SearchPetPanel extends AbsIconLabelPanel
 {
+	final Integer petId;
 	private final SwapManager swapManager;
-	private final KitType slot;
+	private final Pet pet;
 
-	public SearchItemPanel(@Nullable Integer itemId, BufferedImage icon, KitType slot,
-						   ItemManager itemManager, SwapManager swapManager, ClientThread clientThread,
-						   SelectionChangingListener listener, Double score)
+	// TODO need pet changing listener
+	SearchPetPanel(BufferedImage image, ClientThread clientThread, SwapManager swapManager, Pet pet, Double score,
+				   SelectionChangingListener listener)
 	{
-		super(itemId, icon, itemManager, clientThread);
+		super(image, clientThread);
+		this.pet = pet;
+		this.petId = pet.getNpcId();
 		this.swapManager = swapManager;
-		this.slot = slot;
 
-		MouseAdapter itemPanelMouseListener = new MouseAdapter()
+		MouseAdapter panelMouseListener = new MouseAdapter()
 		{
 			@Override
 			public void mouseEntered(MouseEvent e)
 			{
-				if (!swapManager.isItemLocked(slot))
+				if (!swapManager.isPetLocked())
 				{
 					for (JPanel panel : highlightPanels)
 					{
@@ -48,7 +46,7 @@ class SearchItemPanel extends AbsItemPanel
 					}
 					setCursor(new Cursor(Cursor.HAND_CURSOR));
 				}
-				swapManager.hoverOverItem(slot, itemId);
+				swapManager.hoverOverPet(pet.getNpcId());
 			}
 
 			@Override
@@ -66,7 +64,7 @@ class SearchItemPanel extends AbsItemPanel
 			public void mouseReleased(MouseEvent e)
 			{
 				// pre-emptively set background
-				boolean isAlreadySelected = isMatch();
+				boolean isAlreadySelected = Objects.equals(swapManager.swappedPetId(), pet.getNpcId());
 				Color bg = isAlreadySelected ? nonHighlightColor : ColorScheme.MEDIUM_GRAY_COLOR;
 				for (JPanel panel : highlightPanels)
 				{
@@ -74,22 +72,24 @@ class SearchItemPanel extends AbsItemPanel
 				}
 				// now swap it
 				clientThread.invokeLater(() -> {
-					if (!swapManager.isItemLocked(slot))
+					if (!swapManager.isPetLocked())
 					{
-						listener.slotChanging(slot);
-						swapManager.hoverSelectItem(slot, itemId);
+						listener.petChanging();
+						swapManager.hoverSelectPet(pet.getNpcId());
 					}
 				});
 			}
 		};
 
-		addMouseListener(itemPanelMouseListener);
+		addMouseListener(panelMouseListener);
 
 		// Item details panel
 		int rows = score == null ? 1 : 2;
 		JPanel rightPanel = new JPanel(new GridLayout(rows, 1));
 		rightPanel.setBorder(new EmptyBorder(0, 5, 0, 5));
 		highlightPanels.add(rightPanel);
+		String petName = pet.getDisplayName();
+		label.setText(petName);
 		rightPanel.add(label);
 
 		if (score != null)
@@ -114,25 +114,13 @@ class SearchItemPanel extends AbsItemPanel
 
 	private Color defaultBackgroundColor()
 	{
-		if (isMatch())
+		if (Objects.equals(swapManager.swappedPetId(), pet.getNpcId()))
 		{
 			return ColorScheme.MEDIUM_GRAY_COLOR;
 		}
 		else
 		{
 			return nonHighlightColor;
-		}
-	}
-
-	private boolean isMatch()
-	{
-		if (itemId < 0)
-		{
-			return swapManager.isHidden(slot);
-		}
-		else
-		{
-			return Objects.equals(swapManager.swappedItemIdIn(slot), itemId);
 		}
 	}
 }

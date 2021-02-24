@@ -42,7 +42,7 @@ class SwapDiff
 
 	public static SwapDiff blank()
 	{
-		return new SwapDiff(new HashMap<>(), new HashMap<>(), null, null);
+		return new SwapDiff(new HashMap<>(), new HashMap<>(), null, null, null);
 	}
 
 	@Getter
@@ -52,11 +52,14 @@ class SwapDiff
 	@Getter
 	private final Change iconChange;
 	@Getter
+	private final Change changedPet;
+	@Getter
 	private final Integer changedIdleAnimationId;
 
 	boolean isBlank()
 	{
-		return changedIdleAnimationId == null && iconChange == null && slotChanges.isEmpty() && colorChanges.isEmpty();
+		return changedIdleAnimationId == null && iconChange == null && changedPet == null && slotChanges.isEmpty() &&
+			colorChanges.isEmpty();
 	}
 
 	// This diff will take priority of the other diff in the event of a collision.
@@ -78,6 +81,11 @@ class SwapDiff
 		{
 			idleId = other.changedIdleAnimationId;
 		}
-		return new SwapDiff(mergedSlots, mergedColors, iconChange, idleId);
+		Change petChange = this.changedPet;
+		if (petChange == null)
+		{
+			petChange = other.changedPet;
+		}
+		return new SwapDiff(mergedSlots, mergedColors, iconChange, petChange, idleId);
 	}
 }

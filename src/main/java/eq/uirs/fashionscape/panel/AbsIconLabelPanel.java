@@ -22,7 +22,7 @@ abstract class AbsIconLabelPanel extends JPanel
 	protected final ClientThread clientThread;
 	protected final List<JPanel> highlightPanels;
 	protected final Color nonHighlightColor;
-	protected final JLabel label;
+	protected final AutoTooltipLabel label;
 	protected final JLabel icon;
 
 	AbsIconLabelPanel(BufferedImage image, ClientThread clientThread)
@@ -31,14 +31,12 @@ abstract class AbsIconLabelPanel extends JPanel
 
 		BorderLayout layout = new BorderLayout();
 		setLayout(layout);
-		setBorder(new EmptyBorder(0, 10, 0, 10));
+		setBorder(new EmptyBorder(5, 5, 5, 5));
 		setBackground(ColorScheme.DARKER_GRAY_COLOR);
 
 		highlightPanels = new ArrayList<>();
 		nonHighlightColor = getBackground();
 		highlightPanels.add(this);
-
-		setBorder(new EmptyBorder(5, 5, 5, 5));
 
 		icon = new JLabel();
 		icon.setPreferredSize(ICON_SIZE);
@@ -46,7 +44,7 @@ abstract class AbsIconLabelPanel extends JPanel
 		setIcon(icon, image);
 		add(icon, BorderLayout.LINE_START);
 
-		label = new JLabel();
+		label = new AutoTooltipLabel();
 		label.setForeground(Color.WHITE);
 		label.setMaximumSize(new Dimension(0, 0));
 		label.setPreferredSize(new Dimension(0, 0));
@@ -68,6 +66,14 @@ abstract class AbsIconLabelPanel extends JPanel
 		}
 	}
 
+	public void resetBackground()
+	{
+		for (JPanel panel : highlightPanels)
+		{
+			matchComponentBackground(panel, nonHighlightColor);
+		}
+	}
+
 	protected void matchComponentBackground(JPanel panel, Color color)
 	{
 		panel.setBackground(color);
@@ -75,5 +81,12 @@ abstract class AbsIconLabelPanel extends JPanel
 		{
 			c.setBackground(color);
 		}
+	}
+
+	protected Color getScoreColor(Double score)
+	{
+		int red = (int) (255.0 * (1 - Math.pow(score, 2)));
+		int green = (int) (255.0 * Math.pow(score, 2));
+		return new Color(red, green, 0);
 	}
 }

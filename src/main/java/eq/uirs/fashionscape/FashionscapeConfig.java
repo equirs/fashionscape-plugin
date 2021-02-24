@@ -21,6 +21,38 @@ public interface FashionscapeConfig extends Config
 	String KEY_REAL_KITS = "realKitIds";
 
 	@ConfigItem(
+		position = -1,
+		keyName = "petId",
+		name = "Pet ID",
+		description = "Pet npc id to transform to"
+	)
+	default int petId()
+	{
+		return 1;
+	}
+
+	@ConfigItem(
+		position = -1,
+		keyName = "petAnim",
+		name = "Pet pose anim ID",
+		description = "Pet animation to set"
+	)
+	default int petAnim()
+	{
+		return 1;
+	}
+
+	@ConfigItem(
+		position = -1,
+		keyName = "recolor",
+		name = "Recolor id",
+		description = "Recolor to set"
+	)
+	default int recolor() {
+		return 1;
+	}
+
+	@ConfigItem(
 		position = 0,
 		keyName = KEY_EXCLUDE_NON_STANDARD,
 		name = "Exclude non-standard items",

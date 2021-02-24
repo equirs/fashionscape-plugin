@@ -1,5 +1,6 @@
 package eq.uirs.fashionscape.panel;
 
+import eq.uirs.fashionscape.data.Pet;
 import eq.uirs.fashionscape.swap.SwapManager;
 import eq.uirs.fashionscape.swap.event.KnownKitChangedListener;
 import java.awt.BorderLayout;
@@ -34,6 +35,21 @@ import net.runelite.client.util.Text;
 @Slf4j
 class SwapsPanel extends JPanel
 {
+	@Value
+	private static class SlotResult
+	{
+		KitType slot;
+		Integer itemId;
+		BufferedImage image;
+	}
+
+	@Value
+	private static class PetResult
+	{
+		Integer petId;
+		BufferedImage image;
+	}
+
 	private final SwapManager swapManager;
 	private final ItemManager itemManager;
 	private final ClientThread clientThread;
@@ -43,14 +59,6 @@ class SwapsPanel extends JPanel
 
 	private JPanel slotsPanel;
 	private JPanel warningsPanel;
-
-	@Value
-	private static class SlotResult
-	{
-		KitType slot;
-		Integer itemId;
-		BufferedImage image;
-	}
 
 	public SwapsPanel(SwapManager swapManager, ItemManager itemManager, SearchOpener searchOpener,
 					  ClientThread clientThread)
@@ -126,31 +134,55 @@ class SwapsPanel extends JPanel
 	{
 		clientThread.invokeLater(() -> {
 			List<SlotResult> slotResults = new ArrayList<>();
+			PetResult petResult = null;
 			for (PanelEquipSlot panelSlot : PanelEquipSlot.values())
 			{
-				KitType slot = panelSlot.getKitType();
-				if (slot == null)
+				if (panelSlot == PanelEquipSlot.PET)
 				{
-					continue;
+					BufferedImage image = null;
+					Pet pet = null;
+					Integer petNpcId = swapManager.swappedPetId();
+					if (petNpcId != null)
+					{
+						pet = SwapManager.PET_MAP.get(petNpcId);
+					}
+					if (pet != null)
+					{
+						image = itemManager.getImage(pet.getItemId());
+					}
+					else
+					{
+						image = ImageUtil.loadImageResource(getClass(), "pet.png");
+					}
+					petResult = new PetResult(petNpcId, image);
 				}
-				Integer itemId = swapManager.swappedItemIdIn(slot);
-				BufferedImage image;
-				if (itemId != null && itemId >= 0)
+				else if (panelSlot != PanelEquipSlot.ALL)
 				{
-					ItemComposition itemComposition = itemManager.getItemComposition(itemId);
-					image = itemManager.getImage(itemComposition.getId());
+					KitType slot = panelSlot.getKitType();
+					if (slot == null)
+					{
+						continue;
+					}
+					Integer itemId = swapManager.swappedItemIdIn(slot);
+					BufferedImage image;
+					if (itemId != null && itemId >= 0)
+					{
+						ItemComposition itemComposition = itemManager.getItemComposition(itemId);
+						image = itemManager.getImage(itemComposition.getId());
+					}
+					else
+					{
+						image = ImageUtil.loadImageResource(getClass(), slot.name().toLowerCase() + ".png");
+					}
+					slotResults.add(new SlotResult(slot, itemId, image));
 				}
-				else
-				{
-					image = ImageUtil.loadImageResource(getClass(), slot.name().toLowerCase() + ".png");
-				}
-				slotResults.add(new SlotResult(slot, itemId, image));
 			}
-			SwingUtilities.invokeLater(() -> addSlotItemPanels(slotResults));
+			PetResult finalPetResult = petResult;
+			SwingUtilities.invokeLater(() -> addSwapPanels(slotResults, finalPetResult));
 		});
 	}
 
-	private void addSlotItemPanels(List<SlotResult> results)
+	private void addSwapPanels(List<SlotResult> results, PetResult petResult)
 	{
 		GridBagConstraints c = new GridBagConstraints();
 		c.fill = GridBagConstraints.HORIZONTAL;
@@ -171,6 +203,16 @@ class SwapsPanel extends JPanel
 			slotsPanel.add(marginWrapper, c);
 			c.gridy++;
 		}
+
+		Integer petId = petResult.petId;
+		BufferedImage petImage = petResult.image;
+		SwapPetPanel petPanel = new SwapPetPanel(petImage, petId, clientThread, swapManager, searchOpener,
+			itemManager);
+		JPanel marginWrapper = new JPanel(new BorderLayout());
+		marginWrapper.setBackground(ColorScheme.DARK_GRAY_COLOR);
+		marginWrapper.setBorder(new EmptyBorder(5, 0, 0, 0));
+		marginWrapper.add(petPanel, BorderLayout.NORTH);
+		slotsPanel.add(marginWrapper, c);
 	}
 
 	public void refreshWarnings()

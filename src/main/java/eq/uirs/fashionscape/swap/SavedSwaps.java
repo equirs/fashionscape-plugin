@@ -1,6 +1,5 @@
 package eq.uirs.fashionscape.swap;
 
-import com.google.common.base.Objects;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 import eq.uirs.fashionscape.FashionscapeConfig;
@@ -21,6 +20,9 @@ import eq.uirs.fashionscape.swap.event.ItemChanged;
 import eq.uirs.fashionscape.swap.event.KitChanged;
 import eq.uirs.fashionscape.swap.event.KnownKitChanged;
 import eq.uirs.fashionscape.swap.event.LockChanged;
+import eq.uirs.fashionscape.swap.event.PetChanged;
+import eq.uirs.fashionscape.swap.event.PetLockChanged;
+import eq.uirs.fashionscape.swap.event.PetSpawnChanged;
 import eq.uirs.fashionscape.swap.event.SwapEvent;
 import eq.uirs.fashionscape.swap.event.SwapEventListener;
 import java.util.Arrays;
@@ -29,14 +31,15 @@ import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import lombok.Getter;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.inject.Singleton;
-import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.kit.KitType;
 import net.runelite.client.config.ConfigManager;
@@ -96,6 +99,8 @@ class SavedSwaps
 	// swapped icon is stored as item id
 	@Getter
 	private JawIcon swappedIcon = null;
+	@Getter
+	private Integer swappedPetId = null;
 	// currently only applicable for slots that exclusively hold items
 	@Getter
 	private final HashSet<KitType> hiddenSlots = new HashSet<>();
@@ -106,6 +111,8 @@ class SavedSwaps
 	private final Set<KitType> lockedItems = new HashSet<>();
 	private final Set<ColorType> lockedColors = new HashSet<>();
 	private boolean lockedIcon = false;
+	@Getter
+	private boolean petLocked = false;
 
 	private final Map<String, List<SwapEventListener<? extends SwapEvent>>> listeners = new HashMap<>();
 
@@ -293,15 +300,26 @@ class SavedSwaps
 		return swappedColorIds.containsKey(type);
 	}
 
+	boolean containsPet()
+	{
+		return swappedPetId != null;
+	}
+
+	Integer getItemOrDefault(KitType slot, Integer fallback)
+	{
+		return swappedItemIds.getOrDefault(slot, fallback);
+	}
+
+	Integer getKitOrDefault(KitType slot, Integer fallback)
+	{
+		return swappedKitIds.getOrDefault(slot, fallback);
+	}
+
 	void putItem(KitType slot, Integer itemId)
 	{
 		if (isSlotLocked(slot))
 		{
 			return;
-		}
-		if (slot == KitType.JAW)
-		{
-			log.warn("putting jaw {} - this should not happen", itemId);
 		}
 		Integer oldId = swappedItemIds.put(slot, itemId);
 		hiddenSlots.remove(slot);
@@ -321,7 +339,7 @@ class SavedSwaps
 		Integer previousId = swappedIcon != null ? swappedIcon.getId() : null;
 		Integer newId = icon != null ? icon.getId() : null;
 		swappedIcon = icon;
-		if (!Objects.equal(previousId, newId))
+		if (!Objects.equals(previousId, newId))
 		{
 			fireEvent(new IconChanged(icon));
 			saveEquipmentConfigDebounced();
@@ -392,6 +410,16 @@ class SavedSwaps
 		realIcon = icon;
 	}
 
+	void putPet(Integer npcId)
+	{
+		if (!Objects.equals(swappedPetId, npcId))
+		{
+			swappedPetId = npcId;
+			fireEvent(new PetChanged(npcId));
+			saveEquipmentConfigDebounced();
+		}
+	}
+
 	void removeSlot(KitType slot)
 	{
 		removeItem(slot);
@@ -437,6 +465,17 @@ class SavedSwaps
 		}
 	}
 
+	void removePet()
+	{
+		Integer oldId = swappedPetId;
+		swappedPetId = null;
+		if (oldId != null)
+		{
+			fireEvent(new PetChanged(null));
+			saveEquipmentConfigDebounced();
+		}
+	}
+
 	void removeIcon()
 	{
 		if (swappedIcon != null)
@@ -456,6 +495,7 @@ class SavedSwaps
 		kitSlots.forEach(this::removeKit);
 		Set<ColorType> colorTypes = Sets.difference(new HashSet<>(swappedColorIds.keySet()), lockedColors);
 		colorTypes.forEach(this::removeColor);
+		removePet();
 		removeIcon();
 	}
 
@@ -592,6 +632,12 @@ class SavedSwaps
 		fireEvent(new ColorLockChanged(type, isColorLocked(type)));
 	}
 
+	void togglePetLocked()
+	{
+		petLocked = !petLocked;
+		fireEvent(new PetLockChanged(petLocked));
+	}
+
 	void toggleIconLocked()
 	{
 		lockedIcon = !lockedIcon;
@@ -606,9 +652,11 @@ class SavedSwaps
 		lockedKits.clear();
 		lockedItems.clear();
 		lockedColors.clear();
+		petLocked = false;
 		lockedIcon = false;
 		slotClears.forEach(slot -> fireEvent(new LockChanged(slot, false, LockChanged.Type.BOTH)));
 		colorClears.forEach(type -> fireEvent(new ColorLockChanged(type, false)));
+		fireEvent(new PetLockChanged(false));
 		fireEvent(new IconLockChanged(false));
 	}
 
@@ -623,6 +671,22 @@ class SavedSwaps
 	{
 		lockedColors.remove(type);
 		fireEvent(new ColorLockChanged(type, false));
+	}
+
+	void removePetLock()
+	{
+		petLocked = false;
+		fireEvent(new PetLockChanged(false));
+	}
+
+	void petSpawned()
+	{
+		fireEvent(new PetSpawnChanged(true));
+	}
+
+	void petDespawned()
+	{
+		fireEvent(new PetSpawnChanged(false));
 	}
 
 	void removeIconLock()

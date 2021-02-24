@@ -5,6 +5,7 @@ import com.google.common.collect.ImmutableMap;
 import eq.uirs.fashionscape.FashionscapeConfig;
 import eq.uirs.fashionscape.FashionscapePlugin;
 import eq.uirs.fashionscape.colors.ColorScorer;
+import eq.uirs.fashionscape.data.Pet;
 import eq.uirs.fashionscape.swap.SwapManager;
 import eq.uirs.fashionscape.swap.event.LockChanged;
 import eq.uirs.fashionscape.swap.event.LockChangedListener;
@@ -45,6 +46,7 @@ import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
+import lombok.EqualsAndHashCode;
 import lombok.Value;
 import net.runelite.api.Client;
 import net.runelite.api.ItemComposition;
@@ -66,6 +68,26 @@ import net.runelite.http.api.item.ItemStats;
  */
 class SearchPanel extends JPanel
 {
+	private static abstract class Result
+	{
+		@Value
+		@EqualsAndHashCode(callSuper = false)
+		private static class Item extends Result
+		{
+			ItemComposition itemComposition;
+			BufferedImage icon;
+			KitType slot;
+		}
+
+		@Value
+		@EqualsAndHashCode(callSuper = false)
+		private static class Npc extends Result
+		{
+			Pet pet;
+			AsyncBufferedImage icon;
+		}
+	}
+
 	private static final int DEBOUNCE_DELAY_MS = 200;
 	private static final String ERROR_PANEL = "ERROR_PANEL";
 	private static final String RESULTS_PANEL = "RESULTS_PANEL";
@@ -94,13 +116,14 @@ class SearchPanel extends JPanel
 	private final PluginErrorPanel errorPanel = new PluginErrorPanel();
 	private final Map<PanelEquipSlot, MaterialTab> tabMap;
 	private final List<SearchItemPanel> searchPanels = new ArrayList<>();
+	private final List<SearchPetPanel> petPanels = new ArrayList<>();
 
 	private final List<Result> results = new ArrayList<>();
 	private final AtomicBoolean searchInProgress = new AtomicBoolean();
-	private final OnSelectionChangingListener listener = new OnSelectionChangingListener()
+	private final SelectionChangingListener slotListener = new SelectionChangingListener()
 	{
 		@Override
-		public void onSearchSelectionChanging(KitType slot)
+		public void slotChanging(KitType slot)
 		{
 			for (SearchItemPanel item : searchPanels)
 			{
@@ -111,25 +134,41 @@ class SearchPanel extends JPanel
 				}
 			}
 		}
-	};
 
+		@Override
+		public void petChanging()
+		{
+			for (SearchPetPanel panel : petPanels)
+			{
+				if (Objects.equals(panel.petId, swapManager.swappedPetId()))
+				{
+					panel.resetBackground();
+				}
+			}
+		}
+	};
 	private Future<?> searchFuture = null;
-	private Function<ItemComposition, Boolean> filter;
+	private Function<ItemComposition, Boolean> itemFilter;
 	private boolean allowShortQueries = false;
+	private boolean allowPets = false;
+	private boolean allowItems = false;
 	private SortBy sort;
 	private KitType selectedSlot = null;
 	private boolean hasSearched = false;
-	private final Map<Integer, Double> scores = new HashMap<>();
+	private final Map<Integer, Double> itemScores = new HashMap<>();
+	private final Map<Integer, Double> petScores = new HashMap<>();
 
-	private final Comparator<Result> itemAlphaComparator = Comparator.comparing(o -> o.getItemComposition().getName());
-
-	@Value
-	private static class Result
-	{
-		ItemComposition itemComposition;
-		BufferedImage icon;
-		KitType slot;
-	}
+	private final Comparator<Result> alphabeticalComparator = Comparator.comparing(r -> {
+		if (r instanceof Result.Item)
+		{
+			return ((Result.Item) r).getItemComposition().getName();
+		}
+		else if (r instanceof Result.Npc)
+		{
+			return ((Result.Npc) r).pet.getDisplayName();
+		}
+		return "";
+	});
 
 	@Inject
 	public SearchPanel(Client client, SwapManager swapManager, ClientThread clientThread,
@@ -264,6 +303,15 @@ class SearchPanel extends JPanel
 		}
 	}
 
+	public void choosePet()
+	{
+		MaterialTab tab = tabMap.get(PanelEquipSlot.PET);
+		if (tab != null)
+		{
+			slotFilter.select(tab);
+		}
+	}
+
 	public void clearSearch()
 	{
 		if (!Strings.isNullOrEmpty(searchBar.getText()))
@@ -290,7 +338,7 @@ class SearchPanel extends JPanel
 			MaterialTab tab = new MaterialTab(new ImageIcon(), slotFilter, null);
 			builder.put(filterSlot, tab);
 			boolean isLocked = false;
-			if (filterSlot.getKitType() == null)
+			if (filterSlot == PanelEquipSlot.ALL)
 			{
 				allTab = tab;
 			}
@@ -316,22 +364,27 @@ class SearchPanel extends JPanel
 				}
 			});
 			tab.setOnSelectEvent(() -> {
-				filter = itemComposition -> {
-					KitType kitType = filterSlot.getKitType();
-					selectedSlot = kitType;
+				itemFilter = itemComposition -> {
 					Integer slotId = swapManager.slotIdFor(itemComposition);
-					if (kitType == null)
+					if (filterSlot == PanelEquipSlot.ALL)
 					{
-						// allow any equipment slot that is also a KitType (so no ammo, etc)
 						return slotId != null && VALID_SLOT_IDS.contains(slotId);
+					}
+					else if (filterSlot == PanelEquipSlot.PET)
+					{
+						// shouldn't happen
+						return false;
 					}
 					else
 					{
+						KitType kitType = filterSlot.getKitType();
+						selectedSlot = kitType;
 						return slotId != null && kitType.getIndex() == slotId;
 					}
 				};
-				// individual slots will show all results all the time
-				allowShortQueries = filterSlot.getKitType() != null;
+				allowShortQueries = filterSlot != PanelEquipSlot.ALL;
+				allowPets = filterSlot == PanelEquipSlot.PET || filterSlot == PanelEquipSlot.ALL;
+				allowItems = filterSlot != PanelEquipSlot.PET;
 				// reset scroll position
 				updateSearchDebounced(() -> resultsScrollPane.getVerticalScrollBar().setValue(0));
 				return true;
@@ -426,38 +479,53 @@ class SearchPanel extends JPanel
 				return true;
 			}
 
-			Set<Integer> ids = new HashSet<>();
-			Set<Integer> skips = FashionscapePlugin.getItemIdsToExclude(config);
-			for (int i = 0; i < client.getItemCount(); i++)
+			if (allowItems)
 			{
-				ItemComposition itemComposition = null;
-				ItemStats stats = null;
-				try
+				Set<Integer> ids = new HashSet<>();
+				Set<Integer> skips = FashionscapePlugin.getItemIdsToExclude(config);
+				for (int i = 0; i < client.getItemCount(); i++)
 				{
-					int canonical = itemManager.canonicalize(i);
-					if (skips.contains(canonical))
-					{
-						continue;
-					}
-					itemComposition = itemManager.getItemComposition(canonical);
-					stats = itemManager.getItemStats(canonical, false);
-				}
-				catch (Exception ignored)
-				{
-				}
-				// id might already be in results due to canonicalize
-				if (itemComposition != null && stats != null && stats.isEquipable() &&
-					!ids.contains(itemComposition.getId()) && isValidSearch(itemComposition, search))
-				{
-					ids.add(itemComposition.getId());
+					ItemComposition itemComposition = null;
+					ItemStats stats = null;
 					try
 					{
-						KitType slot = KitType.values()[stats.getEquipment().getSlot()];
-						AsyncBufferedImage image = itemManager.getImage(itemComposition.getId());
-						results.add(new Result(itemComposition, image, slot));
+						int canonical = itemManager.canonicalize(i);
+						if (skips.contains(canonical))
+						{
+							continue;
+						}
+						itemComposition = itemManager.getItemComposition(canonical);
+						stats = itemManager.getItemStats(canonical, false);
 					}
 					catch (Exception ignored)
 					{
+					}
+					// id might already be in results due to canonicalize
+					if (itemComposition != null && stats != null && stats.isEquipable() &&
+						!ids.contains(itemComposition.getId()) && isValidSearch(itemComposition, search))
+					{
+						ids.add(itemComposition.getId());
+						try
+						{
+							KitType slot = KitType.values()[stats.getEquipment().getSlot()];
+							AsyncBufferedImage image = itemManager.getImage(itemComposition.getId());
+							results.add(new Result.Item(itemComposition, image, slot));
+						}
+						catch (Exception ignored)
+						{
+						}
+					}
+				}
+			}
+
+			if (allowPets)
+			{
+				for (Pet pet : Pet.values())
+				{
+					if (pet.getDisplayName().toLowerCase().contains(search))
+					{
+						AsyncBufferedImage image = itemManager.getImage(pet.getItemId());
+						results.add(new Result.Npc(pet, image));
 					}
 				}
 			}
@@ -466,11 +534,11 @@ class SearchPanel extends JPanel
 			{
 				ItemComposition nothing = new NothingItemComposition();
 				BufferedImage image = ImageUtil.loadImageResource(getClass(), selectedSlot.name().toLowerCase() + ".png");
-				results.add(0, new Result(nothing, image, selectedSlot));
+				results.add(0, new Result.Item(nothing, image, selectedSlot));
 			}
 
 			searchPanels.clear();
-			scores.clear();
+			itemScores.clear();
 			switch (this.sort)
 			{
 				case RELEASE:
@@ -478,7 +546,7 @@ class SearchPanel extends JPanel
 					break;
 				case ALPHABETICAL:
 					executor.submit(() -> {
-						results.sort(itemAlphaComparator);
+						results.sort(alphabeticalComparator);
 						addPendingResults(postExec);
 					});
 					break;
@@ -498,11 +566,32 @@ class SearchPanel extends JPanel
 		colorScorer.updatePlayerInfo();
 		for (Result result : results)
 		{
-			int itemId = result.getItemComposition().getId();
-			scores.put(itemId, colorScorer.score(itemId, selectedSlot));
+			if (result instanceof Result.Item)
+			{
+				int itemId = ((Result.Item) result).getItemComposition().getId();
+				itemScores.put(itemId, colorScorer.scoreItem(itemId, selectedSlot));
+			}
+			else if (result instanceof Result.Npc)
+			{
+				int npcId = ((Result.Npc) result).pet.getNpcId();
+				Pet pet = SwapManager.PET_MAP.get(npcId);
+				if (pet != null)
+				{
+					petScores.put(pet.getNpcId(), colorScorer.scorePet(pet.getItemId()));
+				}
+			}
 		}
-		results.sort(Comparator.comparing(r ->
-			-scores.getOrDefault(r.getItemComposition().getId(), 0.0)));
+		results.sort(Comparator.comparing(r -> {
+			if (r instanceof Result.Item)
+			{
+				return -itemScores.getOrDefault(((Result.Item) r).getItemComposition().getId(), 0.0);
+			}
+			else if (r instanceof Result.Npc)
+			{
+				return -petScores.getOrDefault(((Result.Npc) r).pet.getNpcId(), 0.0);
+			}
+			return 0.0;
+		}));
 	}
 
 	// only to be called from updateSearch
@@ -527,27 +616,49 @@ class SearchPanel extends JPanel
 				boolean showScores = true;
 				for (Result result : results)
 				{
-					Integer itemId = result.getItemComposition().getId();
-					Double score = scores.get(itemId);
-					if (firstItem)
-					{
-						showScores = score != null && score != 0.0;
-					}
-					if (!showScores)
-					{
-						score = null;
-					}
-					SearchItemPanel panel = new SearchItemPanel(itemId, result.getIcon(),
-						result.getSlot(), itemManager, swapManager, clientThread, listener, score);
-					searchPanels.add(panel);
 					int topPadding = firstItem ? 0 : 5;
-					firstItem = false;
 					JPanel marginWrapper = new JPanel(new BorderLayout());
 					marginWrapper.setBackground(ColorScheme.DARK_GRAY_COLOR);
 					marginWrapper.setBorder(new EmptyBorder(topPadding, 10, 0, 10));
-					marginWrapper.add(panel, BorderLayout.NORTH);
+					if (result instanceof Result.Item)
+					{
+						Result.Item item = (Result.Item) result;
+						Integer itemId = item.getItemComposition().getId();
+						Double score = itemScores.get(itemId);
+						if (firstItem)
+						{
+							showScores = score != null && score != 0.0;
+						}
+						if (!showScores)
+						{
+							score = null;
+						}
+						SearchItemPanel panel = new SearchItemPanel(itemId, item.getIcon(),
+							item.getSlot(), itemManager, swapManager, clientThread, slotListener, score);
+						searchPanels.add(panel);
+						marginWrapper.add(panel, BorderLayout.NORTH);
+						resultsPanel.add(marginWrapper, itemConstraints);
+					}
+					else if (result instanceof Result.Npc)
+					{
+						Result.Npc npc = (Result.Npc) result;
+						Double score = petScores.get(npc.getPet().getNpcId());
+						if (firstItem)
+						{
+							showScores = score != null && score != 0.0;
+						}
+						if (!showScores)
+						{
+							score = null;
+						}
+						SearchPetPanel panel = new SearchPetPanel(npc.getIcon(), clientThread, swapManager,
+							npc.getPet(), score, slotListener);
+						petPanels.add(panel);
+						marginWrapper.add(panel, BorderLayout.NORTH);
+					}
 					resultsPanel.add(marginWrapper, itemConstraints);
 					itemConstraints.gridy++;
+					firstItem = false;
 				}
 				cardLayout.show(centerPanel, RESULTS_PANEL);
 				resultsPanel.updateUI();
@@ -565,7 +676,7 @@ class SearchPanel extends JPanel
 		{
 			return false;
 		}
-		return filter == null || filter.apply(itemComposition);
+		return itemFilter == null || itemFilter.apply(itemComposition);
 	}
 
 	private void updateTabIcon(LockChanged event)

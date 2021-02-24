@@ -50,6 +50,23 @@ import net.runelite.client.util.LinkBrowser;
 
 public class FashionscapePanel extends PluginPanel
 {
+	@RequiredArgsConstructor
+	static class SearchClearingPanel extends JPanel
+	{
+		boolean shouldClearSearch = true;
+		private final SearchPanel searchPanel;
+
+		@Override
+		public void removeAll()
+		{
+			if (shouldClearSearch)
+			{
+				searchPanel.clearResults();
+			}
+			super.removeAll();
+		}
+	}
+
 	private final Client client;
 	private final ClientThread clientThread;
 	private final SwapManager swapManager;
@@ -67,23 +84,6 @@ public class FashionscapePanel extends PluginPanel
 
 	private final SearchPanel searchPanel;
 	private final KitsPanel kitsPanel;
-
-	@RequiredArgsConstructor
-	static class SearchClearingPanel extends JPanel
-	{
-		boolean shouldClearSearch = true;
-		private final SearchPanel searchPanel;
-
-		@Override
-		public void removeAll()
-		{
-			if (shouldClearSearch)
-			{
-				searchPanel.clearResults();
-			}
-			super.removeAll();
-		}
-	}
 
 	@Inject
 	public FashionscapePanel(SearchPanel searchPanel, KitsPanel kitsPanel, SwapManager swapManager,
@@ -110,6 +110,14 @@ public class FashionscapePanel extends PluginPanel
 			{
 				tabGroup.select(searchTab);
 				searchPanel.chooseSlot(slot);
+				searchPanel.clearSearch();
+			}
+
+			@Override
+			public void openPetSearch()
+			{
+				tabGroup.select(searchTab);
+				searchPanel.choosePet();
 				searchPanel.clearSearch();
 			}
 		};
@@ -388,7 +396,10 @@ public class FashionscapePanel extends PluginPanel
 			try (BufferedReader reader = new BufferedReader(new FileReader(selectedFile)))
 			{
 				List<String> lines = reader.lines().collect(Collectors.toList());
-				swapManager.loadImports(lines);
+				clientThread.invokeLater(() -> {
+					swapManager.loadImports(lines);
+					reloadResults();
+				});
 			}
 			catch (IOException e)
 			{

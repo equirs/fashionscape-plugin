@@ -4,6 +4,7 @@ import com.google.common.base.Objects;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
+import eq.uirs.fashionscape.data.Pet;
 import eq.uirs.fashionscape.data.ColorType;
 import eq.uirs.fashionscape.data.Colorable;
 import eq.uirs.fashionscape.data.kit.JawIcon;
@@ -35,15 +36,6 @@ import net.runelite.api.kit.KitType;
 @Singleton
 public class ColorScorer
 {
-	private final Client client;
-	private final SwapManager swapManager;
-
-	private final Map<Integer, GenderItemColors> allColors;
-	private final Map<KitType, List<ItemColorInfo>> kitColors = new ConcurrentHashMap<>();
-	private final Map<ColorType, Colorable> playerColors = new ConcurrentHashMap<>();
-
-	private boolean isFemale;
-
 	@Value
 	private static class Score
 	{
@@ -52,6 +44,16 @@ public class ColorScorer
 		// area percentage (0-1) of the match, relative to item or player
 		double percentage;
 	}
+
+	private final Client client;
+	private final SwapManager swapManager;
+
+	private final Map<Integer, GenderItemColors> allColors;
+	// keys are ordinal+1 for kits, 0 for pets
+	private final Map<Integer, List<ItemColorInfo>> kitColors = new ConcurrentHashMap<>();
+	private final Map<ColorType, Colorable> playerColors = new ConcurrentHashMap<>();
+
+	private boolean isFemale;
 
 	@Inject
 	ColorScorer(Client client, SwapManager swapManager)
@@ -96,10 +98,13 @@ public class ColorScorer
 		for (KitType slot : KitType.values())
 		{
 			Integer itemId = swapManager.swappedItemIdIn(slot);
-			if (itemId != null)
-			{
-				kitColors.put(slot, colorsFor(itemId));
-			}
+			addPlayerInfo(slot, itemId);
+		}
+		Integer petId = swapManager.swappedPetId();
+		if (petId != null)
+		{
+			Pet pet = SwapManager.PET_MAP.get(petId);
+			addPetInfo(pet);
 		}
 		JawIcon icon = swapManager.swappedIcon();
 		if (icon != null)
@@ -107,12 +112,12 @@ public class ColorScorer
 			Integer iconItemId = JawKit.NO_JAW.getIconItemId(icon);
 			if (iconItemId != null)
 			{
-				kitColors.put(KitType.JAW, colorsFor(iconItemId));
+				kitColors.put(KitType.JAW.ordinal() + 1, colorsFor(iconItemId));
 			}
 		}
 	}
 
-	public void setPlayerInfo(Map<KitType, Integer> itemIds, Map<ColorType, Colorable> colors)
+	public void setPlayerInfo(Map<KitType, Integer> itemIds, Map<ColorType, Colorable> colors, Integer petId)
 	{
 		kitColors.clear();
 		Player player = client.getLocalPlayer();
@@ -126,7 +131,12 @@ public class ColorScorer
 		isFemale = composition.isFemale();
 		for (Map.Entry<KitType, Integer> entry : itemIds.entrySet())
 		{
-			kitColors.put(entry.getKey(), colorsFor(entry.getValue()));
+			addPlayerInfo(entry.getKey(), entry.getValue());
+		}
+		if (petId != null)
+		{
+			Pet pet = SwapManager.PET_MAP.get(petId);
+			addPetInfo(pet);
 		}
 	}
 
@@ -134,7 +144,7 @@ public class ColorScorer
 	{
 		if (itemId != null)
 		{
-			kitColors.put(slot, colorsFor(itemId));
+			kitColors.put(slot.ordinal() + 1, colorsFor(itemId));
 		}
 	}
 
@@ -146,14 +156,32 @@ public class ColorScorer
 		}
 	}
 
+	public void addPetInfo(Pet pet)
+	{
+		if (pet != null)
+		{
+			kitColors.put(0, colorsFor(pet.getItemId()));
+		}
+	}
+
+	public double scorePet(int itemId)
+	{
+		return score(itemId, 0);
+	}
+
+	public double scoreItem(int itemId, KitType slot)
+	{
+		return score(itemId, slot.ordinal() + 1);
+	}
+
 	/**
-	 * scores color similarity between an item and the current player's outfit:
+	 * scores color similarity between an item/pet and the current player's outfit:
 	 * 1 is a perfect match, 0 is a complete mismatch
 	 */
-	public double score(int itemId, KitType exclude)
+	private double score(int itemId, Integer ordinal)
 	{
 		List<ItemColorInfo> colors = colorsFor(itemId);
-		return score(colors, exclude, null);
+		return score(colors, ordinal, null);
 	}
 
 	/**
@@ -167,13 +195,13 @@ public class ColorScorer
 		return score(colors, null, exclude);
 	}
 
-	private double score(List<ItemColorInfo> colors, KitType excludeKit, ColorType excludeColor)
+	private double score(List<ItemColorInfo> colors, Integer excludeOrdinal, ColorType excludeColor)
 	{
 		if (colors.isEmpty())
 		{
 			return 0;
 		}
-		Map<Integer, Double> playerInfo = getPlayerRgbInfo(excludeKit, excludeColor);
+		Map<Integer, Double> playerInfo = getPlayerRgbInfo(excludeOrdinal, excludeColor);
 		if (playerInfo.isEmpty())
 		{
 			return 0;
@@ -238,11 +266,11 @@ public class ColorScorer
 		return new ArrayList<>();
 	}
 
-	// Maps rgb -> summed percentage in player, excluding the given slot or color type
-	private Map<Integer, Double> getPlayerRgbInfo(KitType excludeKit, ColorType excludeColor)
+	// Maps rgb -> summed percentage in player, excluding the given slot ordinal and color type
+	private Map<Integer, Double> getPlayerRgbInfo(Integer excludeOrdinal, ColorType excludeColor)
 	{
 		Map<Integer, Double> unscaled = kitColors.entrySet().stream()
-			.filter(e -> !Objects.equal(e.getKey(), excludeKit))
+			.filter(e -> !Objects.equal(e.getKey(), excludeOrdinal))
 			.map(Map.Entry::getValue)
 			.flatMap(List::stream)
 			.collect(Collectors.toMap(ItemColorInfo::getRgb, ItemColorInfo::getPct, Double::sum));

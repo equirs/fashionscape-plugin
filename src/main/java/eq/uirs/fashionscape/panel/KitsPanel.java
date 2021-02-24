@@ -36,6 +36,16 @@ import net.runelite.client.util.ImageUtil;
 @Slf4j
 public class KitsPanel extends JPanel
 {
+	@Value
+	private static class KitColorResult
+	{
+		KitType slot;
+		Integer id; // icon id if icon, kit id otherwise
+
+		ColorType colorType;
+		Integer colorId;
+	}
+
 	private final SwapManager swapManager;
 	private final ClientThread clientThread;
 	private final ItemManager itemManager;
@@ -77,16 +87,6 @@ public class KitsPanel extends JPanel
 		updateUI();
 		scrollPane.revalidate();
 	};
-
-	@Value
-	private static class KitColorResult
-	{
-		KitType slot;
-		Integer id; // icon id if icon, kit id otherwise
-
-		ColorType colorType;
-		Integer colorId;
-	}
 
 	@Inject
 	public KitsPanel(SwapManager swapManager, ClientThread clientThread, Client client, FashionscapeConfig config,

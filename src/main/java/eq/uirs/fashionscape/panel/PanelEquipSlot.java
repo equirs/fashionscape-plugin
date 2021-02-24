@@ -17,7 +17,8 @@ public enum PanelEquipSlot
 	SHIELD(KitType.SHIELD),
 	HANDS(KitType.HANDS),
 	LEGS(KitType.LEGS),
-	BOOTS(KitType.BOOTS);
+	BOOTS(KitType.BOOTS),
+	PET(null);
 
 	@Getter
 	private final KitType kitType;
