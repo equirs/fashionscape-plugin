@@ -184,7 +184,7 @@ class SavedSwaps
 
 	void clear()
 	{
-		Set<KitType> itemSlots = Sets.difference(new HashSet<>(swappedItemIds.keySet()), lockedKits);
+		Set<KitType> itemSlots = Sets.difference(new HashSet<>(swappedItemIds.keySet()), lockedItems);
 		itemSlots.forEach(this::removeItem);
 		Set<KitType> kitSlots = Sets.difference(new HashSet<>(swappedKitIds.keySet()), lockedKits);
 		kitSlots.forEach(this::removeKit);

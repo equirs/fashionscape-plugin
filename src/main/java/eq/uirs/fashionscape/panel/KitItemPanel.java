@@ -438,7 +438,7 @@ public class KitItemPanel extends AbsIconLabelPanel
 			Colorable colorable = colorMap.get(colorId);
 			if (colorable != null)
 			{
-				if (!sb.isEmpty())
+				if (sb.length() > 0)
 				{
 					sb.append(": ");
 				}
