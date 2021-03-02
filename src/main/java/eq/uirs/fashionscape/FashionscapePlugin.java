@@ -10,13 +10,17 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.regex.Pattern;
 import javax.inject.Inject;
+import javax.inject.Provider;
+import javax.swing.SwingUtilities;
 import lombok.Value;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
 import net.runelite.api.ItemComposition;
+import net.runelite.api.MenuAction;
 import net.runelite.api.Player;
 import net.runelite.api.events.GameStateChanged;
+import net.runelite.api.events.MenuOptionClicked;
 import net.runelite.api.events.PlayerChanged;
 import net.runelite.client.RuneLite;
 import net.runelite.client.callback.ClientThread;
@@ -24,6 +28,7 @@ import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.game.ItemManager;
+import net.runelite.client.menus.MenuManager;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.ClientToolbar;
@@ -41,6 +46,10 @@ public class FashionscapePlugin extends Plugin
 	public static final File OUTFITS_DIR = new File(RuneLite.RUNELITE_DIR, "outfits");
 	public static final Pattern PROFILE_PATTERN = Pattern.compile("^(\\w+):(\\d+).*");
 
+	private static final String CONFIG_GROUP = "fashionscape";
+	private static final String COPY_PLAYER = "Copy-outfit";
+	private static final Set<Integer> ITEM_ID_DUPES = new HashSet<>();
+
 	// combined set of all items to skip when searching (bad items, dupes, non-standard if applicable)
 	public static Set<Integer> getItemIdsToExclude(FashionscapeConfig config)
 	{
@@ -52,9 +61,6 @@ public class FashionscapePlugin extends Plugin
 		}
 		return result;
 	}
-
-	private static final String CONFIG_GROUP = "fashionscape";
-	private static final Set<Integer> ITEM_ID_DUPES = new HashSet<>();
 
 	@Value
 	private static class ItemIcon
@@ -82,6 +88,9 @@ public class FashionscapePlugin extends Plugin
 	@Inject
 	private FashionscapeConfig config;
 
+	@Inject
+	private Provider<MenuManager> menuManager;
+
 	private String lastKnownPlayerName;
 	private FashionscapePanel panel;
 	private NavigationButton navButton;
@@ -105,6 +114,15 @@ public class FashionscapePlugin extends Plugin
 			.build();
 		clientToolbar.addNavigation(navButton);
 
+		if (config.copyMenuEntry())
+		{
+			menuManager.get().addPlayerMenuItem(COPY_PLAYER);
+		}
+		else
+		{
+			menuManager.get().removePlayerMenuItem(COPY_PLAYER);
+		}
+
 		swapManager.startUp();
 		clientThread.invokeLater(this::populateDupes);
 	}
@@ -112,6 +130,7 @@ public class FashionscapePlugin extends Plugin
 	@Override
 	protected void shutDown()
 	{
+		menuManager.get().removePlayerMenuItem(COPY_PLAYER);
 		clientThread.invokeLater(() -> {
 			swapManager.revertSwaps(true);
 			swapManager.shutDown();
@@ -157,6 +176,17 @@ public class FashionscapePlugin extends Plugin
 					panel.reloadResults();
 				});
 			}
+			else if (event.getKey().equals(FashionscapeConfig.KEY_IMPORT_MENU_ENTRY))
+			{
+				if (config.copyMenuEntry())
+				{
+					menuManager.get().addPlayerMenuItem(COPY_PLAYER);
+				}
+				else
+				{
+					menuManager.get().removePlayerMenuItem(COPY_PLAYER);
+				}
+			}
 		}
 	}
 
@@ -170,6 +200,31 @@ public class FashionscapePlugin extends Plugin
 		if (panel != null)
 		{
 			panel.onGameStateChanged(event);
+		}
+	}
+
+	@Subscribe
+	public void onMenuOptionClicked(MenuOptionClicked event)
+	{
+		if (event.getMenuAction() == MenuAction.RUNELITE_PLAYER && event.getMenuOption().equals(COPY_PLAYER))
+		{
+			SwingUtilities.invokeLater(() ->
+			{
+				if (!navButton.isSelected())
+				{
+					Runnable onSelect = navButton.getOnSelect();
+					if (onSelect != null)
+					{
+						onSelect.run();
+					}
+				}
+			});
+			Player p = client.getCachedPlayers()[event.getId()];
+			if (p == null)
+			{
+				return;
+			}
+			swapManager.copyOutfit(p.getPlayerComposition());
 		}
 	}
 

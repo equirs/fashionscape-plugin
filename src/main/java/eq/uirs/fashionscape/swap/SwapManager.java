@@ -343,7 +343,7 @@ public class SwapManager
 				.reduce(SwapDiff::mergeOver)
 				.orElse(SwapDiff.blank());
 			SwapDiff colors = colorEquipSwaps.entrySet().stream()
-				.map(e -> this.swapColor(e.getKey(), e.getValue(), false))
+				.map(e -> this.swapColor(e.getKey(), e.getValue(), true))
 				.reduce(SwapDiff::mergeOver)
 				.orElse(SwapDiff.blank());
 			SwapDiff total = equips.mergeOver(colors);
@@ -650,6 +650,39 @@ public class SwapManager
 				e.printStackTrace();
 			}
 		});
+	}
+
+	public void copyOutfit(PlayerComposition other)
+	{
+		try
+		{
+			int[] equipmentIds = other.getEquipmentIds();
+			KitType[] slots = KitType.values();
+			Map<KitType, Integer> itemImports = IntStream.range(0, Math.max(slots.length, equipmentIds.length))
+				.boxed()
+				.filter(i -> equipmentIds[i] >= 512)
+				.collect(Collectors.toMap(i -> slots[i], i -> equipmentIds[i] - 512));
+			// only import kits if their gender matches ours
+			Map<KitType, Integer> kitImports = !Objects.equals(isFemale, other.isFemale()) ?
+				new HashMap<>() :
+				IntStream.range(0, Math.max(slots.length, equipmentIds.length)).boxed()
+					.filter(i -> i > 0 && i < 512)
+					.collect(Collectors.toMap(i -> slots[i], i -> equipmentIds[i] - 256));
+
+			int[] colors = getColors(other);
+			ColorType[] types = ColorType.values();
+			Map<ColorType, Integer> colorImports = IntStream.range(0, colors.length).boxed()
+				.collect(Collectors.toMap(i -> types[i], i -> colors[i]));
+
+			if (!itemImports.isEmpty() || !kitImports.isEmpty() || !colorImports.isEmpty())
+			{
+				importSwaps(itemImports, kitImports, colorImports);
+			}
+		}
+		catch (IllegalAccessException | NoSuchFieldException e)
+		{
+			e.printStackTrace();
+		}
 	}
 
 	/**

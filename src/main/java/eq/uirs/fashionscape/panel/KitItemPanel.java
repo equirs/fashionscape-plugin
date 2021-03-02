@@ -393,7 +393,14 @@ public class KitItemPanel extends AbsIconLabelPanel
 		String colorName = "Not set";
 		if (colorId != null)
 		{
-			colorName = colorMap.get(colorId).getDisplayName();
+			try
+			{
+				colorName = colorMap.get(colorId).getDisplayName();
+			}
+			catch (Exception e)
+			{
+				log.info("color id {}", colorId);
+			}
 		}
 		label.setText(colorName);
 	}

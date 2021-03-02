@@ -10,6 +10,7 @@ public interface FashionscapeConfig extends Config
 {
 
 	String KEY_EXCLUDE_NON_STANDARD = "excludeNonStandardItems";
+	String KEY_IMPORT_MENU_ENTRY = "copyMenuEntry";
 
 	@ConfigItem(
 		position = 0,
@@ -31,6 +32,17 @@ public interface FashionscapeConfig extends Config
 	default RandomizerIntelligence randomizerIntelligence()
 	{
 		return RandomizerIntelligence.LOW;
+	}
+
+	@ConfigItem(
+		position = 2,
+		keyName = KEY_IMPORT_MENU_ENTRY,
+		name = "Copy menu entry",
+		description = "Adds 'copy-outfit' menu option to other players"
+	)
+	default boolean copyMenuEntry()
+	{
+		return true;
 	}
 
 }

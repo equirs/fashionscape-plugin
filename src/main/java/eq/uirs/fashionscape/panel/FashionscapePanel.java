@@ -115,7 +115,7 @@ public class FashionscapePanel extends PluginPanel
 		this.searchPanel = searchPanel;
 		this.kitsPanel = kitsPanel;
 
-		MaterialTab swapsTab = new MaterialTab("Outfit", tabGroup, swapsPanel);
+		MaterialTab swapsTab = new MaterialTab("Items", tabGroup, swapsPanel);
 		MaterialTab kitsTab = new MaterialTab("Base", tabGroup, kitsPanel);
 		searchTab = new MaterialTab("Search", tabGroup, searchPanel);
 
