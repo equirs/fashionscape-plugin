@@ -38,7 +38,7 @@ class SearchItemPanel extends AbsItemPanel
 			@Override
 			public void mouseEntered(MouseEvent e)
 			{
-				if (!swapManager.isLocked(slot))
+				if (!swapManager.isItemLocked(slot))
 				{
 					for (JPanel panel : highlightPanels)
 					{
@@ -46,7 +46,7 @@ class SearchItemPanel extends AbsItemPanel
 					}
 					setCursor(new Cursor(Cursor.HAND_CURSOR));
 				}
-				swapManager.hoverOverItem(itemId);
+				swapManager.hoverOverItem(slot, itemId);
 			}
 
 			@Override
@@ -72,10 +72,10 @@ class SearchItemPanel extends AbsItemPanel
 				}
 				// now swap it
 				clientThread.invokeLater(() -> {
-					if (!swapManager.isLocked(itemId))
+					if (!swapManager.isItemLocked(slot))
 					{
 						listener.onSearchSelectionChanging(slot);
-						swapManager.hoverSelectItem(itemId);
+						swapManager.hoverSelectItem(slot, itemId);
 					}
 				});
 			}

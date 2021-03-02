@@ -8,11 +8,15 @@ import net.runelite.api.ItemID;
 
 public class ItemInteractions
 {
-	// Some broken items which don't have models
+	/**
+	 * broken items which don't have models
+	 */
 	public static final Set<Integer> BAD_ITEM_IDS = ImmutableSet.of(1410, 2513, 4024, 4025, 4026, 4027, 4028, 4029,
 		4030, 4031, 4284, 4285, 7957, 10595, 10596, 10888, 19525, 24265, 25155);
 
-	// items that cannot be normally obtained/equipped in the overworld, also includes degraded/redundant items
+	/**
+	 * items that cannot be normally obtained/equipped in the overworld, also includes degraded/redundant items
+	 */
 	public static final Set<Integer> NON_STANDARD_ITEMS = ImmutableSet.of(
 		945, 1235, 2405, 3839, 3841, 3843, 4041, 4042, 4083, 4084, 4692,
 		4860, 4866, 4868, 4872, 4878, 4884, 4890, 4896, 4902, 4908, 4914, 4920, 4926, 4932, 4938, 4944, 4950, 4956,
@@ -30,7 +34,9 @@ public class ItemInteractions
 
 	// region Hair Jaw Arms
 
-	// item ids of helm-slot items that don't hide the player's hair
+	/**
+	 * item ids of helm-slot items that DON'T hide the player's hair
+	 */
 	public static Set<Integer> HAIR_HELMS = ImmutableSet.of(
 		579, 656, 658, 660, 662, 664, 1017, 1025, 1037, 1038, 1040, 1042, 1044, 1046, 1048, 1050, 1949, 2581, 2631,
 		2633, 2635, 2637, 2639, 2641, 2643, 2645, 2647, 2649, 2651, 2900, 2910, 2920, 2930, 2940, 2978, 2979, 2980,
@@ -56,7 +62,9 @@ public class ItemInteractions
 		25226, 25227, 25228, 25229, 25230, 25231, 25232, 25233, 25234, 25235, 25236, 25237, 25238, 25239, 25240,
 		25241, 25242, 25243, 25398, 25413, 25438);
 
-	// item ids of helm-slot items that hide the player's jaw
+	/**
+	 * item ids of helm-slot items that DO hide the player's jaw
+	 */
 	public static Set<Integer> NO_JAW_HELMS = ImmutableSet.of(
 		1053, 1055, 1057, 1153, 1155, 1157, 1159, 1161, 1163, 1165, 1506, 2587, 2595, 2605, 2613, 2619, 2627, 2657,
 		2665, 2673, 3057, 3486, 4164, 4551, 4611, 4724, 4732, 4745, 4753, 4904, 4905, 4906, 4907, 4908, 4928, 4929,
@@ -80,7 +88,9 @@ public class ItemInteractions
 		25235, 25236, 25237, 25238, 25239, 25240, 25241, 25242, 25243, 25336
 	);
 
-	// item ids of torso-slot items that don't hide the player's arms
+	/**
+	 * item ids of torso-slot items that DON'T hide the player's arms
+	 */
 	public static final Set<Integer> ARMS_TORSOS = ImmutableSet.of(
 		1005, 1101, 1103, 1105, 1107, 1109, 1111, 1113, 1129, 1131, 1133, 1135, 1757, 2499, 2501, 2503, 2513, 6615,
 		7110, 7122, 7128, 7134, 7362, 7364, 7370, 7372, 7374, 7376, 7592, 7957, 12327, 12331, 12381, 12385, 20149,
@@ -91,6 +101,9 @@ public class ItemInteractions
 
 	// region Weapons
 
+	/**
+	 * Weapon item id mapped to its idle animation id (if not present, anim id is the default 808)
+	 */
 	public static final Map<Integer, Integer> WEAPON_TO_IDLE = new HashMap<>();
 
 	static
@@ -538,8 +551,7 @@ public class ItemInteractions
 		WEAPON_TO_IDLE.put(ItemID.TRAILBLAZER_BANNER, IdleAnimationID.BANNER);
 		WEAPON_TO_IDLE.put(ItemID.SLED_25282, IdleAnimationID.SLED);
 		WEAPON_TO_IDLE.put(ItemID.GIANT_BOULDER, IdleAnimationID.HEAVY_ITEM);
-		// TODO replace with ItemID.CURSED_BANANA
-		WEAPON_TO_IDLE.put(25500, IdleAnimationID.CURSED_BANANA);
+		WEAPON_TO_IDLE.put(ItemID.CURSED_BANANA, IdleAnimationID.CURSED_BANANA);
 	}
 
 	// endregion

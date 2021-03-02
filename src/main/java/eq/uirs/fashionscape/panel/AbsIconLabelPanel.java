@@ -42,7 +42,8 @@ abstract class AbsIconLabelPanel extends JPanel
 
 		icon = new JLabel();
 		icon.setPreferredSize(ICON_SIZE);
-		setIcon(image);
+		icon.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+		setIcon(icon, image);
 		add(icon, BorderLayout.LINE_START);
 
 		label = new JLabel();
@@ -52,7 +53,7 @@ abstract class AbsIconLabelPanel extends JPanel
 		// subclasses will add the item label as needed
 	}
 
-	protected void setIcon(BufferedImage image)
+	protected void setIcon(JLabel icon, BufferedImage image)
 	{
 		if (image != null)
 		{

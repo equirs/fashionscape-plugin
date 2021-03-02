@@ -1,17 +1,14 @@
 package eq.uirs.fashionscape.swap;
 
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 import eq.uirs.fashionscape.data.ColorType;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.BiConsumer;
 import lombok.RequiredArgsConstructor;
 import net.runelite.api.kit.KitType;
 
@@ -21,45 +18,29 @@ import net.runelite.api.kit.KitType;
 @RequiredArgsConstructor
 class SavedSwaps
 {
-	private static final List<KitType> HEAD_SLOTS = ImmutableList.of(KitType.HAIR, KitType.HEAD, KitType.JAW);
-	private static final List<KitType> CHEST_SLOTS = ImmutableList.of(KitType.TORSO, KitType.ARMS);
-
 	private final Map<KitType, Integer> swappedItemIds = new HashMap<>();
 	private final Map<KitType, Integer> swappedKitIds = new HashMap<>();
 	private final Map<ColorType, Integer> swappedColorIds = new HashMap<>();
 
-	private final Set<KitType> lockedSlots = new HashSet<>();
+	private final Set<KitType> lockedKits = new HashSet<>();
+	// If kit is locked, item must also be locked. If item is unlocked, kit must also be unlocked.
+	// Only valid state where locks differ is item locked, kit unlocked
+	private final Set<KitType> lockedItems = new HashSet<>();
+	private final Set<ColorType> lockedColors = new HashSet<>();
 
-	private final List<BiConsumer<KitType, Integer>> itemChangeListeners = new LinkedList<>();
-	private final List<BiConsumer<KitType, Integer>> kitChangeListeners = new LinkedList<>();
-	private final List<BiConsumer<ColorType, Integer>> colorChangeListeners = new LinkedList<>();
-	private final List<BiConsumer<KitType, Boolean>> lockListeners = new LinkedList<>();
+	private final Map<String, List<SwapEventListener<? extends SwapEvent>>> listeners = new HashMap<>();
 
-	void addItemSwapListener(BiConsumer<KitType, Integer> listener)
+	void addEventListener(SwapEventListener<? extends SwapEvent> listener)
 	{
-		itemChangeListeners.add(listener);
-	}
-
-	void addKitSwapListener(BiConsumer<KitType, Integer> listener)
-	{
-		kitChangeListeners.add(listener);
-	}
-
-	void addColorSwapListener(BiConsumer<ColorType, Integer> listener)
-	{
-		colorChangeListeners.add(listener);
-	}
-
-	void addLockListener(BiConsumer<KitType, Boolean> listener)
-	{
-		lockListeners.add(listener);
+		String key = listener.getKey();
+		List<SwapEventListener<?>> list = listeners.getOrDefault(key, new LinkedList<>());
+		list.add(listener);
+		listeners.put(key, list);
 	}
 
 	void removeListeners()
 	{
-		itemChangeListeners.clear();
-		kitChangeListeners.clear();
-		colorChangeListeners.clear();
+		listeners.clear();
 	}
 
 	Set<Map.Entry<KitType, Integer>> itemEntries()
@@ -92,14 +73,14 @@ class SavedSwaps
 		return swappedColorIds.get(type);
 	}
 
+	boolean containsSlot(KitType slot)
+	{
+		return swappedKitIds.containsKey(slot) || swappedItemIds.containsKey(slot);
+	}
+
 	boolean containsItem(KitType slot)
 	{
 		return swappedItemIds.containsKey(slot);
-	}
-
-	boolean containsKit(KitType slot)
-	{
-		return swappedKitIds.containsKey(slot);
 	}
 
 	boolean containsColor(ColorType type)
@@ -117,30 +98,37 @@ class SavedSwaps
 		return swappedKitIds.getOrDefault(slot, fallback);
 	}
 
-	Integer getColorOrDefault(ColorType type, Integer fallback)
-	{
-		return swappedColorIds.getOrDefault(type, fallback);
-	}
-
 	void putItem(KitType slot, Integer itemId)
 	{
-		if (lockedSlots.contains(slot))
+		if (isSlotLocked(slot))
 		{
 			return;
 		}
 		Integer oldId = swappedItemIds.put(slot, itemId);
 		if (!itemId.equals(oldId))
 		{
-			itemChangeListeners.forEach(listener -> listener.accept(slot, itemId));
+			fireEvent(new ItemChanged(slot, itemId));
+		}
+		if (swappedKitIds.containsKey(slot))
+		{
+			removeKit(slot);
 		}
 	}
 
 	void putKit(KitType slot, Integer kitId)
 	{
+		if (lockedKits.contains(slot))
+		{
+			return;
+		}
 		Integer oldId = swappedKitIds.put(slot, kitId);
 		if (!kitId.equals(oldId))
 		{
-			kitChangeListeners.forEach(listener -> listener.accept(slot, kitId));
+			fireEvent(new KitChanged(slot, kitId));
+		}
+		if (swappedItemIds.containsKey(slot))
+		{
+			removeItem(slot);
 		}
 	}
 
@@ -149,29 +137,39 @@ class SavedSwaps
 		Integer oldId = swappedColorIds.put(type, colorId);
 		if (!colorId.equals(oldId))
 		{
-			colorChangeListeners.forEach(listener -> listener.accept(type, colorId));
+			fireEvent(new ColorChanged(type, colorId));
 		}
 	}
 
-	void removeItem(KitType slot)
+	void removeSlot(KitType slot)
 	{
-		if (lockedSlots.contains(slot))
+		removeItem(slot);
+		removeKit(slot);
+	}
+
+	private void removeItem(KitType slot)
+	{
+		if (isItemLocked(slot))
 		{
 			return;
 		}
 		Integer oldId = swappedItemIds.remove(slot);
 		if (oldId != null)
 		{
-			itemChangeListeners.forEach(listener -> listener.accept(slot, null));
+			fireEvent(new ItemChanged(slot, null));
 		}
 	}
 
-	void removeKit(KitType slot)
+	private void removeKit(KitType slot)
 	{
+		if (isKitLocked(slot))
+		{
+			return;
+		}
 		Integer oldId = swappedKitIds.remove(slot);
 		if (oldId != null)
 		{
-			kitChangeListeners.forEach(listener -> listener.accept(slot, null));
+			fireEvent(new KitChanged(slot, null));
 		}
 	}
 
@@ -180,90 +178,113 @@ class SavedSwaps
 		Integer oldId = swappedColorIds.remove(type);
 		if (oldId != null)
 		{
-			colorChangeListeners.forEach(listener -> listener.accept(type, null));
+			fireEvent(new ColorChanged(type, null));
 		}
 	}
 
 	void clear()
 	{
-		Set<KitType> slots = Sets.difference(new HashSet<>(swappedItemIds.keySet()), lockedSlots);
-		for (KitType slot : slots)
-		{
-			removeItem(slot);
-		}
-		Set<KitType> kitSlots = new HashSet<>(swappedKitIds.keySet());
-		for (KitType slot : kitSlots)
-		{
-			removeKit(slot);
-		}
+		Set<KitType> itemSlots = Sets.difference(new HashSet<>(swappedItemIds.keySet()), lockedKits);
+		itemSlots.forEach(this::removeItem);
+		Set<KitType> kitSlots = Sets.difference(new HashSet<>(swappedKitIds.keySet()), lockedKits);
+		kitSlots.forEach(this::removeKit);
+		Set<ColorType> colorTypes = Sets.difference(new HashSet<>(swappedColorIds.keySet()), lockedColors);
+		colorTypes.forEach(this::removeColor);
 	}
 
-	void replaceAllItems(Map<KitType, Integer> replacements)
+	boolean isSlotLocked(KitType slot)
 	{
-		// remove slot if in swaps but not in replacements
-		Set<KitType> removes = new HashSet<>();
-		swappedItemIds.forEach((slot, itemId) -> {
-			if (!replacements.containsKey(slot))
-			{
-				removes.add(slot);
-			}
-		});
-		removes.forEach(this::removeItem);
-		// override slots in replacements
-		replacements.forEach(this::putItem);
+		return lockedKits.contains(slot) || lockedItems.contains(slot);
 	}
 
-	boolean isLocked(KitType slot)
+	boolean isKitLocked(KitType slot)
 	{
-		return lockedSlots.contains(slot);
+		return lockedKits.contains(slot);
 	}
 
-	void toggleLocked(KitType slot)
+	boolean isItemLocked(KitType slot)
 	{
-		for (KitType s : combinedLockSlotsFor(slot))
+		return lockedItems.contains(slot);
+	}
+
+	boolean isColorLocked(ColorType type)
+	{
+		return lockedColors.contains(type);
+	}
+
+	void toggleItemLocked(KitType slot)
+	{
+		if (lockedItems.contains(slot))
 		{
-			if (lockedSlots.contains(s))
-			{
-				lockedSlots.remove(s);
-			}
-			else
-			{
-				lockedSlots.add(s);
-			}
-			lockListeners.forEach(listener -> listener.accept(s, isLocked(slot)));
-		}
-	}
-
-	void removeLocks()
-	{
-		Set<KitType> clears = new HashSet<>(lockedSlots);
-		lockedSlots.clear();
-		lockListeners.forEach(listener -> clears.forEach(slot -> listener.accept(slot, false)));
-	}
-
-	void removeLock(KitType slot)
-	{
-		for (KitType s : combinedLockSlotsFor(slot))
-		{
-			lockedSlots.remove(s);
-			lockListeners.forEach(listener -> listener.accept(s, false));
-		}
-	}
-
-	// hair, jaw, and head should all be synced as they have interactions, likewise for arms and torso
-	private List<KitType> combinedLockSlotsFor(KitType slot)
-	{
-		if (HEAD_SLOTS.contains(slot))
-		{
-			return HEAD_SLOTS;
-		}
-		else if (CHEST_SLOTS.contains(slot))
-		{
-			return CHEST_SLOTS;
+			lockedItems.remove(slot);
+			// if item unlocks, kit must also unlock
+			lockedKits.remove(slot);
+			fireEvent(new LockChanged(slot, false, LockChanged.Type.KIT));
 		}
 		else
 		{
-			return Collections.singletonList(slot);
+			lockedItems.add(slot);
 		}
+		fireEvent(new LockChanged(slot, isItemLocked(slot), LockChanged.Type.ITEM));
+	}
+
+	void toggleKitLocked(KitType slot)
+	{
+		if (lockedKits.contains(slot))
+		{
+			lockedKits.remove(slot);
+		}
+		else
+		{
+			lockedKits.add(slot);
+			// if kit is locked, item must be locked too
+			lockedItems.add(slot);
+			fireEvent(new LockChanged(slot, true, LockChanged.Type.ITEM));
+		}
+		fireEvent(new LockChanged(slot, isSlotLocked(slot), LockChanged.Type.KIT));
+	}
+
+	void toggleColorLocked(ColorType type)
+	{
+		if (lockedColors.contains(type))
+		{
+			lockedColors.remove(type);
+		}
+		else
+		{
+			lockedColors.add(type);
+		}
+		fireEvent(new ColorLockChanged(type, isColorLocked(type)));
+	}
+
+	void removeAllLocks()
+	{
+		Set<KitType> slotClears = new HashSet<>(lockedKits);
+		slotClears.addAll(lockedItems);
+		Set<ColorType> colorClears = new HashSet<>(lockedColors);
+		lockedKits.clear();
+		lockedItems.clear();
+		lockedColors.clear();
+		slotClears.forEach(slot -> fireEvent(new LockChanged(slot, false, LockChanged.Type.BOTH)));
+		colorClears.forEach(type -> fireEvent(new ColorLockChanged(type, false)));
+	}
+
+	void removeSlotLock(KitType slot)
+	{
+		lockedKits.remove(slot);
+		lockedItems.remove(slot);
+		fireEvent(new LockChanged(slot, false, LockChanged.Type.BOTH));
+	}
+
+	void removeColorLock(ColorType type)
+	{
+		lockedColors.remove(type);
+		fireEvent(new ColorLockChanged(type, false));
+	}
+
+	private void fireEvent(SwapEvent event)
+	{
+		String key = event.getKey();
+		listeners.getOrDefault(key, new LinkedList<>()).forEach(listener -> listener.onEvent(event));
 	}
 }

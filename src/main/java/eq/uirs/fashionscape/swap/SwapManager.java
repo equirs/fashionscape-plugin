@@ -4,9 +4,13 @@ import eq.uirs.fashionscape.FashionscapeConfig;
 import eq.uirs.fashionscape.FashionscapePlugin;
 import eq.uirs.fashionscape.colors.ColorScorer;
 import eq.uirs.fashionscape.data.ColorType;
+import eq.uirs.fashionscape.data.Colorable;
 import eq.uirs.fashionscape.data.IdleAnimationID;
 import eq.uirs.fashionscape.data.ItemInteractions;
-import eq.uirs.fashionscape.panel.PanelEquipSlot;
+import eq.uirs.fashionscape.data.Kit;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.PrintWriter;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -16,9 +20,14 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Random;
 import java.util.Set;
 import java.util.function.BiConsumer;
+import java.util.function.BiFunction;
 import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.Supplier;
+import java.util.regex.Matcher;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import javax.annotation.Nonnull;
@@ -26,6 +35,8 @@ import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import lombok.Value;
+import lombok.extern.slf4j.Slf4j;
+import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
 import net.runelite.api.InventoryID;
 import net.runelite.api.Item;
@@ -35,6 +46,10 @@ import net.runelite.api.Player;
 import net.runelite.api.PlayerComposition;
 import net.runelite.api.kit.KitType;
 import net.runelite.client.callback.ClientThread;
+import net.runelite.client.chat.ChatColorType;
+import net.runelite.client.chat.ChatMessageBuilder;
+import net.runelite.client.chat.ChatMessageManager;
+import net.runelite.client.chat.QueuedMessage;
 import net.runelite.client.game.ItemManager;
 import net.runelite.http.api.item.ItemEquipmentStats;
 import net.runelite.http.api.item.ItemStats;
@@ -43,14 +58,43 @@ import net.runelite.http.api.item.ItemStats;
  * Singleton class that maintains the memory and logic of swapping items through the plugin
  */
 @Singleton
+@Slf4j
 public class SwapManager
 {
+	public static final Map<Integer, Kit> KIT_MAP = new HashMap<>();
+	// when player's kit info is not known, fall back to showing some default values
+	private static final Map<KitType, Integer> FALLBACK_MALE_KITS = new HashMap<>();
+	private static final Map<KitType, Integer> FALLBACK_FEMALE_KITS = new HashMap<>();
+	private static final Map<KitType, List<Kit>> ALL_KITS_MAP;
+	private static final String KIT_SUFFIX = "_KIT";
+	private static final String COLOR_SUFFIX = "_COLOR";
 
-	private static final int DEFAULT_MALE_KIT_HAIR = 0;
-	private static final int DEFAULT_MALE_KIT_JAW = 10;
-	private static final int DEFAULT_MALE_KIT_ARMS = 26;
-	private static final int DEFAULT_FEMALE_KIT_HAIR = 50;
-	private static final int DEFAULT_FEMALE_KIT_ARMS = 61;
+	static
+	{
+		FALLBACK_MALE_KITS.put(KitType.HAIR, Kit.BALD.getKitId());
+		FALLBACK_MALE_KITS.put(KitType.JAW, Kit.GOATEE.getKitId());
+		FALLBACK_MALE_KITS.put(KitType.TORSO, Kit.PLAIN.getKitId());
+		FALLBACK_MALE_KITS.put(KitType.ARMS, Kit.REGULAR.getKitId());
+		FALLBACK_MALE_KITS.put(KitType.LEGS, Kit.PLAIN_L.getKitId());
+		FALLBACK_MALE_KITS.put(KitType.HANDS, Kit.PLAIN_H.getKitId());
+		FALLBACK_MALE_KITS.put(KitType.BOOTS, Kit.SMALL.getKitId());
+
+		FALLBACK_FEMALE_KITS.put(KitType.HAIR, Kit.PIGTAILS.getKitId());
+		FALLBACK_FEMALE_KITS.put(KitType.JAW, -1);
+		FALLBACK_FEMALE_KITS.put(KitType.TORSO, Kit.SIMPLE.getKitId());
+		FALLBACK_FEMALE_KITS.put(KitType.ARMS, Kit.SHORT_SLEEVES.getKitId());
+		FALLBACK_FEMALE_KITS.put(KitType.LEGS, Kit.PLAIN_LF.getKitId());
+		FALLBACK_FEMALE_KITS.put(KitType.HANDS, Kit.PLAIN_HF.getKitId());
+		FALLBACK_FEMALE_KITS.put(KitType.BOOTS, Kit.SMALL_F.getKitId());
+
+		ALL_KITS_MAP = Arrays.stream(Kit.values())
+			.collect(Collectors.groupingBy(Kit::getKitType));
+
+		for (Kit value : Kit.values())
+		{
+			KIT_MAP.put(value.getKitId(), value);
+		}
+	}
 
 	@Inject
 	private FashionscapeConfig config;
@@ -67,18 +111,21 @@ public class SwapManager
 	@Inject
 	private ColorScorer colorScorer;
 
+	@Inject
+	private ChatMessageManager chatMessageManager;
+
 	private final SavedSwaps savedSwaps = new SavedSwaps();
-	private final SnapshotQueues snapshotQueues = new SnapshotQueues(this::restoreSnapshot);
+	private final SwapDiffHistory swapDiffHistory = new SwapDiffHistory(s -> this.restore(s, true));
 	// player's real kit ids, e.g., hairstyles, base clothing
-	private final Map<KitType, Integer> savedKitIds = new HashMap<>();
+	private final Map<KitType, Integer> realKitIds = new HashMap<>();
 	// player's real base colors
-	private final Map<ColorType, Integer> savedColors = new HashMap<>();
+	private final Map<ColorType, Integer> realColorIds = new HashMap<>();
 
-	// player's composition includes two int arrays, and the one that's size 5 is colors
-	// this will break if Jagex ever adds another color type or another int[5] to the class, but w/e
+	/* player's composition includes two int arrays, and the one that has size 5 is their colors.
+	note: this will break if Jagex ever adds another color type or another int[5] to the class, but that is unlikely */
 	private String obfuscatedColorsFieldName = null;
-
-	private Snapshot hoverSnapshot;
+	private Boolean isFemale;
+	private SwapDiff hoverSwapDiff;
 
 	@Value
 	private static class Candidate
@@ -90,110 +137,141 @@ public class SwapManager
 	public void startUp()
 	{
 		checkForBaseIds();
-		refreshItemSwaps();
+		refreshAllSwaps();
 	}
 
 	public void shutDown()
 	{
 		savedSwaps.removeListeners();
-		snapshotQueues.removeListeners();
+		swapDiffHistory.removeListeners();
 		clear();
 	}
 
 	public void clear()
 	{
-		hoverSnapshot = null;
+		hoverSwapDiff = null;
 		savedSwaps.clear();
-		savedKitIds.clear();
-		snapshotQueues.clear();
+		realKitIds.clear();
+		realColorIds.clear();
+		swapDiffHistory.clear();
 	}
 
-	public void addItemChangeListener(BiConsumer<KitType, Integer> listener)
+	public void addEventListener(SwapEventListener<? extends SwapEvent> listener)
 	{
-		savedSwaps.addItemSwapListener(listener);
-	}
-
-	public void addKitSwapListener(BiConsumer<KitType, Integer> listener)
-	{
-		savedSwaps.addKitSwapListener(listener);
-	}
-
-	public void addColorSwapListener(BiConsumer<ColorType, Integer> listener)
-	{
-		savedSwaps.addColorSwapListener(listener);
-	}
-
-	public void addLockChangeListener(BiConsumer<KitType, Boolean> listener)
-	{
-		savedSwaps.addLockListener(listener);
+		savedSwaps.addEventListener(listener);
 	}
 
 	public void addUndoQueueChangeListener(Consumer<Integer> listener)
 	{
-		snapshotQueues.addUndoQueueChangeListener(listener);
+		swapDiffHistory.addUndoQueueChangeListener(listener);
 	}
 
 	public void addRedoQueueChangeListener(Consumer<Integer> listener)
 	{
-		snapshotQueues.addRedoQueueChangeListener(listener);
+		swapDiffHistory.addRedoQueueChangeListener(listener);
 	}
 
-	public boolean isLocked(KitType slot)
+	public boolean isSlotLocked(KitType slot)
 	{
-		return savedSwaps.isLocked(slot);
+		return savedSwaps.isSlotLocked(slot);
 	}
 
-	public boolean isLocked(Integer itemId)
+	public boolean isKitLocked(KitType slot)
 	{
-		KitType slot = slotForItem(itemId);
-		return isLocked(slot);
+		return savedSwaps.isKitLocked(slot);
 	}
 
-	public void toggleLocked(KitType slot)
+	public boolean isItemLocked(KitType slot)
 	{
-		savedSwaps.toggleLocked(slot);
+		return savedSwaps.isItemLocked(slot);
 	}
 
-	@Nullable
+	public boolean isColorLocked(ColorType type)
+	{
+		return savedSwaps.isColorLocked(type);
+	}
+
+	public void toggleItemLocked(KitType slot)
+	{
+		savedSwaps.toggleItemLocked(slot);
+	}
+
+	public void toggleKitLocked(KitType slot)
+	{
+		savedSwaps.toggleKitLocked(slot);
+	}
+
+	public void toggleColorLocked(ColorType type)
+	{
+		savedSwaps.toggleColorLocked(type);
+	}
+
 	// this should only be called from the client thread
-	public Snapshot refreshItemSwaps()
+	public void refreshAllSwaps()
 	{
-		return savedSwaps.itemEntries().stream()
-			.sorted(Comparator.comparingInt(e -> -e.getKey().getIndex()))
-			.map(e -> swapItem(e.getKey(), e.getValue()))
-			.filter(Objects::nonNull)
-			.reduce(Snapshot::mergeOver)
-			.orElse(null);
+		refreshItemSwaps()
+			.mergeOver(refreshKitSwaps())
+			.mergeOver(refreshColorSwaps());
 	}
 
+	private SwapDiff refreshItemSwaps()
+	{
+		return CompoundSwap.fromMap(savedSwaps.itemEntries().stream().collect(
+			Collectors.toMap(Map.Entry::getKey, e -> e.getValue() + 512))).stream()
+			.map(c -> this.swap(c, SwapMode.PREVIEW))
+			.reduce(SwapDiff::mergeOver)
+			.orElse(SwapDiff.blank());
+	}
+
+	private SwapDiff refreshKitSwaps()
+	{
+		return CompoundSwap.fromMap(savedSwaps.kitEntries().stream().collect(
+			Collectors.toMap(Map.Entry::getKey, e -> e.getValue() + 256))).stream()
+			.map(c -> this.swap(c, SwapMode.PREVIEW))
+			.reduce(SwapDiff::mergeOver)
+			.orElse(SwapDiff.blank());
+	}
+
+	private SwapDiff refreshColorSwaps()
+	{
+		return savedSwaps.colorEntries().stream()
+			.map(e -> swap(e.getKey(), e.getValue(), SwapMode.PREVIEW))
+			.reduce(SwapDiff::mergeOver)
+			.orElse(SwapDiff.blank());
+	}
+
+	/**
+	 * Undoes the last action performed.
+	 * Can only be called from the client thread.
+	 */
 	public void undoLastSwap()
 	{
-		clientThread.invokeLater(() -> {
-			if (client.getLocalPlayer() != null)
-			{
-				snapshotQueues.undoLast();
-			}
-		});
+		if (client.getLocalPlayer() != null)
+		{
+			swapDiffHistory.undoLast();
+		}
 	}
 
 	public boolean canUndo()
 	{
-		return snapshotQueues.undoSize() > 0;
+		return swapDiffHistory.undoSize() > 0;
 	}
 
+	/**
+	 * Redoes the last action that was undone.
+	 * Can only be called from the client thread.
+	 */
 	public void redoLastSwap()
 	{
-		clientThread.invokeLater(() -> {
-			if (client.getLocalPlayer() != null)
-			{
-				snapshotQueues.redoLast();
-			}
-		});
+		if (client.getLocalPlayer() != null)
+		{
+			swapDiffHistory.redoLast();
+		}
 	}
 
 	public boolean canRedo()
 	{
-		return snapshotQueues.redoSize() > 0;
+		return swapDiffHistory.redoSize() > 0;
 	}
 
 	/**
@@ -207,83 +285,76 @@ public class SwapManager
 			return;
 		}
 		PlayerComposition playerComposition = player.getPlayerComposition();
-		if (playerComposition.isFemale())
+		if (playerComposition == null)
 		{
-			savedKitIds.remove(KitType.JAW);
+			return;
 		}
+		isFemale = playerComposition.isFemale();
 		for (KitType kitType : KitType.values())
 		{
 			Integer kitId = kitIdFor(kitType);
 			if (kitId != null)
 			{
-				if (kitId >= 0)
+				if (kitId >= 0 && !realKitIds.containsKey(kitType))
 				{
-					savedKitIds.put(kitType, kitId);
+					realKitIds.put(kitType, kitId);
 				}
-				else if (!savedKitIds.containsKey(kitType))
-				{
-					// fall back to pre-filling a slot with a default model (better than nothing)
-					Integer defaultKitId = null;
-					if (playerComposition.isFemale())
-					{
-						switch (kitType)
-						{
-							case ARMS:
-								defaultKitId = DEFAULT_FEMALE_KIT_ARMS;
-								break;
-							case HAIR:
-								defaultKitId = DEFAULT_FEMALE_KIT_HAIR;
-								break;
-							default:
-								break;
-						}
-					}
-					else
-					{
-						switch (kitType)
-						{
-							case ARMS:
-								defaultKitId = DEFAULT_MALE_KIT_ARMS;
-								break;
-							case HAIR:
-								defaultKitId = DEFAULT_MALE_KIT_HAIR;
-								break;
-							case JAW:
-								defaultKitId = DEFAULT_MALE_KIT_JAW;
-								break;
-							default:
-								break;
-						}
-					}
-					if (defaultKitId != null)
-					{
-						savedKitIds.put(kitType, defaultKitId);
-					}
-				}
+			}
+		}
+		for (ColorType colorType : ColorType.values())
+		{
+			Integer colorId = colorIdFor(colorType);
+			if (colorId != null && !realColorIds.containsKey(colorType))
+			{
+				realColorIds.put(colorType, colorId);
 			}
 		}
 	}
 
-	public void importSwaps(Map<KitType, Integer> newSwaps)
+	public void importSwaps(
+		Map<KitType, Integer> newItems,
+		Map<KitType, Integer> newKits,
+		Map<ColorType, Integer> newColors)
 	{
 		clientThread.invokeLater(() -> {
-			Map<KitType, Integer> unlockedSwaps = newSwaps.entrySet().stream()
-				.filter(e -> !savedSwaps.isLocked(e.getKey()))
+			Map<KitType, Integer> itemSwaps = newItems.entrySet().stream()
+				.filter(e -> !savedSwaps.isItemLocked(e.getKey()))
 				.collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-			unlockedSwaps.entrySet().stream()
-				.sorted(Comparator.comparingInt(e -> -e.getKey().getIndex()))
-				.map(e -> swapItem(e.getKey(), e.getValue()))
-				.filter(Objects::nonNull)
-				.reduce(Snapshot::mergeOver)
-				.ifPresent(snapshotQueues::appendToUndo);
-			savedSwaps.replaceAllItems(unlockedSwaps);
+			Map<KitType, Integer> kitSwaps = newKits.entrySet().stream()
+				.filter(e -> !savedSwaps.isKitLocked(e.getKey()))
+				.collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+			Map<KitType, Integer> itemEquipSwaps = itemSwaps.entrySet().stream().collect(
+				Collectors.toMap(Map.Entry::getKey, e -> e.getValue() + 512)
+			);
+			Map<KitType, Integer> kitEquipSwaps = kitSwaps.entrySet().stream().collect(
+				Collectors.toMap(Map.Entry::getKey, e -> e.getValue() + 256)
+			);
+			Map<KitType, Integer> equipSwaps = new HashMap<>(kitEquipSwaps);
+			equipSwaps.putAll(itemEquipSwaps);
+
+			Map<ColorType, Integer> colorSwaps = newColors.entrySet().stream()
+				.filter(e -> !savedSwaps.isColorLocked(e.getKey()))
+				.collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+			Map<ColorType, Integer> colorEquipSwaps = colorSwaps.entrySet().stream().collect(
+				Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)
+			);
+			SwapDiff equips = CompoundSwap.fromMap(equipSwaps).stream()
+				.map(c -> this.swap(c, SwapMode.SAVE))
+				.reduce(SwapDiff::mergeOver)
+				.orElse(SwapDiff.blank());
+			SwapDiff colors = colorEquipSwaps.entrySet().stream()
+				.map(e -> this.swapColor(e.getKey(), e.getValue(), false))
+				.reduce(SwapDiff::mergeOver)
+				.orElse(SwapDiff.blank());
+			SwapDiff total = equips.mergeOver(colors);
+			swapDiffHistory.appendToUndo(total);
 		});
 	}
 
 	// this should only be called from the client thread
 	public List<String> stringifySwaps()
 	{
-		return savedSwaps.itemEntries().stream()
+		List<String> items = savedSwaps.itemEntries().stream()
 			.map(e -> {
 				KitType slot = e.getKey();
 				Integer itemId = e.getValue();
@@ -291,6 +362,28 @@ public class SwapManager
 				return slot.name() + ":" + itemId + " (" + itemName + ")";
 			})
 			.collect(Collectors.toList());
+		List<String> kits = savedSwaps.kitEntries().stream()
+			.map(e -> {
+				KitType slot = e.getKey();
+				Integer kitId = e.getValue();
+				String kitName = KIT_MAP.get(kitId).getDisplayName();
+				return slot.name() + KIT_SUFFIX + ":" + kitId + " (" + kitName + ")";
+			})
+			.collect(Collectors.toList());
+		List<String> colors = savedSwaps.colorEntries().stream()
+			.map(e -> {
+				ColorType type = e.getKey();
+				Integer colorId = e.getValue();
+				return Arrays.stream(type.getColorables())
+					.filter(c -> c.getColorId(type) == colorId)
+					.findFirst()
+					.map(c -> type.name() + COLOR_SUFFIX + ":" + colorId + " (" + c.getDisplayName() + ")")
+					.orElse("");
+			})
+			.collect(Collectors.toList());
+		items.addAll(kits);
+		items.addAll(colors);
+		return items;
 	}
 
 	@Nullable
@@ -311,110 +404,177 @@ public class SwapManager
 		return savedSwaps.getColor(type);
 	}
 
-	public void revertSlot(KitType slot, boolean force)
+	// this should only be called from the client thread
+	public void revert(KitType slot, ColorType type)
 	{
-		if (force)
+		SwapDiff s = SwapDiff.blank();
+		if (slot != null)
 		{
-			savedSwaps.removeLock(slot);
+			savedSwaps.removeSlotLock(slot);
+			s = s.mergeOver(doRevert(slot));
 		}
+		if (type != null)
+		{
+			savedSwaps.removeColorLock(type);
+			s = s.mergeOver(doRevert(type));
+		}
+		swapDiffHistory.appendToUndo(s);
+	}
+
+	// this should only be called from the client thread
+	public void revertSlot(KitType slot)
+	{
+		savedSwaps.removeSlotLock(slot);
+		SwapDiff s = doRevert(slot);
+		swapDiffHistory.appendToUndo(s);
+	}
+
+	public void hoverOverItem(KitType slot, Integer itemId)
+	{
+		hoverOver(() -> swapItem(slot, itemId, false));
+	}
+
+	public void hoverOverKit(KitType slot, Integer kitId)
+	{
+		hoverOver(() -> swapKit(slot, kitId, false));
+	}
+
+	public void hoverOverColor(ColorType type, Integer colorId)
+	{
+		hoverOver(() -> swapColor(type, colorId, false));
+	}
+
+	private void hoverOver(Supplier<SwapDiff> diffCallable)
+	{
 		clientThread.invokeLater(() -> {
-			Snapshot s = doRevert(slot);
-			snapshotQueues.appendToUndo(s);
+			SwapDiff swapDiff = diffCallable.get();
+			if (hoverSwapDiff == null)
+			{
+				hoverSwapDiff = swapDiff;
+			}
+			else if (!swapDiff.isBlank())
+			{
+				hoverSwapDiff = swapDiff.mergeOver(hoverSwapDiff);
+			}
 		});
 	}
 
-	public void hoverOverItem(Integer itemId)
+	public void hoverSelectItem(KitType slot, Integer itemId)
 	{
-		clientThread.invokeLater(() -> {
-			Snapshot snapshot = swapItem(itemId, false);
-			if (hoverSnapshot == null)
+		hoverSelect(() -> {
+			if (savedSwaps.isItemLocked(slot))
 			{
-				hoverSnapshot = snapshot;
+				return SwapDiff.blank();
 			}
-			else if (snapshot != null)
-			{
-				hoverSnapshot = snapshot.mergeOver(hoverSnapshot);
-			}
+			return Objects.equals(savedSwaps.getItem(slot), itemId) ?
+				doRevert(slot) :
+				swapItem(slot, itemId, true);
 		});
 	}
 
-	public void hoverSelectItem(Integer itemId)
+	public void hoverSelectKit(KitType slot, Integer kitId)
+	{
+		hoverSelect(() -> {
+			if (savedSwaps.isKitLocked(slot))
+			{
+				return SwapDiff.blank();
+			}
+			return Objects.equals(savedSwaps.getKit(slot), kitId) ?
+				doRevert(slot) :
+				swapKit(slot, kitId, true);
+		});
+	}
+
+	public void hoverSelectColor(ColorType type, Integer colorId)
+	{
+		hoverSelect(() -> {
+			if (savedSwaps.isColorLocked(type))
+			{
+				return SwapDiff.blank();
+			}
+			return Objects.equals(savedSwaps.getColor(type), colorId) ?
+				doRevert(type) :
+				swapColor(type, colorId, true);
+		});
+	}
+
+	private void hoverSelect(Supplier<SwapDiff> diffSupplier)
 	{
 		clientThread.invokeLater(() -> {
-			KitType slot = slotForItem(itemId);
-			if (savedSwaps.isLocked(slot))
+			SwapDiff swapDiff = diffSupplier.get();
+			if (!swapDiff.isBlank())
 			{
-				return;
-			}
-			Snapshot snapshot;
-			if (Objects.equals(savedSwaps.getItem(slot), itemId))
-			{
-				snapshot = doRevert(slot);
-			}
-			else
-			{
-				snapshot = swapItem(itemId, true);
-			}
-			if (snapshot != null)
-			{
-				if (hoverSnapshot != null)
+				if (hoverSwapDiff != null)
 				{
-					snapshot = hoverSnapshot.mergeOver(snapshot);
+					swapDiff = hoverSwapDiff.mergeOver(swapDiff);
 				}
-				snapshotQueues.appendToUndo(snapshot);
+				swapDiffHistory.appendToUndo(swapDiff);
+				hoverSwapDiff = null;
 			}
-			hoverSnapshot = null;
 		});
 	}
 
 	public void hoverAway()
 	{
 		clientThread.invokeLater(() -> {
-			if (hoverSnapshot != null)
+			if (hoverSwapDiff != null)
 			{
-				restoreSnapshot(hoverSnapshot);
-				hoverSnapshot = null;
+				restore(hoverSwapDiff, false);
+				hoverSwapDiff = null;
 			}
-			refreshItemSwaps();
+			refreshAllSwaps();
 		});
 	}
 
+	/**
+	 * Reverts all item/kit slots and colors. Unless force is true, locked slots will remain.
+	 * Can only be called from the client thread.
+	 */
 	public void revertSwaps(boolean force)
-	{
-		clientThread.invokeLater(() -> performRevertSwaps(force));
-	}
-
-	private void performRevertSwaps(boolean force)
 	{
 		if (force)
 		{
-			savedSwaps.removeLocks();
+			savedSwaps.removeAllLocks();
 		}
-		Arrays.stream(KitType.values())
-			.sorted(Comparator.comparingInt(s -> -s.getIndex()))
-			.map(slot -> {
-				// TODO how should we revert kits and colors...
-				if (savedSwaps.isLocked(slot))
-				{
-					return null;
-				}
+		Map<KitType, Integer> equipIdsToRevert = Arrays.stream(KitType.values())
+			.filter(slot -> !savedSwaps.isSlotLocked(slot))
+			.collect(Collectors.toMap(slot -> slot, slot -> {
 				Integer itemId = equippedItemIdFor(slot);
-				if (itemId != null && itemId >= 0)
-				{
-					// revert to the player's actual equipped item
-					return swapItem(slot, itemId);
-				}
-				else
-				{
-					// revert to the kit model if we have it, otherwise erase this slot
-					int kitId = savedKitIds.getOrDefault(slot, -256);
-					return swapKit(slot, kitId);
-				}
+				int kitId = realKitIds.getOrDefault(slot, getFallbackKitId(slot));
+				return itemId != null && itemId != 0 ? itemId + 512 : kitId + 256;
+			}));
+		SwapDiff kitsDiff = CompoundSwap.fromMap(equipIdsToRevert).stream()
+			.map(c -> this.swap(c, SwapMode.REVERT))
+			.reduce(SwapDiff::mergeOver)
+			.orElse(SwapDiff.blank());
+		SwapDiff colorsDiff = Arrays.stream(ColorType.values())
+			.filter(type -> !savedSwaps.isColorLocked(type))
+			.map(type -> {
+				Integer colorId = realColorIds.get(type);
+				return colorId != null ? swap(type, colorId, SwapMode.REVERT) : SwapDiff.blank();
 			})
-			.filter(Objects::nonNull)
-			.reduce(Snapshot::mergeOver)
-			.ifPresent(snapshotQueues::appendToUndo);
+			.reduce(SwapDiff::mergeOver)
+			.orElse(SwapDiff.blank());
+		SwapDiff totalDiff = kitsDiff.mergeOver(colorsDiff);
+		swapDiffHistory.appendToUndo(totalDiff);
 		savedSwaps.clear();
+	}
+
+	/**
+	 * @return a default kit id for the player's gender, if known. For slots without default values, or when
+	 * gender is unknown, returns -256 (i.e., equipment id 0)
+	 */
+	private int getFallbackKitId(KitType slot)
+	{
+		if (isFemale != null && slot != null)
+		{
+			Map<KitType, Integer> map = isFemale ? FALLBACK_FEMALE_KITS : FALLBACK_MALE_KITS;
+			return map.getOrDefault(slot, -256);
+		}
+		else
+		{
+			return -256;
+		}
 	}
 
 	@Nullable
@@ -429,36 +589,92 @@ public class SwapManager
 		return null;
 	}
 
-	public void shuffle()
+	public void loadImports(List<String> allLines)
 	{
-		// TODO add shuffle for kits and colors?
-		clientThread.invokeLater(this::performShuffle);
+		Map<KitType, Integer> itemImports = new HashMap<>();
+		Map<KitType, Integer> kitImports = new HashMap<>();
+		Map<ColorType, Integer> colorImports = new HashMap<>();
+		for (String line : allLines)
+		{
+			if (line.trim().isEmpty())
+			{
+				continue;
+			}
+			Matcher matcher = FashionscapePlugin.PROFILE_PATTERN.matcher(line);
+			if (matcher.matches())
+			{
+				String slotStr = matcher.group(1);
+				// could be item id, kit id, or color id
+				int id = Integer.parseInt(matcher.group(2));
+				KitType itemSlot = itemSlotMatch(slotStr);
+				KitType kitSlot = kitSlotMatch(slotStr);
+				ColorType colorType = colorSlotMatch(slotStr);
+				if (itemSlot != null)
+				{
+					itemImports.put(itemSlot, id);
+				}
+				else if (kitSlot != null)
+				{
+					kitImports.put(kitSlot, id);
+				}
+				else if (colorType != null)
+				{
+					colorImports.put(colorType, id);
+				}
+				else
+				{
+					sendHighlightedMessage("Could not import line: " + line);
+				}
+			}
+		}
+		if (!itemImports.isEmpty() || !kitImports.isEmpty() || !colorImports.isEmpty())
+		{
+			importSwaps(itemImports, kitImports, colorImports);
+		}
 	}
 
-	private void performShuffle()
+	public void exportSwaps(File selected)
 	{
+		clientThread.invokeLater(() -> {
+			try (PrintWriter out = new PrintWriter(selected))
+			{
+				List<String> exports = stringifySwaps();
+				for (String line : exports)
+				{
+					out.println(line);
+				}
+				sendHighlightedMessage("Outfit saved to " + selected.getName());
+			}
+			catch (FileNotFoundException e)
+			{
+				e.printStackTrace();
+			}
+		});
+	}
+
+	/**
+	 * Randomizes items/kits/colors in unlocked slots.
+	 * Can only be called from the client thread.
+	 */
+	public void shuffle()
+	{
+		final Random r = new Random();
 		RandomizerIntelligence intelligence = config.randomizerIntelligence();
 		int size = intelligence.getDepth();
 		if (size > 1)
 		{
 			Map<KitType, Integer> lockedSwaps = Arrays.stream(KitType.values())
-				.filter(s -> savedSwaps.isLocked(s) && savedSwaps.containsItem(s))
+				.filter(s -> savedSwaps.isItemLocked(s) && savedSwaps.containsItem(s))
 				.collect(Collectors.toMap(s -> s, savedSwaps::getItem));
 			colorScorer.setPlayerInfo(lockedSwaps);
 		}
-		Map<KitType, Boolean> slotsToRevert = Arrays.stream(PanelEquipSlot.values())
-			.map(PanelEquipSlot::getKitType)
-			.filter(Objects::nonNull)
-			.collect(Collectors.toMap(slot -> slot, savedSwaps::isLocked));
-		slotsToRevert.put(KitType.JAW, true);
-		slotsToRevert.put(KitType.HAIR, true);
-		slotsToRevert.put(KitType.ARMS, true);
+		Map<KitType, Boolean> itemSlotsToRevert = Arrays.stream(KitType.values())
+			.collect(Collectors.toMap(slot -> slot, savedSwaps::isItemLocked));
 
-		// pre-fill slots that will be skipped:
-		// save the swapped item id if the user wants to keep it, else use -1 as a placeholder for now
+		// pre-fill slots that will be skipped with -1 as a placeholder
 		Map<KitType, Integer> newSwaps = Arrays.stream(KitType.values())
-			.filter(slotsToRevert::get)
-			.collect(Collectors.toMap(slot -> slot, slot -> savedSwaps.getItemOrDefault(slot, -1)));
+			.filter(itemSlotsToRevert::get)
+			.collect(Collectors.toMap(s -> s, s -> -1));
 		Set<Integer> skips = FashionscapePlugin.getItemIdsToExclude(config);
 		List<Candidate> candidates = new ArrayList<>(size);
 		List<Integer> randomOrder = IntStream.range(0, client.getItemCount()).boxed().collect(Collectors.toList());
@@ -471,20 +687,21 @@ public class SwapManager
 				continue;
 			}
 			ItemComposition itemComposition = itemManager.getItemComposition(canonical);
+			int itemId = itemComposition.getId();
 			KitType slot = slotForId(slotIdFor(itemComposition));
 			if (slot != null && !newSwaps.containsKey(slot))
 			{
 				// Don't equip a 2h weapon if we already have a shield
 				if (slot == KitType.WEAPON)
 				{
-					ItemEquipmentStats stats = equipmentStatsFor(itemComposition.getId());
+					ItemEquipmentStats stats = equipmentStatsFor(itemId);
 					if (stats != null && stats.isTwoHanded() && newSwaps.get(KitType.SHIELD) != null)
 					{
 						continue;
 					}
 				}
-				// Don't equip a shield if we already have a 2h weapon (mark shield as removed)
-				if (slot == KitType.SHIELD)
+				// Don't equip a shield if we already have a 2h weapon (mark shield as removed instead)
+				else if (slot == KitType.SHIELD)
 				{
 					Integer weaponItemId = newSwaps.get(KitType.WEAPON);
 					if (weaponItemId != null)
@@ -502,6 +719,27 @@ public class SwapManager
 								continue;
 							}
 						}
+					}
+				}
+				else if (slot == KitType.HEAD)
+				{
+					// Don't equip a helm if it hides hair and hair is locked
+					if (!ItemInteractions.HAIR_HELMS.contains(itemId) && savedSwaps.isKitLocked(KitType.HAIR))
+					{
+						continue;
+					}
+					// Don't equip a helm if it hides jaw and jaw is locked
+					if (ItemInteractions.NO_JAW_HELMS.contains(itemId) && savedSwaps.isKitLocked(KitType.JAW))
+					{
+						continue;
+					}
+				}
+				else if (slot == KitType.TORSO)
+				{
+					// Don't equip torso if it hides arms and arms is locked
+					if (!ItemInteractions.ARMS_TORSOS.contains(itemId) && savedSwaps.isKitLocked(KitType.ARMS))
+					{
+						continue;
 					}
 				}
 				candidates.add(new Candidate(itemComposition.getId(), slot));
@@ -535,166 +773,472 @@ public class SwapManager
 			.map(Map.Entry::getKey)
 			.collect(Collectors.toList());
 		removes.forEach(newSwaps::remove);
-		newSwaps.entrySet().stream()
-			.sorted(Comparator.comparingInt(e -> -e.getKey().getIndex()))
-			.map(e -> swapItem(e.getKey(), e.getValue()))
-			.filter(Objects::nonNull)
-			.reduce(Snapshot::mergeOver)
-			.ifPresent(snapshotQueues::appendToUndo);
-		savedSwaps.replaceAllItems(newSwaps);
+
+		SwapDiff totalDiff = SwapDiff.blank();
+
+		// convert to equipment ids
+		Map<KitType, Integer> newEquipSwaps = newSwaps.entrySet().stream()
+			.collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue() + 512));
+
+		// swap items now before moving on to kits
+		SwapDiff itemsDiff = CompoundSwap.fromMap(newEquipSwaps).stream()
+			.map(c -> this.swap(c, SwapMode.SAVE))
+			.reduce(SwapDiff::mergeOver)
+			.orElse(SwapDiff.blank());
+		totalDiff = totalDiff.mergeOver(itemsDiff);
+
+		// See if remaining slots can be kit-swapped
+		if (isFemale != null)
+		{
+			Map<KitType, Integer> kitSwaps = Arrays.stream(KitType.values())
+				.filter(slot -> !newSwaps.containsKey(slot) && isOpen(slot))
+				.map(slot -> {
+					List<Kit> kits = ALL_KITS_MAP.getOrDefault(slot, new ArrayList<>()).stream()
+						.filter(k -> k.isFemale() == isFemale)
+						.collect(Collectors.toList());
+					return kits.isEmpty() ? null : kits.get(r.nextInt(kits.size()));
+				})
+				.filter(Objects::nonNull)
+				.collect(Collectors.toMap(Kit::getKitType, Kit::getKitId));
+
+			Map<KitType, Integer> kitEquipSwaps = kitSwaps.entrySet().stream()
+				.collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue() + 256));
+
+			SwapDiff kitsDiff = CompoundSwap.fromMap(kitEquipSwaps)
+				.stream()
+				.map(c -> this.swap(c, SwapMode.SAVE))
+				.reduce(SwapDiff::mergeOver)
+				.orElse(SwapDiff.blank());
+
+			totalDiff = totalDiff.mergeOver(kitsDiff);
+		}
+
+		// TODO check intelligence to get better matching colors
+		Map<ColorType, Integer> colorSwaps = Arrays.stream(ColorType.values())
+			.filter(type -> !savedSwaps.isColorLocked(type) && type.getColorables().length > 0)
+			.collect(Collectors.toMap(type -> type, type -> {
+				Colorable[] options = type.getColorables();
+				return options[r.nextInt(options.length)].getColorId(type);
+			}));
+
+		SwapDiff colorsDiff = colorSwaps.entrySet().stream()
+			.filter(e -> e.getValue() >= 0)
+			.map(e -> swap(e.getKey(), e.getValue(), SwapMode.SAVE))
+			.reduce(SwapDiff::mergeOver)
+			.orElse(SwapDiff.blank());
+
+		totalDiff = totalDiff.mergeOver(colorsDiff);
+
+		swapDiffHistory.appendToUndo(totalDiff);
 	}
 
-	@Nullable
 	// this should only be called from the client thread
-	public Snapshot swapItem(Integer itemId, boolean persist)
+	public SwapDiff swapItem(KitType slot, Integer itemId, boolean save)
 	{
 		if (itemId == null)
 		{
-			return null;
+			return SwapDiff.blank();
 		}
-		ItemStats stats = itemManager.getItemStats(itemId, false);
-		if (stats == null || stats.getEquipment() == null)
-		{
-			return null;
-		}
-		KitType slot = KitType.values()[stats.getEquipment().getSlot()];
 		int equipmentId = itemId + 512;
-		Snapshot snapshot = swap(slot, equipmentId);
-		if (snapshot != null)
+		SwapMode swapMode = save ? SwapMode.SAVE : SwapMode.PREVIEW;
+		SwapDiff swapDiff = swap(CompoundSwap.single(slot, equipmentId), swapMode);
+		if (hoverSwapDiff != null)
 		{
-			if (hoverSnapshot != null)
-			{
-				snapshot = snapshot.mergeOver(hoverSnapshot);
-			}
-			if (persist)
-			{
-				savedSwaps.putItem(slot, itemId);
-				// only 1 item was swapped, so if the snapshot contains other slots, they must have been removed
-				snapshot.getSlotChanges().keySet().stream()
-					.filter(s -> !slot.equals(s))
-					.forEach(savedSwaps::removeItem);
-			}
+			swapDiff = swapDiff.mergeOver(hoverSwapDiff);
 		}
-
-		return snapshot;
+		return swapDiff;
 	}
 
-	@Nullable
 	// this should only be called from the client thread
-	public Snapshot swapKit(KitType slot, Integer kitId, boolean persist)
+	public SwapDiff swapKit(KitType slot, Integer kitId, boolean save)
 	{
 		if (kitId == null)
 		{
-			return null;
+			return SwapDiff.blank();
 		}
 		int equipmentId = kitId + 256;
-		Snapshot snapshot = swap(slot, equipmentId);
-		if (snapshot != null)
+		SwapMode swapMode = save ? SwapMode.SAVE : SwapMode.PREVIEW;
+		SwapDiff swapDiff = swap(CompoundSwap.single(slot, equipmentId), swapMode);
+		if (hoverSwapDiff != null)
 		{
-			if (hoverSnapshot != null)
-			{
-				snapshot = snapshot.mergeOver(hoverSnapshot);
-			}
-			if (persist)
-			{
-				savedSwaps.putKit(slot, kitId);
-				// only 1 kit was swapped, so if the snapshot contains other slots, they must have been removed
-				snapshot.getSlotChanges().keySet().stream()
-					.filter(s -> !slot.equals(s))
-					.forEach(savedSwaps::removeItem);
-			}
+			swapDiff = swapDiff.mergeOver(hoverSwapDiff);
 		}
-
-		return snapshot;
+		return swapDiff;
 	}
 
-	@Nullable
-	public Snapshot swapColor(ColorType type, Integer colorId, boolean persist)
+	public SwapDiff swapColor(ColorType type, Integer colorId, boolean save)
 	{
 		if (colorId == null)
 		{
-			return null;
+			return SwapDiff.blank();
 		}
-		Snapshot snapshot = swapColor(type, colorId);
-		if (snapshot != null)
+		SwapMode swapMode = save ? SwapMode.SAVE : SwapMode.PREVIEW;
+		SwapDiff swapDiff = swap(type, colorId, swapMode);
+		if (hoverSwapDiff != null)
 		{
-			if (hoverSnapshot != null)
-			{
-				snapshot = snapshot.mergeOver(hoverSnapshot);
-			}
-			if (persist)
-			{
-				savedSwaps.putColor(type, colorId);
-			}
+			swapDiff = swapDiff.mergeOver(hoverSwapDiff);
 		}
-
-		return snapshot;
+		return swapDiff;
 	}
 
-	@Nullable
-	private Snapshot swapItem(KitType slot, Integer itemId)
-	{
-		if (itemId == null)
-		{
-			return null;
-		}
-		int equipmentId = itemId < 0 ? 0 : itemId + 512;
-		return swap(slot, equipmentId);
-	}
-
-	@Nullable
-	private Snapshot swapKit(KitType slot, Integer kitId)
-	{
-		if (kitId == null)
-		{
-			return null;
-		}
-		int equipmentId = kitId < 0 ? 0 : kitId + 256;
-		return swap(slot, equipmentId);
-	}
-
-	@Nullable
-	private Snapshot swapColor(ColorType type, Integer colorId)
+	/**
+	 * directly swaps a single color by id
+	 */
+	private SwapDiff swap(ColorType type, Integer colorId, SwapMode swapMode)
 	{
 		if (type == null || colorId == null)
 		{
-			return null;
+			return SwapDiff.blank();
 		}
 		Player player = client.getLocalPlayer();
 		if (player == null)
 		{
-			return null;
+			return SwapDiff.blank();
 		}
 		PlayerComposition composition = player.getPlayerComposition();
 		if (composition == null)
 		{
-			return null;
+			return SwapDiff.blank();
 		}
-
 		try
 		{
 			int oldColorId = setColorId(composition, type, colorId);
-			Map<ColorType, Snapshot.Change> changes = new HashMap<>();
-			changes.put(type, new Snapshot.Change(oldColorId, savedSwaps.containsColor(type)));
-			return new Snapshot(new HashMap<>(), changes, null);
+			Map<ColorType, SwapDiff.Change> changes = new HashMap<>();
+			changes.put(type, new SwapDiff.Change(oldColorId, savedSwaps.containsColor(type)));
+			switch (swapMode)
+			{
+				case SAVE:
+					savedSwaps.putColor(type, colorId);
+					break;
+				case REVERT:
+					savedSwaps.removeColor(type);
+					break;
+				case PREVIEW:
+					break;
+			}
+			return new SwapDiff(new HashMap<>(), changes, null);
 		}
 		catch (Exception e)
 		{
-			return null;
+			return SwapDiff.blank();
 		}
 	}
 
-	/*
-	 * This is where most of the checks happen to make the swap look as expected, e.g., hiding hair, changing stance.
-	 * If multiple slots are being swapped simultaneously, swap SHIELD before WEAPON.
-	 *
+	/**
+	 * Most of the requested swaps should call this method instead of the more specific swaps below, to ensure
+	 * that the swap doesn't result in illegal combinations of models
+	 */
+	private SwapDiff swap(CompoundSwap s, SwapMode swapMode)
+	{
+		return swap(s, (ignore) -> swapMode);
+	}
+
+	private SwapDiff swap(CompoundSwap s, Function<KitType, SwapMode> swapModeProvider)
+	{
+		switch (s.getType())
+		{
+			case HEAD:
+				Integer headEquipId = s.getEquipmentIds().get(KitType.HEAD);
+				Integer hairEquipId = s.getEquipmentIds().get(KitType.HAIR);
+				Integer jawEquipId = s.getEquipmentIds().get(KitType.JAW);
+				return swapHead(headEquipId, hairEquipId, jawEquipId, swapModeProvider);
+			case TORSO:
+				Integer torsoEquipId = s.getEquipmentIds().get(KitType.TORSO);
+				Integer armsEquipId = s.getEquipmentIds().get(KitType.ARMS);
+				return swapTorso(torsoEquipId, armsEquipId, swapModeProvider);
+			case WEAPONS:
+				Integer weaponEquipId = s.getEquipmentIds().get(KitType.WEAPON);
+				Integer shieldEquipId = s.getEquipmentIds().get(KitType.SHIELD);
+				return swapWeapons(weaponEquipId, shieldEquipId, swapModeProvider);
+			case SINGLE:
+				return swapSingle(s.getKitType(), s.getEquipmentId(), swapModeProvider.apply(s.getKitType()));
+		}
+		return SwapDiff.blank();
+	}
+
+	private SwapDiff swapSingle(KitType slot, Integer equipmentId, SwapMode swapMode)
+	{
+		SwapDiff.Change result = swap(slot, equipmentId, swapMode);
+		Map<KitType, SwapDiff.Change> changes = new HashMap<>();
+		if (result != null)
+		{
+			changes.put(slot, result);
+		}
+		return new SwapDiff(changes, new HashMap<>(), null);
+	}
+
+	/**
+	 * Swaps an item in the head slot, and kits in the hair and/or jaw slots. Behavior changes depending
+	 * on the information present:
+	 * <p>
+	 * When the head slot id is null, the head slot will not change. The hair and jaw kits sent
+	 * will be used if the currently shown item allows for it, otherwise nothing will happen.
+	 * <p>
+	 * The head slot item is removed when id == 0. This means swapping to the hair and jaw kit ids
+	 * if they are sent, otherwise the player's existing kit ids will be used.
+	 * <p>
+	 * For non-null, non-zero head ids, the head item will be swapped, but not if (the item hides hair and the hair kit
+	 * is locked) or (the item hides jaws and the jaw slot is locked). If the new item allows showing hair
+	 * and/or jaw kits, then they will also be swapped using the sent values or the existing kits on the player.
+	 * If the kits are not allowed, they will be hidden as needed.
+	 */
+	private SwapDiff swapHead(
+		Integer headEquipId,
+		Integer hairEquipId,
+		Integer jawEquipId,
+		Function<KitType, SwapMode> swapModeProvider)
+	{
+		// equipment ids that will be used in the swap
+		Integer finalHeadId = null;
+		Integer finalHairId;
+		Integer finalJawId;
+
+		BiFunction<Integer, KitType, Integer> check = (equipId, slot) ->
+			equipId != null ? equipId : equipmentIdForKit(slot) >= 256 ? equipmentIdForKit(slot) : -1;
+
+		Function<Integer, Boolean> headAllowsHair = (equipId) ->
+			equipId < 512 || ItemInteractions.HAIR_HELMS.contains(equipId - 512);
+		Function<Integer, Boolean> headAllowsJaw = (equipId) ->
+			equipId < 512 || !ItemInteractions.NO_JAW_HELMS.contains(equipId - 512);
+
+		int currentHeadEquipId = equipmentIdInSlot(KitType.HEAD);
+		if (savedSwaps.isItemLocked(KitType.HEAD))
+		{
+			// only change hair/jaw and only if current head item allows
+			finalHairId = headAllowsHair.apply(currentHeadEquipId) && !savedSwaps.isKitLocked(KitType.HAIR) ?
+				hairEquipId :
+				null;
+			finalJawId = headAllowsJaw.apply(currentHeadEquipId) && !savedSwaps.isKitLocked(KitType.JAW) ?
+				jawEquipId :
+				null;
+		}
+		else if (headEquipId == null)
+		{
+			// prioritize showing hair/jaw and hiding current helm if applicable
+			finalHairId = !savedSwaps.isKitLocked(KitType.HAIR) ? hairEquipId : null;
+			finalJawId = !savedSwaps.isKitLocked(KitType.JAW) ? jawEquipId : null;
+			boolean headForbidsHair = !headAllowsHair.apply(currentHeadEquipId) &&
+				(finalHairId == null ? savedSwaps.containsSlot(KitType.HAIR) : finalHairId > 0);
+			boolean headForbidsJaw = !headAllowsJaw.apply(currentHeadEquipId) &&
+				(finalJawId == null ? savedSwaps.containsSlot(KitType.JAW) : finalJawId > 0);
+			finalHeadId = headForbidsHair || headForbidsJaw ? Integer.valueOf(0) : headEquipId;
+		}
+		else
+		{
+			// priority: show head and hide hair/jaw, but not if locks on hair/jaw disallow (in which case don't change)
+			finalHeadId = (!headAllowsHair.apply(headEquipId) && savedSwaps.isColorLocked(ColorType.HAIR)) ||
+				(!headAllowsJaw.apply(headEquipId) && savedSwaps.isKitLocked(KitType.JAW)) ?
+				null :
+				headEquipId;
+			finalHairId = !savedSwaps.isKitLocked(KitType.HAIR) ?
+				(headAllowsHair.apply(headEquipId) ? check.apply(hairEquipId, KitType.HAIR) : Integer.valueOf(0)) :
+				null;
+			finalJawId = !savedSwaps.isKitLocked(KitType.JAW) ?
+				(headAllowsJaw.apply(headEquipId) ? check.apply(jawEquipId, KitType.JAW) : Integer.valueOf(0)) :
+				null;
+		}
+
+		Map<KitType, SwapDiff.Change> changes = new HashMap<>();
+		BiConsumer<KitType, Integer> attemptChange = (slot, equipId) -> {
+			if (equipId != null && equipId >= 0)
+			{
+				SwapDiff.Change result = swap(slot, equipId, swapModeProvider.apply(slot));
+				if (result != null)
+				{
+					changes.put(slot, result);
+				}
+			}
+		};
+		attemptChange.accept(KitType.HEAD, finalHeadId);
+		attemptChange.accept(KitType.HAIR, finalHairId);
+		attemptChange.accept(KitType.JAW, finalJawId);
+		return new SwapDiff(changes, new HashMap<>(), null);
+	}
+
+	/**
+	 * Swaps an item or kit in the torso slot and a kit in the arms slot. Behavior changes depending
+	 * on the information present:
+	 * <p>
+	 * When the torso slot id is null, the torso slot will not change. The arms kits sen will be
+	 * used if the currently shown torso allows for it, otherwise nothing will happen.
+	 * <p>
+	 * The torso slot item is removed when id == 0. This means swapping to the arms kit id if it is sent,
+	 * otherwise the player's existing kit id will be used.
+	 * <p>
+	 * For non-null, non-zero torso ids, the torso slot item will change, but not if the item hides arms and the arms
+	 * kit is currently locked. If the new item allows showing the arms kit, then it will also be swapped using the
+	 * sent value or the existing kit on the player. If the torso does not allow showing arms, then the arms kit
+	 * will be removed.
+	 */
+	private SwapDiff swapTorso(
+		Integer torsoEquipId,
+		Integer armsEquipId,
+		Function<KitType, SwapMode> swapModeProvider)
+	{
+		Integer finalTorsoId = null;
+		Integer finalArmsId;
+
+		BiFunction<Integer, KitType, Integer> check = (equipId, slot) ->
+			equipId != null ? equipId : equipmentIdForKit(slot) >= 256 ? equipmentIdForKit(slot) : -1;
+
+		Function<Integer, Boolean> torsoAllowsArms = (equipId) ->
+			equipId < 512 || ItemInteractions.ARMS_TORSOS.contains(equipId - 512);
+
+		int currentTorsoEquipId = equipmentIdInSlot(KitType.TORSO);
+		if (savedSwaps.isKitLocked(KitType.TORSO) ||
+			(savedSwaps.isItemLocked(KitType.TORSO) && torsoEquipId != null && torsoEquipId >= 512))
+		{
+			// only change arms and only if current torso item allows
+			finalArmsId = torsoAllowsArms.apply(currentTorsoEquipId) && !savedSwaps.isKitLocked(KitType.ARMS) ?
+				armsEquipId :
+				null;
+		}
+		else if (torsoEquipId == null)
+		{
+			// prioritize showing arms and hiding current torso if applicable
+			finalArmsId = !savedSwaps.isKitLocked(KitType.ARMS) ? armsEquipId : null;
+			boolean torsoForbidsArms = !torsoAllowsArms.apply(currentTorsoEquipId) &&
+				(finalArmsId == null ? savedSwaps.containsSlot(KitType.ARMS) : finalArmsId > 0);
+			int torsoKitEquipId = realKitIds.getOrDefault(KitType.TORSO, getFallbackKitId(KitType.TORSO)) + 256;
+			finalTorsoId = torsoForbidsArms ? (Integer) torsoKitEquipId : torsoEquipId;
+		}
+		else
+		{
+			// priority: show torso and hide arms, but not if locks on arms disallow (in which case don't change)
+			finalTorsoId = !torsoAllowsArms.apply(torsoEquipId) && savedSwaps.isKitLocked(KitType.ARMS) ?
+				null :
+				torsoEquipId;
+
+			finalArmsId = !savedSwaps.isKitLocked(KitType.ARMS) ?
+				(torsoAllowsArms.apply(torsoEquipId) ? check.apply(armsEquipId, KitType.ARMS) : Integer.valueOf(0)) :
+				null;
+		}
+
+		Map<KitType, SwapDiff.Change> changes = new HashMap<>();
+
+		BiConsumer<KitType, Integer> attemptChange = (slot, equipId) -> {
+			if (equipId != null && equipId >= 0)
+			{
+				SwapDiff.Change result = swap(slot, equipId, swapModeProvider.apply(slot));
+				if (result != null)
+				{
+					changes.put(slot, result);
+				}
+			}
+		};
+		attemptChange.accept(KitType.TORSO, finalTorsoId);
+		attemptChange.accept(KitType.ARMS, finalArmsId);
+		return new SwapDiff(changes, new HashMap<>(), null);
+	}
+
+	/**
+	 * Swaps an item weapon slot and an item in the shield slot. Behavior changes depending
+	 * on the information present:
+	 * <p>
+	 * If the weapon id is null, only the shield will be considered. If the shield is non-null and
+	 * non-zero, and the current weapon is two-handed, then the weapon will be removed.
+	 * <p>
+	 * If the weapon is non-null, non-zero, and two-handed, the shield will be removed. Otherwise,
+	 * the weapon and shield are both swapped if they are respectively non-null.
+	 * <p>
+	 * Lastly, the idle animation ID will change if the sent weapon id is non-null or if it's determined
+	 * that the weapon must be removed.
+	 */
+	private SwapDiff swapWeapons(
+		Integer weaponEquipId,
+		Integer shieldEquipId,
+		Function<KitType, SwapMode> swapModeProvider)
+	{
+		Integer finalWeaponId = null;
+		Integer finalShieldId;
+		Integer finalAnimId = null;
+
+		Function<Integer, Boolean> weaponForbidsShields = (equipId) -> {
+			if (equipId >= 512)
+			{
+				ItemEquipmentStats stats = equipmentStatsFor(equipId - 512);
+				return stats != null && stats.isTwoHanded();
+			}
+			return false;
+		};
+
+		if (weaponEquipId == null || savedSwaps.isItemLocked(KitType.WEAPON))
+		{
+			finalShieldId = shieldEquipId;
+			if (shieldEquipId != null && shieldEquipId > 0 &&
+				weaponForbidsShields.apply(equipmentIdInSlot(KitType.WEAPON)))
+			{
+				if (!savedSwaps.isItemLocked(KitType.WEAPON))
+				{
+					finalWeaponId = 0;
+					finalAnimId = IdleAnimationID.DEFAULT;
+				}
+				else
+				{
+					// weapon is locked and 2h, should not equip shield
+					finalShieldId = null;
+				}
+			}
+		}
+		else
+		{
+			finalShieldId = weaponForbidsShields.apply(weaponEquipId) && !savedSwaps.isItemLocked(KitType.SHIELD) ?
+				Integer.valueOf(0) :
+				shieldEquipId;
+			finalWeaponId = weaponForbidsShields.apply(weaponEquipId) && savedSwaps.isItemLocked(KitType.SHIELD) ?
+				null :
+				weaponEquipId;
+			finalAnimId = finalWeaponId != null ?
+				ItemInteractions.WEAPON_TO_IDLE.getOrDefault(weaponEquipId - 512, IdleAnimationID.DEFAULT) :
+				null;
+		}
+
+		Map<KitType, SwapDiff.Change> changes = new HashMap<>();
+		BiConsumer<KitType, Integer> attemptChange = (slot, equipId) -> {
+			if (equipId != null && equipId >= 0)
+			{
+				SwapDiff.Change result = swap(slot, equipId, swapModeProvider.apply(slot));
+				if (result != null)
+				{
+					changes.put(slot, result);
+				}
+			}
+		};
+		attemptChange.accept(KitType.WEAPON, finalWeaponId);
+		attemptChange.accept(KitType.SHIELD, finalShieldId);
+
+		Integer changedAnim = null;
+		if (finalAnimId != null && finalAnimId >= 0)
+		{
+			Player player = client.getLocalPlayer();
+			if (player != null)
+			{
+				changedAnim = setIdleAnimationId(player, finalAnimId);
+				if (changedAnim.equals(finalAnimId))
+				{
+					changedAnim = null;
+				}
+			}
+		}
+		return new SwapDiff(changes, new HashMap<>(), changedAnim);
+	}
+
+	/**
+	 * this should only be called from one of the swap methods utilizing `CompoundSwap`, otherwise the
+	 * swap may not make logical sense.
+	 * <p>
 	 * equipmentId follows `PlayerComposition::getEquipmentId`:
 	 * 0 for nothing
 	 * 256-511 for a base kit model (i.e., kitId + 256)
 	 * >=512 for an item (i.e., itemId + 512)
+	 * <p>
+	 * save should only be false when previewing. forceClear should be true when reverting
+	 *
+	 * @return the previously occupied equipment id and whether the change was natural if the equipment has
+	 * successfully been changed, otherwise null
 	 */
 	@Nullable
-	private Snapshot swap(KitType slot, int equipmentId)
+	private SwapDiff.Change swap(KitType slot, int equipmentId, SwapMode swapMode)
 	{
 		if (slot == null)
 		{
@@ -710,231 +1254,31 @@ public class SwapManager
 		{
 			return null;
 		}
-
-		Integer animationId = null;
-		Map<KitType, Snapshot.Change> changes = new HashMap<>();
-		if (equipmentId == 0)
+		int oldId = setEquipmentId(composition, slot, equipmentId);
+		boolean unnatural = savedSwaps.containsSlot(slot);
+		switch (swapMode)
 		{
-			// hide slot (check if we need to show kit types the item was hiding)
-			if (slot == KitType.HEAD)
-			{
-				int equipId = equipmentIdInSlot(KitType.HEAD);
-				if (equipId >= 512 && !ItemInteractions.HAIR_HELMS.contains(equipId - 512))
+			case SAVE:
+				if (equipmentId <= 0)
 				{
-					int hairEquipId = savedKitIds.getOrDefault(KitType.HAIR, -256) + 256;
-					int oldId = setEquipmentId(composition, KitType.HAIR, hairEquipId);
-					if (oldId != hairEquipId)
-					{
-						changes.put(KitType.HAIR, new Snapshot.Change(oldId, false));
-					}
+					savedSwaps.removeSlot(slot);
 				}
-				if (equipId >= 512 && ItemInteractions.NO_JAW_HELMS.contains(equipId - 512))
+				else if (equipmentId < 512)
 				{
-					int jawEquipId = savedKitIds.getOrDefault(KitType.JAW, -256) + 256;
-					int oldId = setEquipmentId(composition, KitType.JAW, jawEquipId);
-					if (oldId != jawEquipId)
-					{
-						changes.put(KitType.JAW, new Snapshot.Change(oldId, false));
-					}
-				}
-			}
-			else if (slot == KitType.TORSO)
-			{
-				int equipId = equipmentIdInSlot(KitType.TORSO);
-				if (equipId >= 512 && !ItemInteractions.ARMS_TORSOS.contains(equipId - 512))
-				{
-					int armsEquipId = savedKitIds.getOrDefault(KitType.ARMS, -256) + 256;
-					int oldId = setEquipmentId(composition, KitType.ARMS, armsEquipId);
-					if (oldId != armsEquipId)
-					{
-						changes.put(KitType.ARMS, new Snapshot.Change(oldId, false));
-					}
-				}
-			}
-			else if (slot == KitType.WEAPON)
-			{
-				int oldAnimId = setIdleAnimationId(player, IdleAnimationID.DEFAULT);
-				if (oldAnimId != IdleAnimationID.DEFAULT)
-				{
-					animationId = oldAnimId;
-				}
-			}
-			int oldId = setEquipmentId(composition, slot, 0);
-			if (oldId != 0)
-			{
-				changes.put(slot, new Snapshot.Change(oldId, savedSwaps.containsItem(slot)));
-			}
-		}
-		else if (equipmentId <= 512)
-		{
-			// swapping to kit id (check if any equipment prevents this)
-			if (slot == KitType.HAIR)
-			{
-				int equipId = equipmentIdInSlot(KitType.HEAD);
-				if (equipId >= 512 && !ItemInteractions.HAIR_HELMS.contains(equipId - 512))
-				{
-					return null;
-				}
-			}
-			else if (slot == KitType.JAW)
-			{
-				int equipId = equipmentIdInSlot(KitType.HEAD);
-				if (equipId >= 512 && ItemInteractions.NO_JAW_HELMS.contains(equipId - 512))
-				{
-					return null;
-				}
-			}
-			else if (slot == KitType.ARMS)
-			{
-				int equipId = equipmentIdInSlot(KitType.TORSO);
-				if (equipId >= 512 && !ItemInteractions.ARMS_TORSOS.contains(equipId - 512))
-				{
-					return null;
-				}
-			}
-			// if reverting torso to kit model, see if arms should be reverted to kit as well
-			else if (slot == KitType.TORSO)
-			{
-				int equipId = equipmentIdInSlot(slot);
-				int armsEquipId = savedKitIds.getOrDefault(KitType.ARMS, -256) + 256;
-				if (equipId >= 512 && !ItemInteractions.ARMS_TORSOS.contains(equipId - 512) && armsEquipId != 0)
-				{
-					int oldId = setEquipmentId(composition, KitType.ARMS, armsEquipId);
-					if (oldId != armsEquipId)
-					{
-						changes.put(KitType.ARMS, new Snapshot.Change(oldId, false));
-					}
-				}
-			}
-			int oldId = setEquipmentId(composition, slot, equipmentId);
-			if (oldId != equipmentId)
-			{
-				changes.put(slot, new Snapshot.Change(oldId, savedSwaps.containsItem(slot)));
-			}
-		}
-		else
-		{
-			// otherwise, we're swapping to an item
-			int itemId = equipmentId - 512;
-			if (slot == KitType.WEAPON)
-			{
-				// check if equipping a 2h weapon. if so, remove shield
-				ItemEquipmentStats stats = equipmentStatsFor(itemId);
-				if (stats != null && stats.isTwoHanded())
-				{
-					int oldId = setEquipmentId(composition, KitType.SHIELD, 0);
-					if (oldId != 0)
-					{
-						changes.put(KitType.SHIELD, new Snapshot.Change(oldId, savedSwaps.containsItem(KitType.SHIELD)));
-					}
-				}
-				// check if weapon changes idle animation
-				int newAnimationId = ItemInteractions.WEAPON_TO_IDLE.getOrDefault(itemId, IdleAnimationID.DEFAULT);
-				int oldAnimId = setIdleAnimationId(player, newAnimationId);
-				if (oldAnimId != newAnimationId)
-				{
-					animationId = oldAnimId;
-				}
-			}
-			// check if already holding a 2h weapon. if so, un-equip it
-			if (slot == KitType.SHIELD)
-			{
-				int weaponEquipmentId = equipmentIdInSlot(KitType.WEAPON);
-				if (weaponEquipmentId != 0)
-				{
-					ItemEquipmentStats stats = equipmentStatsFor(weaponEquipmentId - 512);
-					if (stats != null && stats.isTwoHanded())
-					{
-						int oldId = setEquipmentId(composition, KitType.WEAPON, 0);
-						if (oldId != 0)
-						{
-							changes.put(KitType.WEAPON, new Snapshot.Change(oldId, savedSwaps.containsItem(KitType.WEAPON)));
-						}
-						int oldAnimId = setIdleAnimationId(player, IdleAnimationID.DEFAULT);
-						if (oldAnimId != IdleAnimationID.DEFAULT)
-						{
-							animationId = oldAnimId;
-						}
-					}
-				}
-			}
-			if (slot == KitType.HEAD)
-			{
-				// check if we need to show/hide hair
-				if (ItemInteractions.HAIR_HELMS.contains(itemId))
-				{
-					Integer kitId = savedKitIds.get(KitType.HAIR);
-					if (kitId != null && kitId >= 0)
-					{
-						int oldId = setEquipmentId(composition, KitType.HAIR, kitId + 256);
-						if (oldId != kitId + 256)
-						{
-							changes.put(KitType.HAIR, new Snapshot.Change(oldId, false));
-						}
-					}
+					savedSwaps.putKit(slot, equipmentId - 256);
 				}
 				else
 				{
-					int oldId = setEquipmentId(composition, KitType.HAIR, 0);
-					if (oldId != 0)
-					{
-						changes.put(KitType.HAIR, new Snapshot.Change(oldId, false));
-					}
+					savedSwaps.putItem(slot, equipmentId - 512);
 				}
-				// check if we need to show/hide jaw
-				if (!ItemInteractions.NO_JAW_HELMS.contains(itemId))
-				{
-					Integer kitId = savedKitIds.get(KitType.JAW);
-					if (kitId != null && kitId >= 0)
-					{
-						int oldId = setEquipmentId(composition, KitType.JAW, kitId + 256);
-						if (oldId != kitId + 256)
-						{
-							changes.put(KitType.JAW, new Snapshot.Change(oldId, false));
-						}
-					}
-				}
-				else
-				{
-					int oldId = setEquipmentId(composition, KitType.JAW, 0);
-					if (oldId != 0)
-					{
-						changes.put(KitType.JAW, new Snapshot.Change(oldId, false));
-					}
-				}
-			}
-			if (slot == KitType.TORSO)
-			{
-				// check if we need to show/hide arms
-				if (ItemInteractions.ARMS_TORSOS.contains(itemId))
-				{
-					Integer kitId = savedKitIds.get(KitType.ARMS);
-					if (kitId != null && kitId >= 0)
-					{
-						int oldId = setEquipmentId(composition, KitType.ARMS, kitId + 256);
-						if (oldId != kitId + 256)
-						{
-							changes.put(KitType.ARMS, new Snapshot.Change(oldId, false));
-						}
-					}
-				}
-				else
-				{
-					int oldId = setEquipmentId(composition, KitType.ARMS, 0);
-					if (oldId != 0)
-					{
-						changes.put(KitType.ARMS, new Snapshot.Change(oldId, false));
-					}
-				}
-			}
-			int oldId = setEquipmentId(composition, slot, equipmentId);
-			if (oldId != equipmentId)
-			{
-				changes.put(slot, new Snapshot.Change(oldId, savedSwaps.containsItem(slot)));
-			}
+				break;
+			case REVERT:
+				savedSwaps.removeSlot(slot);
+				break;
+			case PREVIEW:
+				break;
 		}
-
-		return new Snapshot(changes, new HashMap<>(), animationId);
+		return oldId == equipmentId ? null : new SwapDiff.Change(oldId, unnatural);
 	}
 
 	// Sets equipment id for slot and returns equipment id of previously occupied item.
@@ -965,29 +1309,36 @@ public class SwapManager
 		return previousId;
 	}
 
-	private Snapshot doRevert(KitType slot)
+	private SwapDiff doRevert(KitType slot)
 	{
 		Integer originalItemId = equippedItemIdFor(slot);
-		Integer originalKitId = swappedKitIdIn(slot);
-		if (originalKitId == null)
+		Integer originalKitId = realKitIds.getOrDefault(slot, getFallbackKitId(slot));
+		if (originalKitId == -256)
 		{
-			originalKitId = savedKitIds.get(slot);
+			originalKitId = null;
 		}
-		Snapshot s;
+		SwapDiff s;
 		if (originalItemId != null)
 		{
-			s = swapItem(slot, originalItemId);
+			int equipmentId = originalItemId < 0 ? 0 : originalItemId + 512;
+			s = swap(CompoundSwap.single(slot, equipmentId), SwapMode.REVERT);
 		}
 		else if (originalKitId != null)
 		{
-			s = swapKit(slot, originalKitId);
+			int equipmentId = originalKitId < 0 ? 0 : originalKitId + 256;
+			s = swap(CompoundSwap.single(slot, equipmentId), SwapMode.REVERT);
 		}
 		else
 		{
-			s = swap(slot, 0);
+			s = swap(CompoundSwap.single(slot, 0), SwapMode.REVERT);
 		}
-		savedSwaps.removeItem(slot);
 		return s;
+	}
+
+	private SwapDiff doRevert(ColorType type)
+	{
+		Integer originalColorId = realColorIds.getOrDefault(type, 0);
+		return swap(type, originalColorId, SwapMode.REVERT);
 	}
 
 	@Nullable
@@ -1003,29 +1354,83 @@ public class SwapManager
 			.orElse(null);
 	}
 
-	@Nullable
-	private KitType slotForItem(Integer itemId)
+	/**
+	 * @return true if the slot does not have an item (real or virtual) obscuring it (directly or indirectly)
+	 */
+	private boolean isOpen(KitType slot)
 	{
-		ItemStats stats = itemManager.getItemStats(itemId, false);
-		if (stats == null || stats.getEquipment() == null)
+		if (slot == null || savedSwaps.isKitLocked(slot) || savedSwaps.containsItem(slot))
 		{
-			return null;
+			return false;
 		}
-		return KitType.values()[stats.getEquipment().getSlot()];
+		Supplier<Boolean> fallback = () -> {
+			if (equipmentIdInSlot(slot) > 0)
+			{
+				// equipment id must be a kit since there can't be an item at this point
+				return true;
+			}
+			else
+			{
+				Integer actualEquipId = equippedItemIdFor(slot);
+				return actualEquipId == null || actualEquipId < 512;
+			}
+		};
+		switch (slot)
+		{
+			case HEAD:
+			case JAW:
+			case HAIR:
+				int headEquipId = equipmentIdInSlot(KitType.HEAD);
+				if (headEquipId == 0)
+				{
+					Integer actualEquipId = equippedItemIdFor(KitType.HEAD);
+					headEquipId = actualEquipId != null ? actualEquipId : 0;
+				}
+				if (headEquipId > 512)
+				{
+					int headItemId = headEquipId - 512;
+					if (slot == KitType.HAIR)
+					{
+						return ItemInteractions.HAIR_HELMS.contains(headItemId);
+					}
+					else if (slot == KitType.JAW)
+					{
+						return !ItemInteractions.NO_JAW_HELMS.contains(headItemId);
+					}
+				}
+				return fallback.get();
+			case TORSO:
+			case ARMS:
+				int torsoEquipId = equipmentIdInSlot(KitType.TORSO);
+				if (torsoEquipId == 0)
+				{
+					Integer actualEquipId = equippedItemIdFor(KitType.TORSO);
+					torsoEquipId = actualEquipId != null ? actualEquipId : 0;
+				}
+				if (torsoEquipId > 512)
+				{
+					int torsoItemId = torsoEquipId - 512;
+					if (slot == KitType.ARMS)
+					{
+						return ItemInteractions.ARMS_TORSOS.contains(torsoItemId);
+					}
+				}
+				return fallback.get();
+			default:
+				return fallback.get();
+		}
 	}
 
 	@Nullable
 	private ItemEquipmentStats equipmentStatsFor(int itemId)
 	{
 		ItemStats stats = itemManager.getItemStats(itemId, false);
-		if (stats != null && stats.isEquipable())
-		{
-			return stats.getEquipment();
-		}
-		return null;
+		return stats != null && stats.isEquipable() ? stats.getEquipment() : null;
 	}
 
-	// returns the equipment id of whatever is being displayed in the given slot
+	/**
+	 * returns the equipment id of whatever is being displayed in the given slot
+	 */
 	private int equipmentIdInSlot(KitType kitType)
 	{
 		Integer itemId = savedSwaps.getItemOrDefault(kitType, equippedItemIdFor(kitType));
@@ -1034,14 +1439,22 @@ public class SwapManager
 			return itemId + 512;
 		}
 		Integer kitId = kitIdFor(kitType);
-		if (kitId != null && kitId >= 0)
-		{
-			return kitId + 256;
-		}
-		return 0;
+		return kitId != null && kitId >= 0 ? kitId + 256 : 0;
 	}
 
-	// returns the item id of the actual item equipped in the given slot (swaps ignored)
+	/**
+	 * Returns the equipment id of whatever kit is currently in this slot, bypassing the equipment id of the item in
+	 * that slot. The id could be that of a swapped kit or the player's actual kit. There is no guarantee that
+	 * the returned kit id is currently being shown.
+	 */
+	private int equipmentIdForKit(KitType slot)
+	{
+		return savedSwaps.getKitOrDefault(slot, realKitIds.getOrDefault(slot, -256)) + 256;
+	}
+
+	/**
+	 * returns the item id of the actual item equipped in the given slot (swaps are ignored)
+	 */
 	@Nullable
 	public Integer equippedItemIdFor(KitType kitType)
 	{
@@ -1061,11 +1474,7 @@ public class SwapManager
 			return null;
 		}
 		Item item = inventory.getItem(kitType.getIndex());
-		if (item != null && item.getId() >= 0)
-		{
-			return item.getId();
-		}
-		return null;
+		return item != null && item.getId() >= 0 ? item.getId() : null;
 	}
 
 	@Nullable
@@ -1077,11 +1486,7 @@ public class SwapManager
 			return null;
 		}
 		PlayerComposition composition = player.getPlayerComposition();
-		if (composition == null)
-		{
-			return null;
-		}
-		return composition.getKitId(kitType);
+		return composition == null ? null : composition.getKitId(kitType);
 	}
 
 	@Nullable
@@ -1108,31 +1513,37 @@ public class SwapManager
 		}
 	}
 
-	// restores snapshot and returns a new snapshot with reverted changes (allows redo)
-	@Nullable
-	private Snapshot restoreSnapshot(Snapshot snapshot)
+	// restores diff and returns a new diff with reverted changes (allows redo)
+	private SwapDiff restore(SwapDiff swapDiff, boolean save)
 	{
-		return snapshot.getSlotChanges().entrySet()
+		Function<KitType, SwapMode> swapModeProvider = (slot) -> {
+			SwapDiff.Change change = swapDiff.getSlotChanges().get(slot);
+			return !save ? SwapMode.PREVIEW : change != null && change.isUnnatural() ?
+				SwapMode.SAVE :
+				SwapMode.REVERT;
+		};
+		// restore kits and items
+		SwapDiff slotRestore = CompoundSwap.fromMap(
+			swapDiff.getSlotChanges().entrySet().stream().collect(
+				Collectors.toMap(Map.Entry::getKey, e -> e.getValue().getId())))
 			.stream()
-			.sorted(Comparator.comparingInt(e -> -e.getKey().getIndex()))
+			.map(c -> this.swap(c, swapModeProvider))
+			.reduce(SwapDiff::mergeOver)
+			.orElse(SwapDiff.blank());
+		SwapDiff colorRestore = swapDiff.getColorChanges().entrySet()
+			.stream()
 			.map(e -> {
-				KitType slot = e.getKey();
-				Snapshot.Change change = e.getValue();
-				int equipId = change.getId();
-				Snapshot s = swap(slot, equipId);
-				if (equipId >= 512 && change.isUnnatural())
-				{
-					savedSwaps.putItem(slot, equipId - 512);
-				}
-				else
-				{
-					savedSwaps.removeItem(slot);
-				}
-				return s;
+				ColorType type = e.getKey();
+				SwapDiff.Change change = e.getValue();
+				int colorId = change.getId();
+				SwapMode swapMode = !save ? SwapMode.PREVIEW : change.isUnnatural() ?
+					SwapMode.SAVE :
+					SwapMode.REVERT;
+				return swap(type, colorId, swapMode);
 			})
-			.filter(Objects::nonNull)
-			.reduce(Snapshot::mergeOver)
-			.orElse(null);
+			.reduce(SwapDiff::mergeOver)
+			.orElse(SwapDiff.blank());
+		return slotRestore.mergeOver(colorRestore);
 	}
 
 	private int[] getColors(PlayerComposition composition) throws NoSuchFieldException, IllegalAccessException
@@ -1149,6 +1560,7 @@ public class SwapManager
 
 	private void findColorsField(PlayerComposition composition)
 	{
+		String foundName = null;
 		for (Field declaredField : composition.getClass().getDeclaredFields())
 		{
 			if (declaredField.getType().equals(int[].class))
@@ -1159,15 +1571,80 @@ public class SwapManager
 					int[] arr = (int[]) declaredField.get(composition);
 					if (arr.length == 5)
 					{
-						obfuscatedColorsFieldName = declaredField.getName();
+						if (foundName == null)
+						{
+							foundName = declaredField.getName();
+						}
+						else
+						{
+							throw new IllegalStateException("more than one int[5] found on player");
+						}
 					}
 				}
-				catch (IllegalAccessException e)
+				catch (IllegalAccessException | IllegalStateException e)
 				{
-					// do nothing
+					e.printStackTrace();
 				}
 			}
 		}
+		if (foundName != null)
+		{
+			obfuscatedColorsFieldName = foundName;
+		}
+	}
+
+	@Nullable
+	private KitType itemSlotMatch(String name)
+	{
+		try
+		{
+			return KitType.valueOf(name);
+		}
+		catch (Exception e)
+		{
+			return null;
+		}
+	}
+
+	@Nullable
+	private KitType kitSlotMatch(String name)
+	{
+		try
+		{
+			String k = name.replace(KIT_SUFFIX, "");
+			return KitType.valueOf(k);
+		}
+		catch (Exception e)
+		{
+			return null;
+		}
+	}
+
+	@Nullable
+	private ColorType colorSlotMatch(String name)
+	{
+		try
+		{
+			String c = name.replace(COLOR_SUFFIX, "");
+			return ColorType.valueOf(c);
+		}
+		catch (Exception e)
+		{
+			return null;
+		}
+	}
+
+	private void sendHighlightedMessage(String message)
+	{
+		String chatMessage = new ChatMessageBuilder()
+			.append(ChatColorType.HIGHLIGHT)
+			.append(message)
+			.build();
+
+		chatMessageManager.queue(QueuedMessage.builder()
+			.type(ChatMessageType.CONSOLE)
+			.runeLiteFormattedMessage(chatMessage)
+			.build());
 	}
 
 }

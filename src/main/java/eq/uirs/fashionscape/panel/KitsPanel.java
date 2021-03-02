@@ -22,7 +22,6 @@ import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.Player;
 import net.runelite.api.PlayerComposition;
-import net.runelite.api.events.PlayerChanged;
 import net.runelite.api.kit.KitType;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.ui.ColorScheme;
@@ -40,38 +39,27 @@ public class KitsPanel extends JPanel
 
 	private final JPanel resultsPanel = new JPanel();
 	private final JScrollPane scrollPane = new JScrollPane();
-	private final List<KitColorPanel> kitPanels = new ArrayList<>();
+	private final List<KitItemPanel> kitPanels = new ArrayList<>();
 
 	private Boolean isFemale = null;
-	private final KitOpener kitOpener = slot -> kitPanels.forEach(panel -> {
-		if (slot.equals(panel.getSlot()))
-		{
-			Boolean female = isFemale();
-			if (female != null)
+	private final KitColorOpener kitColorOpener = (slot, type) -> {
+		kitPanels.forEach(panel -> {
+			if (Objects.equal(slot, panel.getSlot()) && Objects.equal(type, panel.getType()))
 			{
-				panel.openKitOptions(female);
+				Boolean female = isFemale();
+				if (female != null)
+				{
+					panel.openOptions(female);
+				}
 			}
-		}
-		else
-		{
-			panel.closeOptions();
-		}
+			else
+			{
+				panel.closeOptions();
+			}
+		});
 		updateUI();
 		scrollPane.revalidate();
-	});
-
-	private final ColorOpener colorOpener = type -> kitPanels.forEach(panel -> {
-		if (type.equals(panel.getType()))
-		{
-			panel.openColorOptions();
-		}
-		else
-		{
-			panel.closeOptions();
-		}
-		updateUI();
-		scrollPane.revalidate();
-	});
+	};
 
 	@Value
 	private static class KitColorResult
@@ -107,6 +95,16 @@ public class KitsPanel extends JPanel
 		scrollPane.setViewportView(resultsWrapper);
 		add(scrollPane, BorderLayout.CENTER);
 		populateKitSlots();
+	}
+
+	public void collapseOptions()
+	{
+		for (KitItemPanel kitPanel : kitPanels)
+		{
+			kitPanel.closeOptions();
+		}
+		updateUI();
+		scrollPane.revalidate();
 	}
 
 	private void populateKitSlots()
@@ -157,8 +155,8 @@ public class KitsPanel extends JPanel
 			{
 				image = ImageUtil.loadImageResource(getClass(), result.slot.name().toLowerCase() + ".png");
 			}
-			KitColorPanel panel = new KitColorPanel(swapManager, result.colorType, result.colorId, result.slot,
-				result.kitId, kitOpener, colorOpener, image, clientThread);
+			KitItemPanel panel = new KitItemPanel(swapManager, result.colorType, result.colorId, result.slot,
+				result.kitId, kitColorOpener, image, clientThread);
 			kitPanels.add(panel);
 			JPanel marginWrapper = new JPanel(new BorderLayout());
 			marginWrapper.setBackground(ColorScheme.DARK_GRAY_COLOR);
@@ -167,9 +165,11 @@ public class KitsPanel extends JPanel
 			resultsPanel.add(marginWrapper, c);
 			c.gridy++;
 		}
+		revalidate();
+		repaint();
 	}
 
-	public void onPlayerChanged(PlayerChanged event)
+	public void onPlayerChanged()
 	{
 		Player player = client.getLocalPlayer();
 		if (player != null)

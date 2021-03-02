@@ -3,6 +3,7 @@ package eq.uirs.fashionscape.swap;
 import eq.uirs.fashionscape.data.ColorType;
 import java.util.HashMap;
 import java.util.Map;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.ToString;
@@ -14,7 +15,8 @@ import net.runelite.api.kit.KitType;
  */
 @RequiredArgsConstructor
 @ToString
-class Snapshot
+@EqualsAndHashCode
+class SwapDiff
 {
 	@Value
 	public static class Change
@@ -29,6 +31,11 @@ class Snapshot
 		boolean unnatural;
 	}
 
+	public static SwapDiff blank()
+	{
+		return new SwapDiff(new HashMap<>(), new HashMap<>(), null);
+	}
+
 	@Getter
 	private final Map<KitType, Change> slotChanges;
 	@Getter
@@ -36,13 +43,13 @@ class Snapshot
 	@Getter
 	private final Integer changedIdleAnimationId;
 
-	boolean isEmpty()
+	boolean isBlank()
 	{
-		return changedIdleAnimationId == null && slotChanges.isEmpty();
+		return changedIdleAnimationId == null && slotChanges.isEmpty() && colorChanges.isEmpty();
 	}
 
-	// This snapshot will take priority of the other snapshot in the event of a collision.
-	Snapshot mergeOver(Snapshot other)
+	// This diff will take priority of the other diff in the event of a collision.
+	SwapDiff mergeOver(SwapDiff other)
 	{
 		Map<KitType, Change> mergedSlots = new HashMap<>();
 		mergedSlots.putAll(other.slotChanges);
@@ -55,6 +62,6 @@ class Snapshot
 		{
 			idleId = other.changedIdleAnimationId;
 		}
-		return new Snapshot(mergedSlots, mergedColors, idleId);
+		return new SwapDiff(mergedSlots, mergedColors, idleId);
 	}
 }

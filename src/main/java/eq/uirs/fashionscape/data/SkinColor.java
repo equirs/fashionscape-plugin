@@ -8,6 +8,7 @@ import net.runelite.client.util.Text;
 @RequiredArgsConstructor
 public enum SkinColor implements Colorable
 {
+	VERY_PALE(7, new Color(213, 169, 133)),
 	PALE(0, new Color(187, 143, 106)),
 	NORMAL(1, new Color(164, 127, 93)),
 	SLIGHTLY_TAN(2, new Color(158, 122, 73)),
@@ -15,7 +16,6 @@ public enum SkinColor implements Colorable
 	VERY_TAN(4, new Color(121, 88, 42)),
 	DARK(5, new Color(100, 78, 36)),
 	VERY_DARK(6, new Color(76, 61, 9)),
-	VERY_PALE(7, new Color(213, 169, 133)),
 	GREEN(8, new Color(0, 127, 0)),
 	BLACK(9, new Color(15, 15, 15)),
 	WHITE(10, new Color(255, 255, 255)),

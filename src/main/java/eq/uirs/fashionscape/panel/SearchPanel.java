@@ -5,6 +5,8 @@ import com.google.common.collect.ImmutableMap;
 import eq.uirs.fashionscape.FashionscapeConfig;
 import eq.uirs.fashionscape.FashionscapePlugin;
 import eq.uirs.fashionscape.colors.ColorScorer;
+import eq.uirs.fashionscape.swap.LockChanged;
+import eq.uirs.fashionscape.swap.LockChangedListener;
 import eq.uirs.fashionscape.swap.SwapManager;
 import java.awt.BorderLayout;
 import java.awt.CardLayout;
@@ -223,7 +225,12 @@ class SearchPanel extends JPanel
 
 		SwingUtilities.invokeLater(searchBar::requestFocusInWindow);
 
-		swapManager.addLockChangeListener(this::updateTabIcon);
+		swapManager.addEventListener(new LockChangedListener((e) -> {
+			if (e.getType() != LockChanged.Type.KIT)
+			{
+				updateTabIcon(e);
+			}
+		}));
 	}
 
 	public void clearResults()
@@ -283,7 +290,7 @@ class SearchPanel extends JPanel
 			}
 			else
 			{
-				isLocked = swapManager.isLocked(filterSlot.getKitType());
+				isLocked = swapManager.isItemLocked(filterSlot.getKitType());
 			}
 			ImageIcon icon = iconFor(filterSlot, isLocked);
 			tab.setIcon(icon);
@@ -548,8 +555,10 @@ class SearchPanel extends JPanel
 		return filter == null || filter.apply(itemComposition);
 	}
 
-	private void updateTabIcon(KitType slot, boolean isLocked)
+	private void updateTabIcon(LockChanged event)
 	{
+		KitType slot = event.getSlot();
+		boolean isLocked = event.isLocked();
 		Arrays.stream(PanelEquipSlot.values())
 			.filter(p -> Objects.equals(p.getKitType(), slot))
 			.findFirst()

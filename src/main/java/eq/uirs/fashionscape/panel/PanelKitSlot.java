@@ -11,9 +11,9 @@ public enum PanelKitSlot
 {
 	SKIN(null, ColorType.SKIN),
 	HAIR(KitType.HAIR, ColorType.HAIR),
-	JAW(KitType.JAW, null),
+	JAW(KitType.JAW, ColorType.HAIR),
 	TORSO(KitType.TORSO, ColorType.TORSO),
-	ARMS(KitType.ARMS, null),
+	ARMS(KitType.ARMS, ColorType.TORSO),
 	HANDS(KitType.HANDS, null),
 	LEGS(KitType.LEGS, ColorType.LEGS),
 	BOOTS(KitType.BOOTS, ColorType.BOOTS);

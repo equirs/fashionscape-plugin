@@ -64,21 +64,21 @@ public enum Kit
 
 	// region Jaw
 
-	GOATEE(KitType.JAW,"Goatee", false, 10),
-	LONG_J(KitType.JAW,"Long", false, 11),
-	MEDIUM_J(KitType.JAW,"Medium", false, 12),
-	SMALL_MOUSTACHE(KitType.JAW,"Small moustache", false, 13),
-	CLEAN_SHAVEN(KitType.JAW,"Clean-shaven", false,14),
-	SHORT_J(KitType.JAW,"Short", false, 15),
-	POINTY(KitType.JAW,"Pointy", false, 16),
-	SPLIT(KitType.JAW,"Split", false, 17),
-	HANDLEBAR(KitType.JAW,"Handlebar", false, 111),
-	MUTTON(KitType.JAW,"Mutton", false, 112),
-	FULL_MUTTON(KitType.JAW,"Full mutton", false, 113),
-	BIG_MOUSTACHE(KitType.JAW,"Big moustache", false, 114),
-	WAXED_MOUSTACHE(KitType.JAW,"Waxed moustache", false, 115),
-	DALI(KitType.JAW,"Dali", false, 116),
-	VIZIER(KitType.JAW,"Vizier", false, 117),
+	GOATEE(KitType.JAW, "Goatee", false, 10),
+	LONG_J(KitType.JAW, "Long", false, 11),
+	MEDIUM_J(KitType.JAW, "Medium", false, 12),
+	SMALL_MOUSTACHE(KitType.JAW, "Small moustache", false, 13),
+	CLEAN_SHAVEN(KitType.JAW, "Clean-shaven", false, 14),
+	SHORT_J(KitType.JAW, "Short", false, 15),
+	POINTY(KitType.JAW, "Pointy", false, 16),
+	SPLIT(KitType.JAW, "Split", false, 17),
+	HANDLEBAR(KitType.JAW, "Handlebar", false, 111),
+	MUTTON(KitType.JAW, "Mutton", false, 112),
+	FULL_MUTTON(KitType.JAW, "Full mutton", false, 113),
+	BIG_MOUSTACHE(KitType.JAW, "Big moustache", false, 114),
+	WAXED_MOUSTACHE(KitType.JAW, "Waxed moustache", false, 115),
+	DALI(KitType.JAW, "Dali", false, 116),
+	VIZIER(KitType.JAW, "Vizier", false, 117),
 
 	// endregion Jaw
 

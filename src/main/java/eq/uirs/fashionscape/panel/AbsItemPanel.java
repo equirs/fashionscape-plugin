@@ -24,7 +24,7 @@ abstract class AbsItemPanel extends AbsIconLabelPanel
 	protected void setItemName(Integer itemId)
 	{
 		clientThread.invokeLater(() -> {
-			String itemName = "Nothing";
+			String itemName = "Not set";
 			if (itemId != null)
 			{
 				ItemComposition itemComposition = itemManager.getItemComposition(itemId);

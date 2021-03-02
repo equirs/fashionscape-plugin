@@ -112,8 +112,10 @@ public class FashionscapePlugin extends Plugin
 	@Override
 	protected void shutDown()
 	{
-		swapManager.revertSwaps(true);
-		clientThread.invokeLater(() -> swapManager.shutDown());
+		clientThread.invokeLater(() -> {
+			swapManager.revertSwaps(true);
+			swapManager.shutDown();
+		});
 		clientToolbar.removeNavigation(navButton);
 		ITEM_ID_DUPES.clear();
 	}
@@ -134,11 +136,11 @@ public class FashionscapePlugin extends Plugin
 				swapManager.clear();
 			}
 			swapManager.checkForBaseIds();
-			swapManager.refreshItemSwaps();
+			swapManager.refreshAllSwaps();
 		}
 		if (panel != null)
 		{
-			panel.onPlayerChanged(event);
+			panel.onPlayerChanged();
 		}
 	}
 

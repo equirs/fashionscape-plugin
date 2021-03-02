@@ -1,5 +1,8 @@
 package eq.uirs.fashionscape.panel;
 
+import eq.uirs.fashionscape.swap.ItemChangedListener;
+import eq.uirs.fashionscape.swap.LockChanged;
+import eq.uirs.fashionscape.swap.LockChangedListener;
 import eq.uirs.fashionscape.swap.SwapManager;
 import java.awt.BorderLayout;
 import java.awt.Cursor;
@@ -12,6 +15,7 @@ import javax.annotation.Nullable;
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JPanel;
+import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
 import net.runelite.api.ItemComposition;
 import net.runelite.api.kit.KitType;
@@ -60,7 +64,7 @@ class SwapItemPanel extends AbsItemPanel
 		lockButton.setBorderPainted(false);
 		lockButton.setContentAreaFilled(false);
 		lockButton.addActionListener(e -> {
-			swapManager.toggleLocked(slot);
+			swapManager.toggleItemLocked(slot);
 			updateLockButton();
 			updateXButton();
 		});
@@ -74,10 +78,13 @@ class SwapItemPanel extends AbsItemPanel
 		xButton.setBorderPainted(false);
 		xButton.setContentAreaFilled(false);
 		xButton.setIcon(new ImageIcon(ImageUtil.loadImageResource(this.getClass(), "x.png")));
-		xButton.addActionListener(e -> {
-			swapManager.revertSlot(slot, true);
-			updateXButton();
-		});
+		xButton.addActionListener(e -> clientThread.invokeLater(() -> {
+			swapManager.revertSlot(slot);
+			SwingUtilities.invokeLater(() -> {
+				updateLockButton();
+				updateXButton();
+			});
+		}));
 		buttons.add(xButton);
 
 		updateLockButton();
@@ -87,16 +94,24 @@ class SwapItemPanel extends AbsItemPanel
 
 		add(rightPanel, BorderLayout.CENTER);
 
-		swapManager.addItemChangeListener((changedSlot, newId) -> {
-			if (changedSlot == slot)
+		swapManager.addEventListener(new ItemChangedListener(e -> {
+			if (e.getSlot() == slot)
 			{
+				Integer newId = e.getItemId();
 				this.itemId = newId;
 				setItemName(newId);
 				setItemIcon(newId);
 				resetMouseListeners();
 				updateXButton();
 			}
-		});
+		}));
+
+		swapManager.addEventListener(new LockChangedListener(e -> {
+			if (e.getSlot() == slot && e.getType() != LockChanged.Type.KIT)
+			{
+				updateLockButton();
+			}
+		}));
 
 		resetMouseListeners();
 	}
@@ -118,18 +133,17 @@ class SwapItemPanel extends AbsItemPanel
 		lockButton.addMouseListener(hoverAdapter);
 	}
 
-	public void updateLockButton()
+	void updateLockButton()
 	{
-		boolean locked = swapManager.isLocked(slot);
+		boolean locked = swapManager.isItemLocked(slot);
 		String lockIcon = locked ? "lock" : "unlock";
 		lockButton.setIcon(
 			new ImageIcon(ImageUtil.loadImageResource(this.getClass(), lockIcon + ".png")));
 		String action = locked ? "Unlock" : "Lock";
 		lockButton.setToolTipText(action + " " + slot.name().toLowerCase() + " slot");
-		xButton.setEnabled(itemId != null);
 	}
 
-	private void updateXButton()
+	void updateXButton()
 	{
 		xButton.setEnabled(itemId != null);
 		xButton.setToolTipText("Clear " + slot.name().toLowerCase() + " slot");
@@ -181,7 +195,7 @@ class SwapItemPanel extends AbsItemPanel
 		else
 		{
 			BufferedImage image = ImageUtil.loadImageResource(getClass(), slot.name().toLowerCase() + ".png");
-			setIcon(image);
+			setIcon(icon, image);
 		}
 	}
 
