@@ -1,6 +1,8 @@
 package eq.uirs.fashionscape.data;
 
 import java.awt.Color;
+import java.util.Arrays;
+import java.util.Comparator;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import net.runelite.client.util.Text;
@@ -33,6 +35,19 @@ public enum HairColor implements Colorable
 	DARK_GREEN(22, new Color(59, 88, 79)),
 	PURPLE(23, new Color(136, 65, 178)),
 	LIGHT_PURPLE(24, new Color(185, 141, 200));
+
+	private static final HairColor[] sorted = Arrays.stream(values())
+		.sorted(Comparator.comparing(HairColor::getColorId))
+		.toArray(HairColor[]::new);
+
+	public static HairColor fromId(int id)
+	{
+		if (id < 0 || id >= sorted.length)
+		{
+			return null;
+		}
+		return values()[id];
+	}
 
 	@Getter
 	private final int colorId;

@@ -1,6 +1,8 @@
 package eq.uirs.fashionscape.data;
 
 import java.awt.Color;
+import java.util.Arrays;
+import java.util.Comparator;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import net.runelite.client.util.Text;
@@ -37,6 +39,32 @@ public enum ClothingColor implements Colorable
 	TURQUOISE(26, 26, new Color(0, 120, 120)),
 	DEEP_PURPLE(27, 27, new Color(150, 0, 150)),
 	LIGHT_PURPLE(28, 28, new Color(255, 150, 255));
+
+	private static final ClothingColor[] torsoSorted = Arrays.stream(values())
+		.sorted(Comparator.comparing(ClothingColor::getTorsoColorId))
+		.toArray(ClothingColor[]::new);
+
+	private static final ClothingColor[] legsSorted = Arrays.stream(values())
+		.sorted(Comparator.comparing(ClothingColor::getLegsColorId))
+		.toArray(ClothingColor[]::new);
+
+	public static ClothingColor fromTorsoId(int id)
+	{
+		if (id < 0 || id >= torsoSorted.length)
+		{
+			return null;
+		}
+		return values()[id];
+	}
+
+	public static ClothingColor fromLegsId(int id)
+	{
+		if (id < 0 || id >= legsSorted.length)
+		{
+			return null;
+		}
+		return values()[id];
+	}
 
 	@Getter
 	private final int torsoColorId;

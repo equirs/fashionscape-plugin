@@ -1,6 +1,8 @@
 package eq.uirs.fashionscape.data;
 
 import java.awt.Color;
+import java.util.Arrays;
+import java.util.Comparator;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import net.runelite.client.util.Text;
@@ -21,6 +23,19 @@ public enum SkinColor implements Colorable
 	WHITE(10, new Color(255, 255, 255)),
 	CYAN(11, new Color(5, 152, 159)),
 	PURPLE(12, new Color(100, 65, 164));
+
+	private static final SkinColor[] sorted = Arrays.stream(values())
+		.sorted(Comparator.comparing(SkinColor::getColorId))
+		.toArray(SkinColor[]::new);
+
+	public static SkinColor fromId(int id)
+	{
+		if (id < 0 || id >= sorted.length)
+		{
+			return null;
+		}
+		return values()[id];
+	}
 
 	@Getter
 	private final int colorId;

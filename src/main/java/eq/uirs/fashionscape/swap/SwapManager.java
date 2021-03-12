@@ -3,11 +3,15 @@ package eq.uirs.fashionscape.swap;
 import eq.uirs.fashionscape.FashionscapeConfig;
 import eq.uirs.fashionscape.FashionscapePlugin;
 import eq.uirs.fashionscape.colors.ColorScorer;
+import eq.uirs.fashionscape.data.BootsColor;
+import eq.uirs.fashionscape.data.ClothingColor;
 import eq.uirs.fashionscape.data.ColorType;
 import eq.uirs.fashionscape.data.Colorable;
+import eq.uirs.fashionscape.data.HairColor;
 import eq.uirs.fashionscape.data.IdleAnimationID;
 import eq.uirs.fashionscape.data.ItemInteractions;
 import eq.uirs.fashionscape.data.Kit;
+import eq.uirs.fashionscape.data.SkinColor;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.PrintWriter;
@@ -17,6 +21,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -123,6 +128,7 @@ public class SwapManager
 
 	/* player's composition includes two int arrays, and the one that has size 5 is their colors.
 	note: this will break if Jagex ever adds another color type or another int[5] to the class, but that is unlikely */
+	// TODO remove
 	private String obfuscatedColorsFieldName = null;
 	private Boolean isFemale;
 	private SwapDiff hoverSwapDiff;
@@ -402,6 +408,29 @@ public class SwapManager
 	public Integer swappedColorIdIn(ColorType type)
 	{
 		return savedSwaps.getColor(type);
+	}
+
+	public Map<ColorType, Colorable> swappedColorsMap()
+	{
+		BiFunction<ColorType, Integer, Colorable> getColor = (type, id) -> {
+			switch (type)
+			{
+				case HAIR:
+					return HairColor.fromId(id);
+				case TORSO:
+					return ClothingColor.fromTorsoId(id);
+				case LEGS:
+					return ClothingColor.fromLegsId(id);
+				case BOOTS:
+					return BootsColor.fromId(id);
+				case SKIN:
+					return SkinColor.fromId(id);
+			}
+			return null;
+		};
+		return Arrays.stream(ColorType.values())
+			.filter(savedSwaps::containsColor)
+			.collect(Collectors.toMap(t -> t, t -> getColor.apply(t, savedSwaps.getColor(t))));
 	}
 
 	// this should only be called from the client thread
@@ -699,7 +728,10 @@ public class SwapManager
 			Map<KitType, Integer> lockedSwaps = Arrays.stream(KitType.values())
 				.filter(s -> savedSwaps.isItemLocked(s) && savedSwaps.containsItem(s))
 				.collect(Collectors.toMap(s -> s, savedSwaps::getItem));
-			colorScorer.setPlayerInfo(lockedSwaps);
+			Map<ColorType, Colorable> lockedColors = swappedColorsMap().entrySet().stream()
+				.filter(e -> savedSwaps.isColorLocked(e.getKey()) && savedSwaps.containsColor(e.getKey()))
+				.collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+			colorScorer.setPlayerInfo(lockedSwaps, lockedColors);
 		}
 		Map<KitType, Boolean> itemSlotsToRevert = Arrays.stream(KitType.values())
 			.collect(Collectors.toMap(slot -> slot, savedSwaps::isItemLocked));
@@ -712,8 +744,10 @@ public class SwapManager
 		List<Candidate> candidates = new ArrayList<>(size);
 		List<Integer> randomOrder = IntStream.range(0, client.getItemCount()).boxed().collect(Collectors.toList());
 		Collections.shuffle(randomOrder);
-		for (Integer i : randomOrder)
+		Iterator<Integer> randomIterator = randomOrder.iterator();
+		while (newSwaps.size() < KitType.values().length && randomIterator.hasNext())
 		{
+			Integer i = randomIterator.next();
 			int canonical = itemManager.canonicalize(i);
 			if (skips.contains(canonical))
 			{
@@ -743,14 +777,7 @@ public class SwapManager
 						if (stats != null && stats.isTwoHanded())
 						{
 							newSwaps.put(KitType.SHIELD, -1);
-							if (newSwaps.size() >= KitType.values().length)
-							{
-								break;
-							}
-							else
-							{
-								continue;
-							}
+							continue;
 						}
 					}
 				}
@@ -793,10 +820,6 @@ public class SwapManager
 					best = candidates.get(0);
 				}
 				newSwaps.put(best.slot, best.itemId);
-				if (newSwaps.size() >= KitType.values().length)
-				{
-					break;
-				}
 				candidates.clear();
 			}
 		}
@@ -806,6 +829,45 @@ public class SwapManager
 			.map(Map.Entry::getKey)
 			.collect(Collectors.toList());
 		removes.forEach(newSwaps::remove);
+
+		// shuffle colors
+		Map<ColorType, Integer> newColors = new HashMap<>();
+		List<ColorType> allColorTypes = Arrays.asList(ColorType.values().clone());
+		Collections.shuffle(allColorTypes);
+		for (ColorType type : allColorTypes)
+		{
+			if (savedSwaps.isColorLocked(type))
+			{
+				continue;
+			}
+			List<Colorable> colorables = Arrays.asList(type.getColorables().clone());
+			if (colorables.isEmpty())
+			{
+				continue;
+			}
+			Collections.shuffle(colorables);
+			int limit;
+			switch (intelligence)
+			{
+				case LOW:
+					limit = Math.max(1, colorables.size() / 4);
+					break;
+				case MODERATE:
+					limit = Math.max(1, colorables.size() / 2);
+					break;
+				case HIGH:
+					limit = colorables.size();
+					break;
+				default:
+					limit = 1;
+			}
+			Colorable best = colorables.stream()
+				.limit(limit)
+				.max(Comparator.comparingDouble(c -> colorScorer.score(c, type)))
+				.orElse(colorables.get(0));
+			colorScorer.addPlayerColor(type, best);
+			newColors.put(type, best.getColorId(type));
+		}
 
 		SwapDiff totalDiff = SwapDiff.blank();
 
@@ -846,15 +908,7 @@ public class SwapManager
 			totalDiff = totalDiff.mergeOver(kitsDiff);
 		}
 
-		// TODO check intelligence to get better matching colors
-		Map<ColorType, Integer> colorSwaps = Arrays.stream(ColorType.values())
-			.filter(type -> !savedSwaps.isColorLocked(type) && type.getColorables().length > 0)
-			.collect(Collectors.toMap(type -> type, type -> {
-				Colorable[] options = type.getColorables();
-				return options[r.nextInt(options.length)].getColorId(type);
-			}));
-
-		SwapDiff colorsDiff = colorSwaps.entrySet().stream()
+		SwapDiff colorsDiff = newColors.entrySet().stream()
 			.filter(e -> e.getValue() >= 0)
 			.map(e -> swap(e.getKey(), e.getValue(), SwapMode.SAVE))
 			.reduce(SwapDiff::mergeOver)
@@ -1579,6 +1633,7 @@ public class SwapManager
 		return slotRestore.mergeOver(colorRestore);
 	}
 
+	// TODO replace with composition.getColors()
 	private int[] getColors(PlayerComposition composition) throws NoSuchFieldException, IllegalAccessException
 	{
 		// unfortunately, RuneLite does not expose the player composition colors, so we find them reflectively
@@ -1591,6 +1646,7 @@ public class SwapManager
 		return (int[]) colorsField.get(composition);
 	}
 
+	// TODO remove
 	private void findColorsField(PlayerComposition composition)
 	{
 		String foundName = null;

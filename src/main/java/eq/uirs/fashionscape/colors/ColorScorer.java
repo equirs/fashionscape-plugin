@@ -1,8 +1,11 @@
 package eq.uirs.fashionscape.colors;
 
+import com.google.common.base.Objects;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
+import eq.uirs.fashionscape.data.ColorType;
+import eq.uirs.fashionscape.data.Colorable;
 import eq.uirs.fashionscape.swap.SwapManager;
 import java.awt.Color;
 import java.io.BufferedReader;
@@ -11,6 +14,7 @@ import java.io.InputStreamReader;
 import java.io.Reader;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -31,7 +35,8 @@ public class ColorScorer
 	private final SwapManager swapManager;
 
 	private final Map<Integer, GenderItemColors> allColors;
-	private final Map<KitType, List<ItemColorInfo>> playerColors = new HashMap<>();
+	private final Map<KitType, List<ItemColorInfo>> kitColors = new HashMap<>();
+	private final Map<ColorType, Colorable> playerColors = new HashMap<>();
 
 	private boolean isFemale;
 
@@ -70,7 +75,7 @@ public class ColorScorer
 	// this should be called before scoring if relying on current player swaps
 	public void updatePlayerInfo()
 	{
-		playerColors.clear();
+		kitColors.clear();
 		Player player = client.getLocalPlayer();
 		if (player == null)
 		{
@@ -81,30 +86,34 @@ public class ColorScorer
 		{
 			return;
 		}
+		playerColors.clear();
+		playerColors.putAll(swapManager.swappedColorsMap());
 		isFemale = composition.isFemale();
 		for (KitType slot : KitType.values())
 		{
 			Integer itemId = swapManager.swappedItemIdIn(slot);
 			if (itemId != null)
 			{
-				playerColors.put(slot, colorsFor(itemId));
+				kitColors.put(slot, colorsFor(itemId));
 			}
 		}
 	}
 
-	public void setPlayerInfo(Map<KitType, Integer> itemIds)
+	public void setPlayerInfo(Map<KitType, Integer> itemIds, Map<ColorType, Colorable> colors)
 	{
-		playerColors.clear();
+		kitColors.clear();
 		Player player = client.getLocalPlayer();
 		if (player == null)
 		{
 			return;
 		}
+		playerColors.clear();
+		playerColors.putAll(colors);
 		PlayerComposition composition = player.getPlayerComposition();
 		isFemale = composition.isFemale();
 		for (Map.Entry<KitType, Integer> entry : itemIds.entrySet())
 		{
-			playerColors.put(entry.getKey(), colorsFor(entry.getValue()));
+			kitColors.put(entry.getKey(), colorsFor(entry.getValue()));
 		}
 	}
 
@@ -112,7 +121,15 @@ public class ColorScorer
 	{
 		if (itemId != null)
 		{
-			playerColors.put(slot, colorsFor(itemId));
+			kitColors.put(slot, colorsFor(itemId));
+		}
+	}
+
+	public void addPlayerColor(ColorType type, Colorable colorable)
+	{
+		if (colorable != null)
+		{
+			playerColors.put(type, colorable);
 		}
 	}
 
@@ -122,22 +139,42 @@ public class ColorScorer
 	 */
 	public double score(int itemId, KitType exclude)
 	{
-		Map<Integer, Double> playerInfo = getPlayerRgbInfo(exclude);
 		List<ItemColorInfo> colors = colorsFor(itemId);
-		if (colors.isEmpty() || playerColors.isEmpty())
+		return score(colors, exclude, null);
+	}
+
+	/**
+	 * scores color similarity between a Colorable and the current player's outfit:
+	 * 1 is a perfect match, 0 is a complete mismatch
+	 */
+	public double score(Colorable colorable, ColorType exclude)
+	{
+		int rgb = colorable.getColor().getRGB();
+		List<ItemColorInfo> colors = Collections.singletonList(new ItemColorInfo(rgb, 1.0));
+		return score(colors, null, exclude);
+	}
+
+	private double score(List<ItemColorInfo> colors, KitType excludeKit, ColorType excludeColor)
+	{
+		if (colors.isEmpty())
 		{
 			return 0;
 		}
-		// compute an aggregate score relative to the item
-		List<Score> scoresItem = new ArrayList<>();
+		Map<Integer, Double> playerInfo = getPlayerRgbInfo(excludeKit, excludeColor);
+		if (playerInfo.isEmpty())
+		{
+			return 0;
+		}
+		// compute an aggregate score relative to the item/color target
+		List<Score> scoresTarget = new ArrayList<>();
 		for (ItemColorInfo c : colors)
 		{
 			playerInfo.entrySet().stream()
 				.min(Comparator.comparingDouble(e -> colorDistance(c.rgb, e.getKey())))
 				.map(e -> new Score(1.0 - colorDistance(c.rgb, e.getKey()), c.pct))
-				.ifPresent(scoresItem::add);
+				.ifPresent(scoresTarget::add);
 		}
-		double itemScore = scoresItem.stream()
+		double targetScore = scoresTarget.stream()
 			.mapToDouble(s -> Math.pow(s.match, 2) * s.percentage)
 			.sum();
 		// compute an aggregate score relative to the player
@@ -152,8 +189,8 @@ public class ColorScorer
 		double playerScore = scoresPlayer.stream()
 			.mapToDouble(s -> Math.pow(s.match, 2) * s.percentage)
 			.sum();
-		// more weighting in relation to the item itself seems to yield better results
-		return (3.0 * itemScore + playerScore) / 4.0;
+		// more weighting in relation to the target itself seems to yield better results
+		return (3.0 * targetScore + playerScore) / 4.0;
 	}
 
 	// Standard Euclidean color distance scaled from 0 (best) to 1 (worst)
@@ -188,14 +225,19 @@ public class ColorScorer
 		return new ArrayList<>();
 	}
 
-	// Maps rgb -> summed percentage in player, excluding the given slot
-	private Map<Integer, Double> getPlayerRgbInfo(KitType exclude)
+	// Maps rgb -> summed percentage in player, excluding the given slot or color type
+	private Map<Integer, Double> getPlayerRgbInfo(KitType excludeKit, ColorType excludeColor)
 	{
-		Map<Integer, Double> unscaled = playerColors.entrySet().stream()
-			.filter(e -> e.getKey() != exclude)
+		Map<Integer, Double> unscaled = kitColors.entrySet().stream()
+			.filter(e -> !Objects.equal(e.getKey(), excludeKit))
 			.map(Map.Entry::getValue)
 			.flatMap(List::stream)
 			.collect(Collectors.toMap(ItemColorInfo::getRgb, ItemColorInfo::getPct, Double::sum));
+		Map<Integer, Double> unscaledColors = playerColors.entrySet().stream()
+			.filter(e -> !Objects.equal(e.getKey(), excludeColor))
+			.map(Map.Entry::getValue)
+			.collect(Collectors.toMap(c -> c.getColor().getRGB(), c -> 1.0, Double::sum));
+		unscaledColors.forEach((rgb, score) -> unscaled.merge(rgb, score, Double::sum));
 		final Double scale = unscaled.values().stream().mapToDouble(d -> d).sum();
 		return unscaled.entrySet().stream()
 			.collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue() / scale));
