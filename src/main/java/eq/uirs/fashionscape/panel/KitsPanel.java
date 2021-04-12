@@ -42,9 +42,9 @@ public class KitsPanel extends JPanel
 	private final List<KitItemPanel> kitPanels = new ArrayList<>();
 
 	private Boolean isFemale = null;
-	private final KitColorOpener kitColorOpener = (slot, type) -> {
+	private final KitColorOpener kitColorOpener = (slot) -> {
 		kitPanels.forEach(panel -> {
-			if (Objects.equal(slot, panel.getSlot()) && Objects.equal(type, panel.getType()))
+			if (Objects.equal(slot, panel.getSlot()))
 			{
 				Boolean female = isFemale();
 				if (female != null)
@@ -155,7 +155,7 @@ public class KitsPanel extends JPanel
 			{
 				image = ImageUtil.loadImageResource(getClass(), result.slot.name().toLowerCase() + ".png");
 			}
-			KitItemPanel panel = new KitItemPanel(swapManager, result.colorType, result.colorId, result.slot,
+			KitItemPanel panel = new KitItemPanel(swapManager, result.slot,
 				result.kitId, kitColorOpener, image, clientThread);
 			kitPanels.add(panel);
 			JPanel marginWrapper = new JPanel(new BorderLayout());

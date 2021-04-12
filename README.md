@@ -1,11 +1,14 @@
 # Fashionscape
-***disclaimer:*** this plugin isn't intended to be on all the time. It's recommended to turn it off during combat since
-the animations will not look right and the swapped items might distract. I'm not responsible for any stupid mistakes
-that result from leaving the plugin on when you should have turned it off.
+
+Docs for version: ***1.1.3***
 
 Ever spend countless hours on a grind for an untradeable item, only to realize that it doesn't look good with literally 
 any other item in the game? This plugin was made for you. It allows anyone to preview combinations of equipment to 
 plan out the perfect look quickly and efficiently.
+
+***disclaimer:*** this plugin isn't intended to be on all the time. It's recommended to turn it off during combat since
+the animations will be wrong, and the swapped items might distract. I'm not responsible for any stupid mistakes
+that result from leaving the plugin on when you should have turned it off.
 
 ## User guide
 All the UI lives in a dedicated side panel. If the plugin is on, you'll find it near the bottom of the list
@@ -13,7 +16,7 @@ All the UI lives in a dedicated side panel. If the plugin is on, you'll find it 
  
 ![Panel icon](icon.png)
 
-The panel has some a row of button controls, and below it, three tabs: outfit, base, and search. 
+The panel has a row of button controls, and below it, three tabs: outfit, base, and search. 
 
 ![Top buttons](top_buttons.png)
 
@@ -42,15 +45,14 @@ for new items in that slot. You can also "lock" and clear out each slot with the
 #### Base tab
 "Base" is similar to "items", only this tab allows changing your character's base models and colors, essentially 
 combining every makeover NPC into one. There is a jaw (or beard) slot that is only available to male characters, while 
-every other slot is available to either gender. The icons in this tab have a rounded border indicating the color you've 
-swapped to (if you haven't changed the color, it will show up as light gray). Note that torso+arms and hair+jaw slot 
-colors are connected, so changing one always changes the other. There is no search feature for these slots since there 
+every other slot is available to either gender. 
+There is no search feature for these slots since there 
 not as many options; instead, **clicking the icon** brings up a dropdown to browse the color/model options available.
 
 ![Search tab](search_tab.png)
 
 #### Search tab
-The main feature of "search" is... what you expect. Leaving the search bar empty will show all the results for a selected
+Here you can search for equipment to try on. Leaving the search bar empty will show all the results for a selected
 slot (except the "all" tab, where too many results would be displayed). The results will update as you type. Hovering
 over an item will show a preview of what it looks like on your character. When clicked, the item will update and will
 display as part of your outfit. If the item is already worn, clicking it again removes it.
@@ -63,8 +65,7 @@ that result compared to the colours of all the items currently worn (excluding t
 With this option selected, you can also see the colour-coded percent match for that item.
 
 #### Lock mechanics
-You can "lock" individual slots with the lock icon next to the x button for each slot in the "items" and "base" panels
-(some base slots have two locks: model and color, in that order, with the color lock matching the current slot color). 
+You can "lock" individual slots with the lock icon next to the x button for each slot in the "items" and "base" panels. 
 This prevents that slot from being cleared by most features (e.g., randomizing, loading a new outfit, undoing).
 Clicking the lock again will unlock it. The locking feature is designed to work with the randomizer: as you find pieces 
 that work together, you can lock them and randomize the remaining slots. Note that locking a base model will always 
@@ -84,7 +85,7 @@ your base models for those slots.
 
 #### Configuration
 
-There are a bunch of items in the game that are either restricted to certain activities/events or are unobtainable
+There are a bunch of items in the game which are either restricted to certain activities/events or are unobtainable
 without hacking the game. These can be hidden from the plugin's search results and the randomizer by checking "exclude
 non-standard items".
 
@@ -92,7 +93,7 @@ The randomizer has a few "intelligence" settings. Higher intelligence means the 
 that are similar in color. Lower intelligence settings are computationally faster.
 
 There is right-click option to "copy-outfit" on other players, which imports their entire look on your character,
-including items, colors, and (if your genders match) base models. Since many other plugins provide player menu entries,
+including items and (if your genders match) base models. Since many other plugins provide player menu entries,
 this feature can be toggled off.
 
 ## FAQ
@@ -103,8 +104,9 @@ functionally affecting the game for you, it's no different from using resource p
 
 Q: Why is it changing my character's arms / (facial) hair?
 
-A: The RuneLite client has no way of telling what your character's base models look like unless you reveal them, so 
-it's using some default models. The easiest fix is to un-equip your head- and torso-slot items.
+A: The client has no way of telling what your character's base models look like unless you reveal them, so 
+it's using some default models. The easiest fix is to un-equip your head- and torso-slot items. You can re-equip your
+items after doing this.
 
 Q: My animations mess up when I equip (...). Why?
 

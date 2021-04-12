@@ -15,7 +15,6 @@ import eq.uirs.fashionscape.data.SkinColor;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.PrintWriter;
-import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -123,13 +122,7 @@ public class SwapManager
 	private final SwapDiffHistory swapDiffHistory = new SwapDiffHistory(s -> this.restore(s, true));
 	// player's real kit ids, e.g., hairstyles, base clothing
 	private final Map<KitType, Integer> realKitIds = new HashMap<>();
-	// player's real base colors
-	private final Map<ColorType, Integer> realColorIds = new HashMap<>();
 
-	/* player's composition includes two int arrays, and the one that has size 5 is their colors.
-	note: this will break if Jagex ever adds another color type or another int[5] to the class, but that is unlikely */
-	// TODO remove
-	private String obfuscatedColorsFieldName = null;
 	private Boolean isFemale;
 	private SwapDiff hoverSwapDiff;
 
@@ -158,7 +151,6 @@ public class SwapManager
 		hoverSwapDiff = null;
 		savedSwaps.clear();
 		realKitIds.clear();
-		realColorIds.clear();
 		swapDiffHistory.clear();
 	}
 
@@ -216,8 +208,7 @@ public class SwapManager
 	public void refreshAllSwaps()
 	{
 		refreshItemSwaps()
-			.mergeOver(refreshKitSwaps())
-			.mergeOver(refreshColorSwaps());
+			.mergeOver(refreshKitSwaps());
 	}
 
 	private SwapDiff refreshItemSwaps()
@@ -234,14 +225,6 @@ public class SwapManager
 		return CompoundSwap.fromMap(savedSwaps.kitEntries().stream().collect(
 			Collectors.toMap(Map.Entry::getKey, e -> e.getValue() + 256))).stream()
 			.map(c -> this.swap(c, SwapMode.PREVIEW))
-			.reduce(SwapDiff::mergeOver)
-			.orElse(SwapDiff.blank());
-	}
-
-	private SwapDiff refreshColorSwaps()
-	{
-		return savedSwaps.colorEntries().stream()
-			.map(e -> swap(e.getKey(), e.getValue(), SwapMode.PREVIEW))
 			.reduce(SwapDiff::mergeOver)
 			.orElse(SwapDiff.blank());
 	}
@@ -307,20 +290,11 @@ public class SwapManager
 				}
 			}
 		}
-		for (ColorType colorType : ColorType.values())
-		{
-			Integer colorId = colorIdFor(colorType);
-			if (colorId != null && !realColorIds.containsKey(colorType))
-			{
-				realColorIds.put(colorType, colorId);
-			}
-		}
 	}
 
 	public void importSwaps(
 		Map<KitType, Integer> newItems,
-		Map<KitType, Integer> newKits,
-		Map<ColorType, Integer> newColors)
+		Map<KitType, Integer> newKits)
 	{
 		clientThread.invokeLater(() -> {
 			Map<KitType, Integer> itemSwaps = newItems.entrySet().stream()
@@ -338,22 +312,11 @@ public class SwapManager
 			Map<KitType, Integer> equipSwaps = new HashMap<>(kitEquipSwaps);
 			equipSwaps.putAll(itemEquipSwaps);
 
-			Map<ColorType, Integer> colorSwaps = newColors.entrySet().stream()
-				.filter(e -> !savedSwaps.isColorLocked(e.getKey()))
-				.collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-			Map<ColorType, Integer> colorEquipSwaps = colorSwaps.entrySet().stream().collect(
-				Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)
-			);
 			SwapDiff equips = CompoundSwap.fromMap(equipSwaps).stream()
 				.map(c -> this.swap(c, SwapMode.SAVE))
 				.reduce(SwapDiff::mergeOver)
 				.orElse(SwapDiff.blank());
-			SwapDiff colors = colorEquipSwaps.entrySet().stream()
-				.map(e -> this.swapColor(e.getKey(), e.getValue(), true))
-				.reduce(SwapDiff::mergeOver)
-				.orElse(SwapDiff.blank());
-			SwapDiff total = equips.mergeOver(colors);
-			swapDiffHistory.appendToUndo(total);
+			swapDiffHistory.appendToUndo(equips);
 		});
 	}
 
@@ -434,18 +397,13 @@ public class SwapManager
 	}
 
 	// this should only be called from the client thread
-	public void revert(KitType slot, ColorType type)
+	public void revert(KitType slot)
 	{
 		SwapDiff s = SwapDiff.blank();
 		if (slot != null)
 		{
 			savedSwaps.removeSlotLock(slot);
 			s = s.mergeOver(doRevert(slot));
-		}
-		if (type != null)
-		{
-			savedSwaps.removeColorLock(type);
-			s = s.mergeOver(doRevert(type));
 		}
 		swapDiffHistory.appendToUndo(s);
 	}
@@ -466,11 +424,6 @@ public class SwapManager
 	public void hoverOverKit(KitType slot, Integer kitId)
 	{
 		hoverOver(() -> swapKit(slot, kitId, false));
-	}
-
-	public void hoverOverColor(ColorType type, Integer colorId)
-	{
-		hoverOver(() -> swapColor(type, colorId, false));
 	}
 
 	private void hoverOver(Supplier<SwapDiff> diffCallable)
@@ -511,19 +464,6 @@ public class SwapManager
 			return Objects.equals(savedSwaps.getKit(slot), kitId) ?
 				doRevert(slot) :
 				swapKit(slot, kitId, true);
-		});
-	}
-
-	public void hoverSelectColor(ColorType type, Integer colorId)
-	{
-		hoverSelect(() -> {
-			if (savedSwaps.isColorLocked(type))
-			{
-				return SwapDiff.blank();
-			}
-			return Objects.equals(savedSwaps.getColor(type), colorId) ?
-				doRevert(type) :
-				swapColor(type, colorId, true);
 		});
 	}
 
@@ -576,16 +516,7 @@ public class SwapManager
 			.map(c -> this.swap(c, SwapMode.REVERT))
 			.reduce(SwapDiff::mergeOver)
 			.orElse(SwapDiff.blank());
-		SwapDiff colorsDiff = Arrays.stream(ColorType.values())
-			.filter(type -> !savedSwaps.isColorLocked(type))
-			.map(type -> {
-				Integer colorId = realColorIds.get(type);
-				return colorId != null ? swap(type, colorId, SwapMode.REVERT) : SwapDiff.blank();
-			})
-			.reduce(SwapDiff::mergeOver)
-			.orElse(SwapDiff.blank());
-		SwapDiff totalDiff = kitsDiff.mergeOver(colorsDiff);
-		swapDiffHistory.appendToUndo(totalDiff);
+		swapDiffHistory.appendToUndo(kitsDiff);
 		savedSwaps.clear();
 	}
 
@@ -658,7 +589,7 @@ public class SwapManager
 		}
 		if (!itemImports.isEmpty() || !kitImports.isEmpty() || !colorImports.isEmpty())
 		{
-			importSwaps(itemImports, kitImports, colorImports);
+			importSwaps(itemImports, kitImports);
 		}
 	}
 
@@ -683,34 +614,22 @@ public class SwapManager
 
 	public void copyOutfit(PlayerComposition other)
 	{
-		try
-		{
-			int[] equipmentIds = other.getEquipmentIds();
-			KitType[] slots = KitType.values();
-			Map<KitType, Integer> itemImports = IntStream.range(0, Math.max(slots.length, equipmentIds.length))
-				.boxed()
-				.filter(i -> equipmentIds[i] >= 512)
-				.collect(Collectors.toMap(i -> slots[i], i -> equipmentIds[i] - 512));
-			// only import kits if their gender matches ours
-			Map<KitType, Integer> kitImports = !Objects.equals(isFemale, other.isFemale()) ?
-				new HashMap<>() :
-				IntStream.range(0, Math.max(slots.length, equipmentIds.length)).boxed()
-					.filter(i -> i > 0 && i < 512)
-					.collect(Collectors.toMap(i -> slots[i], i -> equipmentIds[i] - 256));
+		int[] equipmentIds = other.getEquipmentIds();
+		KitType[] slots = KitType.values();
+		Map<KitType, Integer> itemImports = IntStream.range(0, Math.max(slots.length, equipmentIds.length))
+			.boxed()
+			.filter(i -> equipmentIds[i] >= 512)
+			.collect(Collectors.toMap(i -> slots[i], i -> equipmentIds[i] - 512));
+		// only import kits if their gender matches ours
+		Map<KitType, Integer> kitImports = !Objects.equals(isFemale, other.isFemale()) ?
+			new HashMap<>() :
+			IntStream.range(0, Math.max(slots.length, equipmentIds.length)).boxed()
+				.filter(i -> i > 0 && i < 512)
+				.collect(Collectors.toMap(i -> slots[i], i -> equipmentIds[i] - 256));
 
-			int[] colors = getColors(other);
-			ColorType[] types = ColorType.values();
-			Map<ColorType, Integer> colorImports = IntStream.range(0, colors.length).boxed()
-				.collect(Collectors.toMap(i -> types[i], i -> colors[i]));
-
-			if (!itemImports.isEmpty() || !kitImports.isEmpty() || !colorImports.isEmpty())
-			{
-				importSwaps(itemImports, kitImports, colorImports);
-			}
-		}
-		catch (IllegalAccessException | NoSuchFieldException e)
+		if (!itemImports.isEmpty() || !kitImports.isEmpty())
 		{
-			e.printStackTrace();
+			importSwaps(itemImports, kitImports);
 		}
 	}
 
@@ -908,14 +827,6 @@ public class SwapManager
 			totalDiff = totalDiff.mergeOver(kitsDiff);
 		}
 
-		SwapDiff colorsDiff = newColors.entrySet().stream()
-			.filter(e -> e.getValue() >= 0)
-			.map(e -> swap(e.getKey(), e.getValue(), SwapMode.SAVE))
-			.reduce(SwapDiff::mergeOver)
-			.orElse(SwapDiff.blank());
-
-		totalDiff = totalDiff.mergeOver(colorsDiff);
-
 		swapDiffHistory.appendToUndo(totalDiff);
 	}
 
@@ -951,64 +862,6 @@ public class SwapManager
 			swapDiff = swapDiff.mergeOver(hoverSwapDiff);
 		}
 		return swapDiff;
-	}
-
-	public SwapDiff swapColor(ColorType type, Integer colorId, boolean save)
-	{
-		if (colorId == null)
-		{
-			return SwapDiff.blank();
-		}
-		SwapMode swapMode = save ? SwapMode.SAVE : SwapMode.PREVIEW;
-		SwapDiff swapDiff = swap(type, colorId, swapMode);
-		if (hoverSwapDiff != null)
-		{
-			swapDiff = swapDiff.mergeOver(hoverSwapDiff);
-		}
-		return swapDiff;
-	}
-
-	/**
-	 * directly swaps a single color by id
-	 */
-	private SwapDiff swap(ColorType type, Integer colorId, SwapMode swapMode)
-	{
-		if (type == null || colorId == null)
-		{
-			return SwapDiff.blank();
-		}
-		Player player = client.getLocalPlayer();
-		if (player == null)
-		{
-			return SwapDiff.blank();
-		}
-		PlayerComposition composition = player.getPlayerComposition();
-		if (composition == null)
-		{
-			return SwapDiff.blank();
-		}
-		try
-		{
-			int oldColorId = setColorId(composition, type, colorId);
-			Map<ColorType, SwapDiff.Change> changes = new HashMap<>();
-			changes.put(type, new SwapDiff.Change(oldColorId, savedSwaps.containsColor(type)));
-			switch (swapMode)
-			{
-				case SAVE:
-					savedSwaps.putColor(type, colorId);
-					break;
-				case REVERT:
-					savedSwaps.removeColor(type);
-					break;
-				case PREVIEW:
-					break;
-			}
-			return new SwapDiff(new HashMap<>(), changes, null);
-		}
-		catch (Exception e)
-		{
-			return SwapDiff.blank();
-		}
 	}
 
 	/**
@@ -1377,17 +1230,6 @@ public class SwapManager
 		return previousId;
 	}
 
-	// Sets color id for slot and returns color id before replacement.
-	private int setColorId(@Nonnull PlayerComposition composition, @Nonnull ColorType type, int colorId)
-		throws NoSuchFieldException, IllegalAccessException, IndexOutOfBoundsException
-	{
-		int[] colors = getColors(composition);
-		int previousId = colors[type.ordinal()];
-		colors[type.ordinal()] = colorId;
-		composition.setHash();
-		return previousId;
-	}
-
 	// Sets idle animation id for current player and returns previous idle animation
 	private int setIdleAnimationId(@Nonnull Player player, int animationId)
 	{
@@ -1420,12 +1262,6 @@ public class SwapManager
 			s = swap(CompoundSwap.single(slot, 0), SwapMode.REVERT);
 		}
 		return s;
-	}
-
-	private SwapDiff doRevert(ColorType type)
-	{
-		Integer originalColorId = realColorIds.getOrDefault(type, 0);
-		return swap(type, originalColorId, SwapMode.REVERT);
 	}
 
 	@Nullable
@@ -1576,30 +1412,6 @@ public class SwapManager
 		return composition == null ? null : composition.getKitId(kitType);
 	}
 
-	@Nullable
-	private Integer colorIdFor(ColorType colorType)
-	{
-		Player player = client.getLocalPlayer();
-		if (player == null)
-		{
-			return null;
-		}
-		PlayerComposition composition = player.getPlayerComposition();
-		if (composition == null)
-		{
-			return null;
-		}
-		try
-		{
-			int[] colors = getColors(composition);
-			return colors[colorType.ordinal()];
-		}
-		catch (Exception e)
-		{
-			return null;
-		}
-	}
-
 	// restores diff and returns a new diff with reverted changes (allows redo)
 	private SwapDiff restore(SwapDiff swapDiff, boolean save)
 	{
@@ -1617,69 +1429,7 @@ public class SwapManager
 			.map(c -> this.swap(c, swapModeProvider))
 			.reduce(SwapDiff::mergeOver)
 			.orElse(SwapDiff.blank());
-		SwapDiff colorRestore = swapDiff.getColorChanges().entrySet()
-			.stream()
-			.map(e -> {
-				ColorType type = e.getKey();
-				SwapDiff.Change change = e.getValue();
-				int colorId = change.getId();
-				SwapMode swapMode = !save ? SwapMode.PREVIEW : change.isUnnatural() ?
-					SwapMode.SAVE :
-					SwapMode.REVERT;
-				return swap(type, colorId, swapMode);
-			})
-			.reduce(SwapDiff::mergeOver)
-			.orElse(SwapDiff.blank());
-		return slotRestore.mergeOver(colorRestore);
-	}
-
-	// TODO replace with composition.getColors()
-	private int[] getColors(PlayerComposition composition) throws NoSuchFieldException, IllegalAccessException
-	{
-		// unfortunately, RuneLite does not expose the player composition colors, so we find them reflectively
-		if (obfuscatedColorsFieldName == null)
-		{
-			findColorsField(composition);
-		}
-		Field colorsField = composition.getClass().getDeclaredField(obfuscatedColorsFieldName);
-		colorsField.setAccessible(true);
-		return (int[]) colorsField.get(composition);
-	}
-
-	// TODO remove
-	private void findColorsField(PlayerComposition composition)
-	{
-		String foundName = null;
-		for (Field declaredField : composition.getClass().getDeclaredFields())
-		{
-			if (declaredField.getType().equals(int[].class))
-			{
-				try
-				{
-					declaredField.setAccessible(true);
-					int[] arr = (int[]) declaredField.get(composition);
-					if (arr.length == 5)
-					{
-						if (foundName == null)
-						{
-							foundName = declaredField.getName();
-						}
-						else
-						{
-							throw new IllegalStateException("more than one int[5] found on player");
-						}
-					}
-				}
-				catch (IllegalAccessException | IllegalStateException e)
-				{
-					e.printStackTrace();
-				}
-			}
-		}
-		if (foundName != null)
-		{
-			obfuscatedColorsFieldName = foundName;
-		}
+		return slotRestore;
 	}
 
 	@Nullable
