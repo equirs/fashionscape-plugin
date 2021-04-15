@@ -84,7 +84,7 @@ public class SwapManager
 		FALLBACK_MALE_KITS.put(KitType.BOOTS, Kit.SMALL.getKitId());
 
 		FALLBACK_FEMALE_KITS.put(KitType.HAIR, Kit.PIGTAILS.getKitId());
-		FALLBACK_FEMALE_KITS.put(KitType.JAW, -1);
+		FALLBACK_FEMALE_KITS.put(KitType.JAW, -256);
 		FALLBACK_FEMALE_KITS.put(KitType.TORSO, Kit.SIMPLE.getKitId());
 		FALLBACK_FEMALE_KITS.put(KitType.ARMS, Kit.SHORT_SLEEVES.getKitId());
 		FALLBACK_FEMALE_KITS.put(KitType.LEGS, Kit.PLAIN_LF.getKitId());
@@ -207,26 +207,17 @@ public class SwapManager
 	// this should only be called from the client thread
 	public void refreshAllSwaps()
 	{
-		refreshItemSwaps()
-			.mergeOver(refreshKitSwaps());
-	}
-
-	private SwapDiff refreshItemSwaps()
-	{
-		return CompoundSwap.fromMap(savedSwaps.itemEntries().stream().collect(
-			Collectors.toMap(Map.Entry::getKey, e -> e.getValue() + 512))).stream()
-			.map(c -> this.swap(c, SwapMode.PREVIEW))
-			.reduce(SwapDiff::mergeOver)
-			.orElse(SwapDiff.blank());
-	}
-
-	private SwapDiff refreshKitSwaps()
-	{
-		return CompoundSwap.fromMap(savedSwaps.kitEntries().stream().collect(
-			Collectors.toMap(Map.Entry::getKey, e -> e.getValue() + 256))).stream()
-			.map(c -> this.swap(c, SwapMode.PREVIEW))
-			.reduce(SwapDiff::mergeOver)
-			.orElse(SwapDiff.blank());
+		Map<KitType, Integer> savedItemEquipIds = savedSwaps.itemEntries().stream().collect(
+			Collectors.toMap(Map.Entry::getKey, e -> e.getValue() + 512)
+		);
+		Map<KitType, Integer> savedKitEquipIds = savedSwaps.kitEntries().stream().collect(
+			Collectors.toMap(Map.Entry::getKey, e -> e.getValue() + 256)
+		);
+		savedItemEquipIds.putAll(savedKitEquipIds);
+		for (CompoundSwap c : CompoundSwap.fromMap(savedItemEquipIds))
+		{
+			this.swap(c, SwapMode.PREVIEW);
+		}
 	}
 
 	/**
@@ -802,7 +793,7 @@ public class SwapManager
 		totalDiff = totalDiff.mergeOver(itemsDiff);
 
 		// See if remaining slots can be kit-swapped
-		if (isFemale != null)
+		if (isFemale != null && !config.excludeBaseModels())
 		{
 			Map<KitType, Integer> kitSwaps = Arrays.stream(KitType.values())
 				.filter(slot -> !newSwaps.containsKey(slot) && isOpen(slot))
@@ -933,9 +924,6 @@ public class SwapManager
 		Integer finalHairId;
 		Integer finalJawId;
 
-		BiFunction<Integer, KitType, Integer> check = (equipId, slot) ->
-			equipId != null ? equipId : equipmentIdForKit(slot) >= 256 ? equipmentIdForKit(slot) : -1;
-
 		Function<Integer, Boolean> headAllowsHair = (equipId) ->
 			equipId < 512 || ItemInteractions.HAIR_HELMS.contains(equipId - 512);
 		Function<Integer, Boolean> headAllowsJaw = (equipId) ->
@@ -945,40 +933,81 @@ public class SwapManager
 		if (savedSwaps.isItemLocked(KitType.HEAD))
 		{
 			// only change hair/jaw and only if current head item allows
-			finalHairId = headAllowsHair.apply(currentHeadEquipId) && !savedSwaps.isKitLocked(KitType.HAIR) ?
-				hairEquipId :
-				null;
-			finalJawId = headAllowsJaw.apply(currentHeadEquipId) && !savedSwaps.isKitLocked(KitType.JAW) ?
-				jawEquipId :
-				null;
+			boolean hairAllowed = headAllowsHair.apply(currentHeadEquipId) && !savedSwaps.isKitLocked(KitType.HAIR);
+			finalHairId = hairAllowed ? hairEquipId : null;
+			boolean jawAllowed = headAllowsJaw.apply(currentHeadEquipId) && !savedSwaps.isKitLocked(KitType.JAW);
+			finalJawId = jawAllowed ? jawEquipId : null;
 		}
 		else if (headEquipId == null)
 		{
-			// prioritize showing hair/jaw and hiding current helm if applicable
+			// prioritize showing hair/jaw and hiding current helm if new kits conflict with it.
 			finalHairId = !savedSwaps.isKitLocked(KitType.HAIR) ? hairEquipId : null;
 			finalJawId = !savedSwaps.isKitLocked(KitType.JAW) ? jawEquipId : null;
-			boolean headForbidsHair = !headAllowsHair.apply(currentHeadEquipId) &&
-				(finalHairId == null ? savedSwaps.containsSlot(KitType.HAIR) : finalHairId > 0);
-			boolean headForbidsJaw = !headAllowsJaw.apply(currentHeadEquipId) &&
-				(finalJawId == null ? savedSwaps.containsSlot(KitType.JAW) : finalJawId > 0);
-			finalHeadId = headForbidsHair || headForbidsJaw ? Integer.valueOf(0) : headEquipId;
+			boolean headForbidsHair = !headAllowsHair.apply(currentHeadEquipId) && finalHairId != null &&
+				finalHairId > 0;
+			boolean headForbidsJaw = !headAllowsJaw.apply(currentHeadEquipId) && finalJawId != null &&
+				finalJawId > 0;
+			finalHeadId = headForbidsHair || headForbidsJaw ? 0 : null;
 		}
 		else
 		{
 			// priority: show head and hide hair/jaw, but not if locks on hair/jaw disallow (in which case don't change)
-			finalHeadId = (!headAllowsHair.apply(headEquipId) && savedSwaps.isColorLocked(ColorType.HAIR)) ||
-				(!headAllowsJaw.apply(headEquipId) && savedSwaps.isKitLocked(KitType.JAW)) ?
-				null :
-				headEquipId;
-			finalHairId = !savedSwaps.isKitLocked(KitType.HAIR) ?
-				(headAllowsHair.apply(headEquipId) ? check.apply(hairEquipId, KitType.HAIR) : Integer.valueOf(0)) :
-				null;
-			finalJawId = !savedSwaps.isKitLocked(KitType.JAW) ?
-				(headAllowsJaw.apply(headEquipId) ? check.apply(jawEquipId, KitType.JAW) : Integer.valueOf(0)) :
-				null;
+			boolean hairDisallowed = !headAllowsHair.apply(headEquipId) && savedSwaps.isKitLocked(KitType.HAIR);
+			boolean jawDisallowed = !headAllowsJaw.apply(headEquipId) && savedSwaps.isKitLocked(KitType.JAW);
+			finalHeadId = hairDisallowed || jawDisallowed ? null : headEquipId;
+			Integer headIdToCheck = hairDisallowed || jawDisallowed ? currentHeadEquipId : headEquipId;
+			Integer potentialHairId = headAllowsHair.apply(headIdToCheck) ? hairEquipId : Integer.valueOf(0);
+			finalHairId = !savedSwaps.isKitLocked(KitType.HAIR) ? potentialHairId : null;
+			Integer potentialJawId = headAllowsJaw.apply(headIdToCheck) ? jawEquipId : Integer.valueOf(0);
+			finalJawId = !savedSwaps.isKitLocked(KitType.JAW) ? potentialJawId : null;
 		}
 
 		Map<KitType, SwapDiff.Change> changes = new HashMap<>();
+
+		// edge cases:
+		// if not changing hair but hair can be shown, make sure that at least something is displayed there
+		if (finalHairId == null && equipmentIdInSlot(KitType.HAIR) == 0 &&
+			((finalHeadId == null && headAllowsHair.apply(currentHeadEquipId)) ||
+				(finalHeadId != null && headAllowsHair.apply(finalHeadId))))
+		{
+			if (savedSwaps.isKitLocked(KitType.HAIR))
+			{
+				// hair is locked on nothing, don't change helm to something that could show empty kit
+				finalHeadId = null;
+				finalJawId = null;
+			}
+			else
+			{
+				int revertHairId = realKitIds.getOrDefault(KitType.HAIR, getFallbackKitId(KitType.HAIR)) + 256;
+				SwapDiff.Change result = swap(KitType.HAIR, revertHairId, SwapMode.REVERT);
+				if (result != null)
+				{
+					changes.put(KitType.HAIR, result);
+				}
+			}
+		}
+		// if not changing jaw but jaw can be shown, make sure that at least something is displayed there
+		if (finalJawId == null && equipmentIdInSlot(KitType.JAW) == 0 &&
+			((finalHeadId == null && headAllowsJaw.apply(currentHeadEquipId)) ||
+				(finalHeadId != null && headAllowsJaw.apply(finalHeadId))))
+		{
+			if (savedSwaps.isKitLocked(KitType.JAW))
+			{
+				// jaw is locked on nothing, don't change helm to something that could show empty kit
+				finalHeadId = null;
+				finalHairId = null;
+			}
+			else
+			{
+				int revertJawId = realKitIds.getOrDefault(KitType.JAW, getFallbackKitId(KitType.JAW)) + 256;
+				SwapDiff.Change result = swap(KitType.JAW, revertJawId, SwapMode.REVERT);
+				if (result != null)
+				{
+					changes.put(KitType.JAW, result);
+				}
+			}
+		}
+
 		BiConsumer<KitType, Integer> attemptChange = (slot, equipId) -> {
 			if (equipId != null && equipId >= 0)
 			{
@@ -1018,43 +1047,66 @@ public class SwapManager
 		Integer finalTorsoId = null;
 		Integer finalArmsId;
 
-		BiFunction<Integer, KitType, Integer> check = (equipId, slot) ->
-			equipId != null ? equipId : equipmentIdForKit(slot) >= 256 ? equipmentIdForKit(slot) : -1;
-
 		Function<Integer, Boolean> torsoAllowsArms = (equipId) ->
 			equipId < 512 || ItemInteractions.ARMS_TORSOS.contains(equipId - 512);
+
+		Map<KitType, SwapDiff.Change> changes = new HashMap<>();
 
 		int currentTorsoEquipId = equipmentIdInSlot(KitType.TORSO);
 		if (savedSwaps.isKitLocked(KitType.TORSO) ||
 			(savedSwaps.isItemLocked(KitType.TORSO) && torsoEquipId != null && torsoEquipId >= 512))
 		{
 			// only change arms and only if current torso item allows
-			finalArmsId = torsoAllowsArms.apply(currentTorsoEquipId) && !savedSwaps.isKitLocked(KitType.ARMS) ?
-				armsEquipId :
-				null;
+			boolean armsAllowed = torsoAllowsArms.apply(currentTorsoEquipId) && !savedSwaps.isKitLocked(KitType.ARMS);
+			finalArmsId = armsAllowed ? armsEquipId : null;
 		}
 		else if (torsoEquipId == null)
 		{
 			// prioritize showing arms and hiding current torso if applicable
 			finalArmsId = !savedSwaps.isKitLocked(KitType.ARMS) ? armsEquipId : null;
-			boolean torsoForbidsArms = !torsoAllowsArms.apply(currentTorsoEquipId) &&
-				(finalArmsId == null ? savedSwaps.containsSlot(KitType.ARMS) : finalArmsId > 0);
-			int torsoKitEquipId = realKitIds.getOrDefault(KitType.TORSO, getFallbackKitId(KitType.TORSO)) + 256;
-			finalTorsoId = torsoForbidsArms ? (Integer) torsoKitEquipId : torsoEquipId;
+			boolean torsoForbidsArms = !torsoAllowsArms.apply(currentTorsoEquipId) && finalArmsId != null &&
+				finalArmsId > 0;
+			if (torsoForbidsArms)
+			{
+				int revertTorsoId = realKitIds.getOrDefault(KitType.TORSO, getFallbackKitId(KitType.TORSO)) + 256;
+				SwapDiff.Change result = swap(KitType.TORSO, revertTorsoId, SwapMode.REVERT);
+				if (result != null)
+				{
+					changes.put(KitType.TORSO, result);
+				}
+			}
 		}
 		else
 		{
 			// priority: show torso and hide arms, but not if locks on arms disallow (in which case don't change)
-			finalTorsoId = !torsoAllowsArms.apply(torsoEquipId) && savedSwaps.isKitLocked(KitType.ARMS) ?
-				null :
-				torsoEquipId;
-
-			finalArmsId = !savedSwaps.isKitLocked(KitType.ARMS) ?
-				(torsoAllowsArms.apply(torsoEquipId) ? check.apply(armsEquipId, KitType.ARMS) : Integer.valueOf(0)) :
-				null;
+			boolean torsoDisallowed = !torsoAllowsArms.apply(torsoEquipId) && savedSwaps.isKitLocked(KitType.ARMS);
+			finalTorsoId = torsoDisallowed ? null : torsoEquipId;
+			Integer torsoIdToCheck = torsoDisallowed ? currentTorsoEquipId : torsoEquipId;
+			Integer potentialArmsId = torsoAllowsArms.apply(torsoIdToCheck) ? armsEquipId : Integer.valueOf(0);
+			finalArmsId = !savedSwaps.isKitLocked(KitType.ARMS) ? potentialArmsId : null;
 		}
 
-		Map<KitType, SwapDiff.Change> changes = new HashMap<>();
+		// edge case:
+		// if not changing arms but arms can be shown, make sure that at least something is displayed there
+		if (finalArmsId == null && equipmentIdInSlot(KitType.ARMS) == 0 &&
+			((finalTorsoId == null && torsoAllowsArms.apply(currentTorsoEquipId)) ||
+				(finalTorsoId != null && torsoAllowsArms.apply(finalTorsoId))))
+		{
+			if (savedSwaps.isKitLocked(KitType.ARMS))
+			{
+				// arms locked on nothing, don't change torso to something that could show empty kit
+				finalTorsoId = null;
+			}
+			else
+			{
+				int revertArmsId = realKitIds.getOrDefault(KitType.ARMS, getFallbackKitId(KitType.ARMS)) + 256;
+				SwapDiff.Change result = swap(KitType.ARMS, revertArmsId, SwapMode.REVERT);
+				if (result != null)
+				{
+					changes.put(KitType.ARMS, result);
+				}
+			}
+		}
 
 		BiConsumer<KitType, Integer> attemptChange = (slot, equipId) -> {
 			if (equipId != null && equipId >= 0)
@@ -1069,6 +1121,28 @@ public class SwapManager
 		attemptChange.accept(KitType.TORSO, finalTorsoId);
 		attemptChange.accept(KitType.ARMS, finalArmsId);
 		return new SwapDiff(changes, new HashMap<>(), null);
+	}
+
+	/**
+	 * Convenience method that returns the first non-null of: equipId, the current equipment id in this slot,
+	 * or the fallback kit id if allowFallback.
+	 */
+	private int getEquipmentIdOrFallback(Integer equipId, KitType slot, boolean allowFallback)
+	{
+		if (equipId != null)
+		{
+			return equipId;
+		}
+		int kitEquipId = equipmentIdForKit(slot);
+		if (kitEquipId >= 256)
+		{
+			return kitEquipId;
+		}
+		if (allowFallback)
+		{
+			return getFallbackKitId(slot) + 256;
+		}
+		return -1;
 	}
 
 	/**
@@ -1238,30 +1312,58 @@ public class SwapManager
 		return previousId;
 	}
 
+	/**
+	 * Performs a revert back to an "original" state for the given slot.
+	 * In most cases, this swaps to whatever was actually equipped in the slot. Some exceptions:
+	 * When reverting a kit, and an item is actually equipped in a slot that hides that kit, the item will be shown
+	 * and the kit will be hidden.
+	 */
 	private SwapDiff doRevert(KitType slot)
 	{
+//		if (slot == KitType.HAIR)
+//		{
+//			Integer headEquipId = equippedItemIdFor(KitType.HEAD);
+//			if (headEquipId != null && headEquipId >= 512 && !ItemInteractions.HAIR_HELMS.contains(headEquipId - 512))
+//			{
+//				return swap(CompoundSwap.single(KitType.HEAD, headEquipId), SwapMode.REVERT);
+//			}
+//		}
+//		else if (slot == KitType.JAW)
+//		{
+//			Integer headEquipId = equippedItemIdFor(KitType.HEAD);
+//			if (headEquipId != null && headEquipId >= 512 && ItemInteractions.NO_JAW_HELMS.contains(headEquipId - 512))
+//			{
+//				return swap(CompoundSwap.single(KitType.HEAD, headEquipId), SwapMode.REVERT);
+//			}
+//		}
+//		else if (slot == KitType.ARMS)
+//		{
+//			Integer torsoEquipId = equippedItemIdFor(KitType.TORSO);
+//			if (torsoEquipId != null && torsoEquipId >= 512 && !ItemInteractions.ARMS_TORSOS.contains(torsoEquipId - 512))
+//			{
+//				return swap(CompoundSwap.single(KitType.TORSO, torsoEquipId), SwapMode.REVERT);
+//			}
+//		}
 		Integer originalItemId = equippedItemIdFor(slot);
 		Integer originalKitId = realKitIds.getOrDefault(slot, getFallbackKitId(slot));
 		if (originalKitId == -256)
 		{
 			originalKitId = null;
 		}
-		SwapDiff s;
+		int equipmentId;
 		if (originalItemId != null)
 		{
-			int equipmentId = originalItemId < 0 ? 0 : originalItemId + 512;
-			s = swap(CompoundSwap.single(slot, equipmentId), SwapMode.REVERT);
+			equipmentId = originalItemId < 0 ? 0 : originalItemId + 512;
 		}
 		else if (originalKitId != null)
 		{
-			int equipmentId = originalKitId < 0 ? 0 : originalKitId + 256;
-			s = swap(CompoundSwap.single(slot, equipmentId), SwapMode.REVERT);
+			equipmentId = originalKitId < 0 ? 0 : originalKitId + 256;
 		}
 		else
 		{
-			s = swap(CompoundSwap.single(slot, 0), SwapMode.REVERT);
+			equipmentId = 0;
 		}
-		return s;
+		return swap(CompoundSwap.single(slot, equipmentId), SwapMode.REVERT);
 	}
 
 	@Nullable
@@ -1422,14 +1524,13 @@ public class SwapManager
 				SwapMode.REVERT;
 		};
 		// restore kits and items
-		SwapDiff slotRestore = CompoundSwap.fromMap(
+		return CompoundSwap.fromMap(
 			swapDiff.getSlotChanges().entrySet().stream().collect(
 				Collectors.toMap(Map.Entry::getKey, e -> e.getValue().getId())))
 			.stream()
 			.map(c -> this.swap(c, swapModeProvider))
 			.reduce(SwapDiff::mergeOver)
 			.orElse(SwapDiff.blank());
-		return slotRestore;
 	}
 
 	@Nullable
