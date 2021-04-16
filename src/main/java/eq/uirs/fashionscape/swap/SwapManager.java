@@ -933,10 +933,26 @@ public class SwapManager
 		if (savedSwaps.isItemLocked(KitType.HEAD))
 		{
 			// only change hair/jaw and only if current head item allows
-			boolean hairAllowed = headAllowsHair.apply(currentHeadEquipId) && !savedSwaps.isKitLocked(KitType.HAIR);
-			finalHairId = hairAllowed ? hairEquipId : null;
-			boolean jawAllowed = headAllowsJaw.apply(currentHeadEquipId) && !savedSwaps.isKitLocked(KitType.JAW);
-			finalJawId = jawAllowed ? jawEquipId : null;
+			if (!savedSwaps.isKitLocked(KitType.HAIR) && hairEquipId != null)
+			{
+				boolean hairAllowed = (headAllowsHair.apply(currentHeadEquipId) && hairEquipId > 0) ||
+					(!headAllowsHair.apply(currentHeadEquipId) && hairEquipId <= 0);
+				finalHairId = hairAllowed ? hairEquipId : null;
+			}
+			else
+			{
+				finalHairId = null;
+			}
+			if (!savedSwaps.isKitLocked(KitType.JAW) && jawEquipId != null)
+			{
+				boolean jawAllowed = (headAllowsJaw.apply(currentHeadEquipId) && jawEquipId > 0) ||
+					(!headAllowsJaw.apply(currentHeadEquipId) && jawEquipId <= 0);
+				finalJawId = jawAllowed ? jawEquipId : null;
+			}
+			else
+			{
+				finalJawId = null;
+			}
 		}
 		else if (headEquipId == null)
 		{
@@ -1057,8 +1073,16 @@ public class SwapManager
 			(savedSwaps.isItemLocked(KitType.TORSO) && torsoEquipId != null && torsoEquipId >= 512))
 		{
 			// only change arms and only if current torso item allows
-			boolean armsAllowed = torsoAllowsArms.apply(currentTorsoEquipId) && !savedSwaps.isKitLocked(KitType.ARMS);
-			finalArmsId = armsAllowed ? armsEquipId : null;
+			if (savedSwaps.isKitLocked(KitType.ARMS) && armsEquipId != null)
+			{
+				boolean armsAllowed = (torsoAllowsArms.apply(currentTorsoEquipId) && armsEquipId > 0) ||
+					(!torsoAllowsArms.apply(currentTorsoEquipId) && armsEquipId <= 0);
+				finalArmsId = armsAllowed ? armsEquipId : null;
+			}
+			else
+			{
+				finalArmsId = null;
+			}
 		}
 		else if (torsoEquipId == null)
 		{
