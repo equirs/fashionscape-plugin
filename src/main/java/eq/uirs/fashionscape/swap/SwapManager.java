@@ -1148,28 +1148,6 @@ public class SwapManager
 	}
 
 	/**
-	 * Convenience method that returns the first non-null of: equipId, the current equipment id in this slot,
-	 * or the fallback kit id if allowFallback.
-	 */
-	private int getEquipmentIdOrFallback(Integer equipId, KitType slot, boolean allowFallback)
-	{
-		if (equipId != null)
-		{
-			return equipId;
-		}
-		int kitEquipId = equipmentIdForKit(slot);
-		if (kitEquipId >= 256)
-		{
-			return kitEquipId;
-		}
-		if (allowFallback)
-		{
-			return getFallbackKitId(slot) + 256;
-		}
-		return -1;
-	}
-
-	/**
 	 * Swaps an item weapon slot and an item in the shield slot. Behavior changes depending
 	 * on the information present:
 	 * <p>
@@ -1344,30 +1322,30 @@ public class SwapManager
 	 */
 	private SwapDiff doRevert(KitType slot)
 	{
-//		if (slot == KitType.HAIR)
-//		{
-//			Integer headEquipId = equippedItemIdFor(KitType.HEAD);
-//			if (headEquipId != null && headEquipId >= 512 && !ItemInteractions.HAIR_HELMS.contains(headEquipId - 512))
-//			{
-//				return swap(CompoundSwap.single(KitType.HEAD, headEquipId), SwapMode.REVERT);
-//			}
-//		}
-//		else if (slot == KitType.JAW)
-//		{
-//			Integer headEquipId = equippedItemIdFor(KitType.HEAD);
-//			if (headEquipId != null && headEquipId >= 512 && ItemInteractions.NO_JAW_HELMS.contains(headEquipId - 512))
-//			{
-//				return swap(CompoundSwap.single(KitType.HEAD, headEquipId), SwapMode.REVERT);
-//			}
-//		}
-//		else if (slot == KitType.ARMS)
-//		{
-//			Integer torsoEquipId = equippedItemIdFor(KitType.TORSO);
-//			if (torsoEquipId != null && torsoEquipId >= 512 && !ItemInteractions.ARMS_TORSOS.contains(torsoEquipId - 512))
-//			{
-//				return swap(CompoundSwap.single(KitType.TORSO, torsoEquipId), SwapMode.REVERT);
-//			}
-//		}
+		if (slot == KitType.HAIR)
+		{
+			Integer headItemId = equippedItemIdFor(KitType.HEAD);
+			if (headItemId != null && headItemId >= 0 && !ItemInteractions.HAIR_HELMS.contains(headItemId))
+			{
+				return swap(CompoundSwap.single(KitType.HEAD, headItemId + 512), SwapMode.REVERT);
+			}
+		}
+		else if (slot == KitType.JAW)
+		{
+			Integer headItemId = equippedItemIdFor(KitType.HEAD);
+			if (headItemId != null && headItemId >= 0 && ItemInteractions.NO_JAW_HELMS.contains(headItemId))
+			{
+				return swap(CompoundSwap.single(KitType.HEAD, headItemId + 512), SwapMode.REVERT);
+			}
+		}
+		else if (slot == KitType.ARMS)
+		{
+			Integer torsoItemId = equippedItemIdFor(KitType.TORSO);
+			if (torsoItemId != null && torsoItemId >= 0 && !ItemInteractions.ARMS_TORSOS.contains(torsoItemId))
+			{
+				return swap(CompoundSwap.single(KitType.TORSO, torsoItemId + 512), SwapMode.REVERT);
+			}
+		}
 		Integer originalItemId = equippedItemIdFor(slot);
 		Integer originalKitId = realKitIds.getOrDefault(slot, getFallbackKitId(slot));
 		if (originalKitId == -256)
@@ -1426,15 +1404,9 @@ public class SwapManager
 		};
 		switch (slot)
 		{
-			case HEAD:
-			case JAW:
 			case HAIR:
+			case JAW:
 				int headEquipId = equipmentIdInSlot(KitType.HEAD);
-				if (headEquipId == 0)
-				{
-					Integer actualEquipId = equippedItemIdFor(KitType.HEAD);
-					headEquipId = actualEquipId != null ? actualEquipId : 0;
-				}
 				if (headEquipId > 512)
 				{
 					int headItemId = headEquipId - 512;
@@ -1442,27 +1414,15 @@ public class SwapManager
 					{
 						return ItemInteractions.HAIR_HELMS.contains(headItemId);
 					}
-					else if (slot == KitType.JAW)
-					{
-						return !ItemInteractions.NO_JAW_HELMS.contains(headItemId);
-					}
+					return !ItemInteractions.NO_JAW_HELMS.contains(headItemId);
 				}
 				return fallback.get();
-			case TORSO:
 			case ARMS:
 				int torsoEquipId = equipmentIdInSlot(KitType.TORSO);
-				if (torsoEquipId == 0)
-				{
-					Integer actualEquipId = equippedItemIdFor(KitType.TORSO);
-					torsoEquipId = actualEquipId != null ? actualEquipId : 0;
-				}
 				if (torsoEquipId > 512)
 				{
 					int torsoItemId = torsoEquipId - 512;
-					if (slot == KitType.ARMS)
-					{
-						return ItemInteractions.ARMS_TORSOS.contains(torsoItemId);
-					}
+					return ItemInteractions.ARMS_TORSOS.contains(torsoItemId);
 				}
 				return fallback.get();
 			default:
@@ -1482,10 +1442,34 @@ public class SwapManager
 	 */
 	private int equipmentIdInSlot(KitType kitType)
 	{
-		Integer itemId = savedSwaps.getItemOrDefault(kitType, equippedItemIdFor(kitType));
-		if (itemId != null && itemId >= 0)
+		Integer virtualItemId = savedSwaps.getItem(kitType);
+		if (virtualItemId != null && virtualItemId >= 0)
 		{
-			return itemId + 512;
+			return virtualItemId + 512;
+		}
+		Integer realItemId = equippedItemIdFor(kitType);
+		if (realItemId != null && realItemId >= 0)
+		{
+			// check if a virtual slot is obscuring the real item
+			boolean realItemHidden = false;
+			switch (kitType)
+			{
+				case HEAD:
+					realItemHidden = (!ItemInteractions.HAIR_HELMS.contains(realItemId) &&
+						savedSwaps.containsSlot(KitType.HAIR)) ||
+						(ItemInteractions.NO_JAW_HELMS.contains(realItemId) && savedSwaps.containsSlot(KitType.JAW));
+					break;
+				case TORSO:
+					realItemHidden = !ItemInteractions.ARMS_TORSOS.contains(realItemId) &&
+						savedSwaps.containsSlot(KitType.ARMS);
+					break;
+				default:
+					break;
+			}
+			if (!realItemHidden)
+			{
+				return realItemId + 512;
+			}
 		}
 		Integer kitId = kitIdFor(kitType);
 		return kitId != null && kitId >= 0 ? kitId + 256 : 0;

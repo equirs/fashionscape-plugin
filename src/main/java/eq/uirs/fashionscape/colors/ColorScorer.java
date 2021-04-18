@@ -17,8 +17,11 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -35,8 +38,8 @@ public class ColorScorer
 	private final SwapManager swapManager;
 
 	private final Map<Integer, GenderItemColors> allColors;
-	private final Map<KitType, List<ItemColorInfo>> kitColors = new HashMap<>();
-	private final Map<ColorType, Colorable> playerColors = new HashMap<>();
+	private final Map<KitType, List<ItemColorInfo>> kitColors = new ConcurrentHashMap<>();
+	private final Map<ColorType, Colorable> playerColors = new ConcurrentHashMap<>();
 
 	private boolean isFemale;
 
@@ -64,11 +67,11 @@ public class ColorScorer
 			Type type = new TypeToken<Map<Integer, GenderItemColors>>()
 			{
 			}.getType();
-			allColors = gson.fromJson(reader, type);
+			allColors = new ConcurrentHashMap<>(gson.fromJson(reader, type));
 		}
 		else
 		{
-			allColors = new HashMap<>();
+			allColors = new ConcurrentHashMap<>();
 		}
 	}
 
