@@ -1,5 +1,8 @@
 package eq.uirs.fashionscape.data;
 
+import com.google.common.collect.BiMap;
+import com.google.common.collect.HashBiMap;
+import com.google.common.collect.ImmutableBiMap;
 import com.google.common.collect.ImmutableSet;
 import java.util.HashMap;
 import java.util.Map;
@@ -95,6 +98,57 @@ public class ItemInteractions
 		7110, 7122, 7128, 7134, 7362, 7364, 7370, 7372, 7374, 7376, 7592, 7957, 12327, 12331, 12381, 12385, 20149,
 		20208, 20417, 20423, 20566, 23264, 23381
 	);
+
+	// endregion
+
+	// region Gender Swap Kits
+
+	public static final BiMap<Kit, Kit> MALE_TO_FEMALE_KITS;
+
+	static {
+		Map<Kit, Kit> mToF = new HashMap<>();
+		mToF.put(Kit.BALD, Kit.BALD_F);
+		mToF.put(Kit.DREADLOCKS, Kit.DREADLOCKS_F);
+		mToF.put(Kit.LONG, Kit.LONG_F);
+		mToF.put(Kit.MEDIUM, Kit.MEDIUM_F);
+		mToF.put(Kit.SHORT, Kit.SHORT_F);
+		mToF.put(Kit.CROPPED, Kit.CROPPED_F);
+		mToF.put(Kit.WILD_SPIKES, Kit.WILD_SPIKES_F);
+		mToF.put(Kit.SPIKES, Kit.SPIKY);
+		mToF.put(Kit.WIND_BRAIDS, Kit.WIND_BRAIDS_F);
+		mToF.put(Kit.CURTAINS, Kit.CURTAINS_F);
+		mToF.put(Kit.FRONT_SPLIT, Kit.FRONT_SPLIT_F);
+		mToF.put(Kit.PLAIN, Kit.PLAIN_F);
+		mToF.put(Kit.SHIRT, Kit.SHIRT_F);
+		mToF.put(Kit.TORN, Kit.TORN_F);
+		mToF.put(Kit.SWEATER, Kit.SWEATER_F);
+		mToF.put(Kit.VEST, Kit.VEST_F);
+		mToF.put(Kit.REGULAR, Kit.SHORT_SLEEVES);
+		mToF.put(Kit.MUSCLEBOUND, Kit.MUSCLEY);
+		mToF.put(Kit.LOOSE_SLEEVED, Kit.FRILLY_A);
+		mToF.put(Kit.LARGE_CUFFED, Kit.LARGE_CUFFS);
+		mToF.put(Kit.THIN, Kit.LONG_SLEEVED);
+		mToF.put(Kit.SHOULDER_PADS, Kit.BARE_ARMS);
+		mToF.put(Kit.THIN_STRIPE, Kit.THIN_STRIPE_F);
+		mToF.put(Kit.THICK_STRIPE, Kit.SWEATER_A);
+		mToF.put(Kit.WHITE_CUFFS, Kit.WHITE_CUFFS_F);
+		mToF.put(Kit.TATTY, Kit.TATTY_F);
+		mToF.put(Kit.RIPPED, Kit.BARE_SHOULDERS);
+		mToF.put(Kit.PLAIN_L, Kit.PLAIN_LF);
+		mToF.put(Kit.SHORTS, Kit.SHORT_SKIRT);
+		mToF.put(Kit.FLARES, Kit.FLARES_F);
+		mToF.put(Kit.TURN_UPS, Kit.TURN_UPS_F);
+		mToF.put(Kit.TATTY_L, Kit.TATTY_LF);
+		mToF.put(Kit.RIPPED_L, Kit.TORN_SKIRT);
+		mToF.put(Kit.PATCHED, Kit.PATCHED_SKIRT);
+		mToF.put(Kit.PLAIN_H, Kit.PLAIN_HF);
+		mToF.put(Kit.BRACERS, Kit.BRACERS_F);
+		mToF.put(Kit.SMALL, Kit.SMALL_F);
+		mToF.put(Kit.LARGE, Kit.LARGE_F);
+		MALE_TO_FEMALE_KITS = new ImmutableBiMap.Builder<Kit, Kit>()
+			.putAll(mToF)
+			.build();
+	}
 
 	// endregion
 

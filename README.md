@@ -45,8 +45,9 @@ for new items in that slot. You can also "lock" and clear out each slot with the
 #### Base tab
 "Base" is similar to "items", only this tab allows changing your character's base models and colors, essentially 
 combining every makeover NPC into one. There is a jaw (or beard) slot that is only available to male characters, while 
-every other slot is available to either gender. 
-There is no search feature for these slots since there 
+every other slot is available to either gender. The icons in this tab have a rounded border indicating the color you've 
+swapped to (if you haven't changed the color, it will show up as light gray). Note that torso+arms and hair+jaw slot 
+colors are connected, so changing one always changes the other. There is no search feature for these slots since there 
 not as many options; instead, **clicking the icon** brings up a dropdown to browse the color/model options available.
 
 ![Search tab](search_tab.png)
@@ -65,7 +66,8 @@ that result compared to the colours of all the items currently worn (excluding t
 With this option selected, you can also see the colour-coded percent match for that item.
 
 #### Lock mechanics
-You can "lock" individual slots with the lock icon next to the x button for each slot in the "items" and "base" panels. 
+You can "lock" individual slots with the lock icon next to the x button for each slot in the "items" and "base" panels
+(some base slots have two locks: model and color, in that order, with the color lock matching the current slot color).
 This prevents that slot from being cleared by most features (e.g., randomizing, loading a new outfit, undoing).
 Clicking the lock again will unlock it. The locking feature is designed to work with the randomizer: as you find pieces 
 that work together, you can lock them and randomize the remaining slots. Note that locking a base model will always 
@@ -93,7 +95,7 @@ The randomizer has a few "intelligence" settings. Higher intelligence means the 
 that are similar in color. Lower intelligence settings are computationally faster.
 
 There is right-click option to "copy-outfit" on other players, which imports their entire look on your character,
-including items and (if your genders match) base models. Since many other plugins provide player menu entries,
+including items, colors, and (if your genders match) base models. Since many other plugins provide player menu entries,
 this feature can be toggled off.
 
 ## FAQ

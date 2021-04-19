@@ -9,6 +9,7 @@ import net.runelite.client.util.Text;
 @RequiredArgsConstructor
 public enum PanelKitSlot
 {
+	SKIN(null, ColorType.SKIN),
 	HAIR(KitType.HAIR, ColorType.HAIR),
 	JAW(KitType.JAW, ColorType.HAIR),
 	TORSO(KitType.TORSO, ColorType.TORSO),

@@ -1,5 +1,6 @@
 package eq.uirs.fashionscape.swap;
 
+import com.google.common.collect.BiMap;
 import eq.uirs.fashionscape.FashionscapeConfig;
 import eq.uirs.fashionscape.FashionscapePlugin;
 import eq.uirs.fashionscape.colors.ColorScorer;
@@ -34,6 +35,7 @@ import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
@@ -122,6 +124,8 @@ public class SwapManager
 	private final SwapDiffHistory swapDiffHistory = new SwapDiffHistory(s -> this.restore(s, true));
 	// player's real kit ids, e.g., hairstyles, base clothing
 	private final Map<KitType, Integer> realKitIds = new HashMap<>();
+	// player's real base colors
+	private final Map<ColorType, Integer> realColorIds = new HashMap<>();
 
 	private Boolean isFemale;
 	private SwapDiff hoverSwapDiff;
@@ -151,6 +155,7 @@ public class SwapManager
 		hoverSwapDiff = null;
 		savedSwaps.clear();
 		realKitIds.clear();
+		realColorIds.clear();;
 		swapDiffHistory.clear();
 	}
 
@@ -216,7 +221,11 @@ public class SwapManager
 		savedItemEquipIds.putAll(savedKitEquipIds);
 		for (CompoundSwap c : CompoundSwap.fromMap(savedItemEquipIds))
 		{
-			this.swap(c, SwapMode.PREVIEW);
+			swap(c, SwapMode.PREVIEW);
+		}
+		for (Map.Entry<ColorType, Integer> e : savedSwaps.colorEntries())
+		{
+			swap(e.getKey(), e.getValue(), SwapMode.PREVIEW);
 		}
 	}
 
@@ -281,11 +290,20 @@ public class SwapManager
 				}
 			}
 		}
+		for (ColorType colorType : ColorType.values())
+		{
+			Integer colorId = colorIdFor(colorType);
+			if (colorId != null && !realColorIds.containsKey(colorType))
+			{
+				realColorIds.put(colorType, colorId);
+			}
+		}
 	}
 
 	public void importSwaps(
 		Map<KitType, Integer> newItems,
-		Map<KitType, Integer> newKits)
+		Map<KitType, Integer> newKits,
+		Map<ColorType, Integer> newColors)
 	{
 		clientThread.invokeLater(() -> {
 			Map<KitType, Integer> itemSwaps = newItems.entrySet().stream()
@@ -307,7 +325,20 @@ public class SwapManager
 				.map(c -> this.swap(c, SwapMode.SAVE))
 				.reduce(SwapDiff::mergeOver)
 				.orElse(SwapDiff.blank());
-			swapDiffHistory.appendToUndo(equips);
+
+			Map<ColorType, Integer> colorSwaps = newColors.entrySet().stream()
+				.filter(e -> !savedSwaps.isColorLocked(e.getKey()))
+				.collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+			Map<ColorType, Integer> colorEquipSwaps = colorSwaps.entrySet().stream().collect(
+				Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)
+			);
+
+			SwapDiff colors = colorEquipSwaps.entrySet().stream()
+				.map(e -> this.swapColor(e.getKey(), e.getValue(), true))
+				.reduce(SwapDiff::mergeOver)
+				.orElse(SwapDiff.blank());
+			SwapDiff total = equips.mergeOver(colors);
+			swapDiffHistory.appendToUndo(total);
 		});
 	}
 
@@ -388,13 +419,18 @@ public class SwapManager
 	}
 
 	// this should only be called from the client thread
-	public void revert(KitType slot)
+	public void revert(KitType slot, ColorType type)
 	{
 		SwapDiff s = SwapDiff.blank();
 		if (slot != null)
 		{
 			savedSwaps.removeSlotLock(slot);
 			s = s.mergeOver(doRevert(slot));
+		}
+		if (type != null)
+		{
+			savedSwaps.removeColorLock(type);
+			s = s.mergeOver(doRevert(type));
 		}
 		swapDiffHistory.appendToUndo(s);
 	}
@@ -415,6 +451,11 @@ public class SwapManager
 	public void hoverOverKit(KitType slot, Integer kitId)
 	{
 		hoverOver(() -> swapKit(slot, kitId, false));
+	}
+
+	public void hoverOverColor(ColorType type, Integer colorId)
+	{
+		hoverOver(() -> swapColor(type, colorId, false));
 	}
 
 	private void hoverOver(Supplier<SwapDiff> diffCallable)
@@ -455,6 +496,19 @@ public class SwapManager
 			return Objects.equals(savedSwaps.getKit(slot), kitId) ?
 				doRevert(slot) :
 				swapKit(slot, kitId, true);
+		});
+	}
+
+	public void hoverSelectColor(ColorType type, Integer colorId)
+	{
+		hoverSelect(() -> {
+			if (savedSwaps.isColorLocked(type))
+			{
+				return SwapDiff.blank();
+			}
+			return Objects.equals(savedSwaps.getColor(type), colorId) ?
+				doRevert(type) :
+				swapColor(type, colorId, true);
 		});
 	}
 
@@ -507,7 +561,16 @@ public class SwapManager
 			.map(c -> this.swap(c, SwapMode.REVERT))
 			.reduce(SwapDiff::mergeOver)
 			.orElse(SwapDiff.blank());
-		swapDiffHistory.appendToUndo(kitsDiff);
+		SwapDiff colorsDiff = Arrays.stream(ColorType.values())
+			.filter(type -> !savedSwaps.isColorLocked(type))
+			.map(type -> {
+				Integer colorId = realColorIds.get(type);
+				return colorId != null ? swap(type, colorId, SwapMode.REVERT) : SwapDiff.blank();
+			})
+			.reduce(SwapDiff::mergeOver)
+			.orElse(SwapDiff.blank());
+		SwapDiff totalDiff = kitsDiff.mergeOver(colorsDiff);
+		swapDiffHistory.appendToUndo(totalDiff);
 		savedSwaps.clear();
 	}
 
@@ -580,7 +643,7 @@ public class SwapManager
 		}
 		if (!itemImports.isEmpty() || !kitImports.isEmpty() || !colorImports.isEmpty())
 		{
-			importSwaps(itemImports, kitImports);
+			importSwaps(itemImports, kitImports, colorImports);
 		}
 	}
 
@@ -607,20 +670,42 @@ public class SwapManager
 	{
 		int[] equipmentIds = other.getEquipmentIds();
 		KitType[] slots = KitType.values();
-		Map<KitType, Integer> itemImports = IntStream.range(0, Math.max(slots.length, equipmentIds.length))
-			.boxed()
+		Map<KitType, Integer> itemImports = IntStream.range(0, equipmentIds.length).boxed()
 			.filter(i -> equipmentIds[i] >= 512)
 			.collect(Collectors.toMap(i -> slots[i], i -> equipmentIds[i] - 512));
-		// only import kits if their gender matches ours
-		Map<KitType, Integer> kitImports = !Objects.equals(isFemale, other.isFemale()) ?
-			new HashMap<>() :
-			IntStream.range(0, Math.max(slots.length, equipmentIds.length)).boxed()
-				.filter(i -> i > 0 && i < 512)
-				.collect(Collectors.toMap(i -> slots[i], i -> equipmentIds[i] - 256));
 
-		if (!itemImports.isEmpty() || !kitImports.isEmpty())
+		Map<KitType, Integer> kitImports = new HashMap<>();
+		if (isFemale != null)
 		{
-			importSwaps(itemImports, kitImports);
+			Stream<Integer> rangeStream = IntStream.range(0, equipmentIds.length).boxed()
+				.filter(i -> equipmentIds[i] > 0 && equipmentIds[i] < 512);
+			if (isFemale == other.isFemale())
+			{
+				kitImports = rangeStream
+					.collect(Collectors.toMap(i -> slots[i], i -> equipmentIds[i] - 256));
+			}
+			else
+			{
+				BiMap<Kit, Kit> otherGenderMap = isFemale ?
+					ItemInteractions.MALE_TO_FEMALE_KITS :
+					ItemInteractions.MALE_TO_FEMALE_KITS.inverse();
+				kitImports = rangeStream
+					.map(i -> KIT_MAP.get(equipmentIds[i] - 256))
+					.filter(Objects::nonNull)
+					.map(otherGenderMap::get)
+					.filter(Objects::nonNull)
+					.collect(Collectors.toMap(Kit::getKitType, Kit::getKitId));
+			}
+		}
+
+		int[] colors = other.getColors();
+		ColorType[] types = ColorType.values();
+		Map<ColorType, Integer> colorImports = IntStream.range(0, colors.length).boxed()
+			.collect(Collectors.toMap(i -> types[i], i -> colors[i]));
+
+		if (!itemImports.isEmpty() || !kitImports.isEmpty() || !colorImports.isEmpty())
+		{
+			importSwaps(itemImports, kitImports, colorImports);
 		}
 	}
 
@@ -818,6 +903,14 @@ public class SwapManager
 			totalDiff = totalDiff.mergeOver(kitsDiff);
 		}
 
+		SwapDiff colorsDiff = newColors.entrySet().stream()
+			.filter(e -> e.getValue() >= 0)
+			.map(e -> swap(e.getKey(), e.getValue(), SwapMode.SAVE))
+			.reduce(SwapDiff::mergeOver)
+			.orElse(SwapDiff.blank());
+
+		totalDiff = totalDiff.mergeOver(colorsDiff);
+
 		swapDiffHistory.appendToUndo(totalDiff);
 	}
 
@@ -853,6 +946,64 @@ public class SwapManager
 			swapDiff = swapDiff.mergeOver(hoverSwapDiff);
 		}
 		return swapDiff;
+	}
+
+	public SwapDiff swapColor(ColorType type, Integer colorId, boolean save)
+	{
+		if (colorId == null)
+		{
+			return SwapDiff.blank();
+		}
+		SwapMode swapMode = save ? SwapMode.SAVE : SwapMode.PREVIEW;
+		SwapDiff swapDiff = swap(type, colorId, swapMode);
+		if (hoverSwapDiff != null)
+		{
+			swapDiff = swapDiff.mergeOver(hoverSwapDiff);
+		}
+		return swapDiff;
+	}
+
+	/**
+	 * directly swaps a single color by id
+	 */
+	private SwapDiff swap(ColorType type, Integer colorId, SwapMode swapMode)
+	{
+		if (type == null || colorId == null)
+		{
+			return SwapDiff.blank();
+		}
+		Player player = client.getLocalPlayer();
+		if (player == null)
+		{
+			return SwapDiff.blank();
+		}
+		PlayerComposition composition = player.getPlayerComposition();
+		if (composition == null)
+		{
+			return SwapDiff.blank();
+		}
+		try
+		{
+			int oldColorId = setColorId(composition, type, colorId);
+			Map<ColorType, SwapDiff.Change> changes = new HashMap<>();
+			changes.put(type, new SwapDiff.Change(oldColorId, savedSwaps.containsColor(type)));
+			switch (swapMode)
+			{
+				case SAVE:
+					savedSwaps.putColor(type, colorId);
+					break;
+				case REVERT:
+					savedSwaps.removeColor(type);
+					break;
+				case PREVIEW:
+					break;
+			}
+			return new SwapDiff(new HashMap<>(), changes, null);
+		}
+		catch (Exception e)
+		{
+			return SwapDiff.blank();
+		}
 	}
 
 	/**
@@ -1306,6 +1457,16 @@ public class SwapManager
 		return previousId;
 	}
 
+	// Sets color id for slot and returns color id before replacement.
+	private int setColorId(@Nonnull PlayerComposition composition, @Nonnull ColorType type, int colorId)
+	{
+		int[] colors = composition.getColors();
+		int previousId = colors[type.ordinal()];
+		colors[type.ordinal()] = colorId;
+		composition.setHash();
+		return previousId;
+	}
+
 	// Sets idle animation id for current player and returns previous idle animation
 	private int setIdleAnimationId(@Nonnull Player player, int animationId)
 	{
@@ -1366,6 +1527,12 @@ public class SwapManager
 			equipmentId = 0;
 		}
 		return swap(CompoundSwap.single(slot, equipmentId), SwapMode.REVERT);
+	}
+
+	private SwapDiff doRevert(ColorType type)
+	{
+		Integer originalColorId = realColorIds.getOrDefault(type, 0);
+		return swap(type, originalColorId, SwapMode.REVERT);
 	}
 
 	@Nullable
@@ -1522,6 +1689,23 @@ public class SwapManager
 		return composition == null ? null : composition.getKitId(kitType);
 	}
 
+	@Nullable
+	private Integer colorIdFor(ColorType colorType)
+	{
+		Player player = client.getLocalPlayer();
+		if (player == null)
+		{
+			return null;
+		}
+		PlayerComposition composition = player.getPlayerComposition();
+		if (composition == null)
+		{
+			return null;
+		}
+		int[] colors = composition.getColors();
+		return colors[colorType.ordinal()];
+	}
+
 	// restores diff and returns a new diff with reverted changes (allows redo)
 	private SwapDiff restore(SwapDiff swapDiff, boolean save)
 	{
@@ -1532,13 +1716,27 @@ public class SwapManager
 				SwapMode.REVERT;
 		};
 		// restore kits and items
-		return CompoundSwap.fromMap(
+		SwapDiff slotRestore = CompoundSwap.fromMap(
 			swapDiff.getSlotChanges().entrySet().stream().collect(
 				Collectors.toMap(Map.Entry::getKey, e -> e.getValue().getId())))
 			.stream()
 			.map(c -> this.swap(c, swapModeProvider))
 			.reduce(SwapDiff::mergeOver)
 			.orElse(SwapDiff.blank());
+		SwapDiff colorRestore = swapDiff.getColorChanges().entrySet()
+			.stream()
+			.map(e -> {
+				ColorType type = e.getKey();
+				SwapDiff.Change change = e.getValue();
+				int colorId = change.getId();
+				SwapMode swapMode = !save ? SwapMode.PREVIEW : change.isUnnatural() ?
+					SwapMode.SAVE :
+					SwapMode.REVERT;
+				return swap(type, colorId, swapMode);
+			})
+			.reduce(SwapDiff::mergeOver)
+			.orElse(SwapDiff.blank());
+		return slotRestore.mergeOver(colorRestore);
 	}
 
 	@Nullable
