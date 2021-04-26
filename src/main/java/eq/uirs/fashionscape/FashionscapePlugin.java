@@ -22,6 +22,7 @@ import net.runelite.api.Player;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.MenuOptionClicked;
 import net.runelite.api.events.PlayerChanged;
+import net.runelite.api.events.UsernameChanged;
 import net.runelite.client.RuneLite;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
@@ -91,7 +92,6 @@ public class FashionscapePlugin extends Plugin
 	@Inject
 	private Provider<MenuManager> menuManager;
 
-	private String lastKnownPlayerName;
 	private FashionscapePanel panel;
 	private NavigationButton navButton;
 
@@ -113,28 +113,18 @@ public class FashionscapePlugin extends Plugin
 			.priority(8)
 			.build();
 		clientToolbar.addNavigation(navButton);
-
-		if (config.copyMenuEntry())
-		{
-			menuManager.get().addPlayerMenuItem(COPY_PLAYER);
-		}
-		else
-		{
-			menuManager.get().removePlayerMenuItem(COPY_PLAYER);
-		}
-
-		swapManager.startUp();
-		clientThread.invokeLater(this::populateDupes);
+		refreshMenuEntries();
+		clientThread.invokeLater(() -> {
+			populateDupes();
+			swapManager.startUp();
+		});
 	}
 
 	@Override
 	protected void shutDown()
 	{
 		menuManager.get().removePlayerMenuItem(COPY_PLAYER);
-		clientThread.invokeLater(() -> {
-			swapManager.revertSwaps(true);
-			swapManager.shutDown();
-		});
+		clientThread.invokeLater(() -> swapManager.shutDown());
 		clientToolbar.removeNavigation(navButton);
 		ITEM_ID_DUPES.clear();
 	}
@@ -145,22 +135,18 @@ public class FashionscapePlugin extends Plugin
 		Player player = event.getPlayer();
 		if (player != null && player == client.getLocalPlayer())
 		{
-			if (lastKnownPlayerName == null)
+			swapManager.onPlayerChanged();
+			if (panel != null)
 			{
-				lastKnownPlayerName = player.getName();
+				panel.onPlayerChanged(player);
 			}
-			else if (!lastKnownPlayerName.equals(player.getName()))
-			{
-				lastKnownPlayerName = player.getName();
-				swapManager.clear();
-			}
-			swapManager.checkForBaseIds();
-			swapManager.refreshAllSwaps();
 		}
-		if (panel != null)
-		{
-			panel.onPlayerChanged();
-		}
+	}
+
+	@Subscribe
+	public void onUsernameChanged(UsernameChanged event)
+	{
+		swapManager.clearRealIds();
 	}
 
 	@Subscribe
@@ -178,14 +164,7 @@ public class FashionscapePlugin extends Plugin
 			}
 			else if (event.getKey().equals(FashionscapeConfig.KEY_IMPORT_MENU_ENTRY))
 			{
-				if (config.copyMenuEntry())
-				{
-					menuManager.get().addPlayerMenuItem(COPY_PLAYER);
-				}
-				else
-				{
-					menuManager.get().removePlayerMenuItem(COPY_PLAYER);
-				}
+				refreshMenuEntries();
 			}
 		}
 	}
@@ -256,6 +235,18 @@ public class FashionscapePlugin extends Plugin
 				itemIcons.add(itemIcon);
 				ids.add(itemComposition.getId());
 			}
+		}
+	}
+
+	private void refreshMenuEntries()
+	{
+		if (config.copyMenuEntry())
+		{
+			menuManager.get().addPlayerMenuItem(COPY_PLAYER);
+		}
+		else
+		{
+			menuManager.get().removePlayerMenuItem(COPY_PLAYER);
 		}
 	}
 

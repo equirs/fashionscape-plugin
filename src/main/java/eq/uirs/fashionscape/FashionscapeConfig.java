@@ -1,10 +1,14 @@
 package eq.uirs.fashionscape;
 
+import eq.uirs.fashionscape.data.ColorType;
 import eq.uirs.fashionscape.swap.RandomizerIntelligence;
+import java.util.HashMap;
+import net.runelite.api.kit.KitType;
 import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
 import net.runelite.client.config.ConfigSection;
+import org.apache.commons.lang3.SerializationUtils;
 
 @ConfigGroup("fashionscape")
 public interface FashionscapeConfig extends Config
@@ -65,5 +69,43 @@ public interface FashionscapeConfig extends Config
 	{
 		return false;
 	}
+
+	@ConfigItem(
+		keyName = "currentEquipment",
+		name = "Current equipment",
+		description = "The player's equipment ids set by the plugin (hidden)",
+		hidden = true
+	)
+	default byte[] currentEquipment()
+	{
+		return SerializationUtils.serialize(new HashMap<KitType, Integer>());
+	}
+
+	@ConfigItem(
+		keyName = "currentEquipment",
+		name = "Current equipment",
+		description = "The player's equipment ids set by the plugin (hidden)",
+		hidden = true
+	)
+	void setCurrentEquipment(byte[] equipIdsMapBytes);
+
+	@ConfigItem(
+		keyName = "currentItems",
+		name = "Current items",
+		description = "The player's item ids set by the plugin (hidden)",
+		hidden = true
+	)
+	default byte[] currentColors()
+	{
+		return SerializationUtils.serialize(new HashMap<ColorType, Integer>());
+	}
+
+	@ConfigItem(
+		keyName = "currentItems",
+		name = "Current items",
+		description = "The player's item ids set by the plugin (hidden)",
+		hidden = true
+	)
+	void setCurrentColors(byte[] colorMapBytes);
 
 }

@@ -68,7 +68,7 @@ With this option selected, you can also see the colour-coded percent match for t
 #### Lock mechanics
 You can "lock" individual slots with the lock icon next to the x button for each slot in the "items" and "base" panels
 (some base slots have two locks: model and color, in that order, with the color lock matching the current slot color).
-This prevents that slot from being cleared by most features (e.g., randomizing, loading a new outfit, undoing).
+This prevents that slot from being cleared by the randomizer and the undo/redo function.
 Clicking the lock again will unlock it. The locking feature is designed to work with the randomizer: as you find pieces 
 that work together, you can lock them and randomize the remaining slots. Note that locking a base model will always 
 lock the corresponding item slot, and unlocking an item slot will always unlock the base model. However, you can be in

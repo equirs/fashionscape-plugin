@@ -35,6 +35,7 @@ import javax.swing.border.EmptyBorder;
 import lombok.RequiredArgsConstructor;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
+import net.runelite.api.Player;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.kit.KitType;
 import net.runelite.client.callback.ClientThread;
@@ -184,11 +185,11 @@ public class FashionscapePanel extends PluginPanel
 		checkButtonEnabled(clear, loggedIn, hasUnlocked, hasNonEmpty);
 	}
 
-	public void onPlayerChanged()
+	public void onPlayerChanged(Player player)
 	{
 		if (kitsPanel != null)
 		{
-			kitsPanel.onPlayerChanged();
+			kitsPanel.onPlayerChanged(player);
 		}
 	}
 
@@ -286,7 +287,7 @@ public class FashionscapePanel extends PluginPanel
 		JPopupMenu softClearMenu = new JPopupMenu();
 		JMenuItem softClear = new JMenuItem("Soft clear");
 		softClear.addActionListener(e -> clientThread.invokeLater(() -> {
-			swapManager.revertSwaps(false);
+			swapManager.revertSwaps(false, false);
 			reloadResults();
 		}));
 		softClearMenu.add(softClear);
@@ -294,7 +295,7 @@ public class FashionscapePanel extends PluginPanel
 		clear = new JButton(new ImageIcon(ImageUtil.loadImageResource(getClass(), "clear.png")));
 		clear.setToolTipText("Clear all");
 		clear.addActionListener(e -> clientThread.invokeLater(() -> {
-			swapManager.revertSwaps(true);
+			swapManager.revertSwaps(true, false);
 			reloadResults();
 		}));
 		clear.setFocusPainted(false);

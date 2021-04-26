@@ -2,6 +2,7 @@ package eq.uirs.fashionscape.swap;
 
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
+import eq.uirs.fashionscape.FashionscapeConfig;
 import eq.uirs.fashionscape.data.ColorType;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -9,18 +10,34 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import lombok.RequiredArgsConstructor;
+import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+import javax.inject.Inject;
+import javax.inject.Singleton;
+import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.kit.KitType;
+import org.apache.commons.lang3.SerializationUtils;
 
 /**
- * observable wrapper for user's item swaps
+ * observable wrapper for user's item swaps. Persists swaps to plugin config.
  */
-@RequiredArgsConstructor
+@Singleton
+@Slf4j
 class SavedSwaps
 {
-	private final Map<KitType, Integer> swappedItemIds = new HashMap<>();
-	private final Map<KitType, Integer> swappedKitIds = new HashMap<>();
-	private final Map<ColorType, Integer> swappedColorIds = new HashMap<>();
+	private static final int DEBOUNCE_DELAY_MS = 200;
+
+	@Inject
+	private FashionscapeConfig config;
+
+	@Inject
+	private ScheduledExecutorService executor;
+
+	private final HashMap<KitType, Integer> swappedItemIds = new HashMap<>();
+	private final HashMap<KitType, Integer> swappedKitIds = new HashMap<>();
+	private final HashMap<ColorType, Integer> swappedColorIds = new HashMap<>();
 
 	private final Set<KitType> lockedKits = new HashSet<>();
 	// If kit is locked, item must also be locked. If item is unlocked, kit must also be unlocked.
@@ -29,6 +46,48 @@ class SavedSwaps
 	private final Set<ColorType> lockedColors = new HashSet<>();
 
 	private final Map<String, List<SwapEventListener<? extends SwapEvent>>> listeners = new HashMap<>();
+
+	// should only load once since config might be behind local state
+	private boolean hasLoadedConfig = false;
+	private Future<?> colorSaveFuture = null;
+	private Future<?> equipSaveFuture = null;
+
+	/**
+	 * Reads saved swaps from config. Should be called after listeners are set (i.e., after panels created)
+	 */
+	void loadFromConfig()
+	{
+		if (!hasLoadedConfig)
+		{
+			hasLoadedConfig = true;
+		}
+		else
+		{
+			return;
+		}
+		byte[] equipment = config.currentEquipment();
+		byte[] colors = config.currentColors();
+		try
+		{
+			Map<KitType, Integer> equipIds = SerializationUtils.deserialize(equipment);
+			equipIds.forEach((slot, equipId) -> {
+				if (equipId >= 256 && equipId < 512)
+				{
+					putKit(slot, equipId - 256);
+				}
+				else if (equipId >= 512)
+				{
+					putItem(slot, equipId - 512);
+				}
+			});
+			Map<ColorType, Integer> colorIds = SerializationUtils.deserialize(colors);
+			colorIds.forEach(this::putColor);
+		}
+		catch (Exception ignored)
+		{
+			// ignore
+		}
+	}
 
 	void addEventListener(SwapEventListener<? extends SwapEvent> listener)
 	{
@@ -108,6 +167,7 @@ class SavedSwaps
 		{
 			removeKit(slot);
 		}
+		saveEquipmentConfigDebounced();
 	}
 
 	void putKit(KitType slot, Integer kitId)
@@ -125,6 +185,7 @@ class SavedSwaps
 		{
 			removeItem(slot);
 		}
+		saveEquipmentConfigDebounced();
 	}
 
 	void putColor(ColorType type, Integer colorId)
@@ -134,6 +195,7 @@ class SavedSwaps
 		{
 			fireEvent(new ColorChanged(type, colorId));
 		}
+		saveColorConfigDebounced();
 	}
 
 	void removeSlot(KitType slot)
@@ -153,6 +215,7 @@ class SavedSwaps
 		{
 			fireEvent(new ItemChanged(slot, null));
 		}
+		saveEquipmentConfigDebounced();
 	}
 
 	private void removeKit(KitType slot)
@@ -166,6 +229,7 @@ class SavedSwaps
 		{
 			fireEvent(new KitChanged(slot, null));
 		}
+		saveEquipmentConfigDebounced();
 	}
 
 	void removeColor(ColorType type)
@@ -175,6 +239,7 @@ class SavedSwaps
 		{
 			fireEvent(new ColorChanged(type, null));
 		}
+		saveColorConfigDebounced();
 	}
 
 	void clear()
@@ -282,4 +347,37 @@ class SavedSwaps
 		String key = event.getKey();
 		listeners.getOrDefault(key, new LinkedList<>()).forEach(listener -> listener.onEvent(event));
 	}
+
+	private void saveEquipmentConfigDebounced()
+	{
+		Future<?> future = equipSaveFuture;
+		if (future != null)
+		{
+			future.cancel(false);
+		}
+		equipSaveFuture = executor.schedule(() -> {
+			Map<KitType, Integer> itemEquips = swappedItemIds.entrySet().stream()
+				.collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue() + 512));
+			Map<KitType, Integer> kitEquips = swappedKitIds.entrySet().stream()
+				.collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue() + 256));
+			HashMap<KitType, Integer> equips = new HashMap<>(itemEquips);
+			equips.putAll(kitEquips);
+			byte[] bytes = SerializationUtils.serialize(equips);
+			config.setCurrentEquipment(bytes);
+		}, DEBOUNCE_DELAY_MS, TimeUnit.MILLISECONDS);
+	}
+
+	private void saveColorConfigDebounced()
+	{
+		Future<?> future = colorSaveFuture;
+		if (future != null)
+		{
+			future.cancel(false);
+		}
+		colorSaveFuture = executor.schedule(() -> {
+			byte[] bytes = SerializationUtils.serialize(swappedColorIds);
+			config.setCurrentColors(bytes);
+		}, DEBOUNCE_DELAY_MS, TimeUnit.MILLISECONDS);
+	}
+
 }

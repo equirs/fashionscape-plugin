@@ -5,11 +5,13 @@ import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * Observable wrapper for user's undo / redo history
  */
 @RequiredArgsConstructor
+@Slf4j
 class SwapDiffHistory
 {
 	private final Function<SwapDiff, SwapDiff> restoration;

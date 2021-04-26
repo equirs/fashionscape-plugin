@@ -169,9 +169,8 @@ public class KitsPanel extends JPanel
 		repaint();
 	}
 
-	public void onPlayerChanged()
+	public void onPlayerChanged(Player player)
 	{
-		Player player = client.getLocalPlayer();
 		if (player != null)
 		{
 			PlayerComposition composition = player.getPlayerComposition();

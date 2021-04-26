@@ -17,6 +17,7 @@ import javax.swing.JButton;
 import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
+import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.ItemComposition;
 import net.runelite.api.kit.KitType;
 import net.runelite.client.callback.ClientThread;
@@ -25,6 +26,7 @@ import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.util.AsyncBufferedImage;
 import net.runelite.client.util.ImageUtil;
 
+@Slf4j
 class SwapItemPanel extends AbsItemPanel
 {
 	private static final Dimension ICON_SIZE = new Dimension(20, 20);
