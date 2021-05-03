@@ -1,6 +1,6 @@
 # Fashionscape
 
-Docs for version: ***1.1.3***
+Docs for version: ***1.1.4***
 
 Ever spend countless hours on a grind for an untradeable item, only to realize that it doesn't look good with literally 
 any other item in the game? This plugin was made for you. It allows anyone to preview combinations of equipment to 
@@ -87,7 +87,7 @@ your base models for those slots.
 
 #### Configuration
 
-There are a bunch of items in the game which are either restricted to certain activities/events or are unobtainable
+There are a bunch of items in the game which are either restricted to certain activities/events or are unobtainable 
 without hacking the game. These can be hidden from the plugin's search results and the randomizer by checking "exclude
 non-standard items".
 
