@@ -1,7 +1,6 @@
 package eq.uirs.fashionscape.data;
 
 import com.google.common.collect.BiMap;
-import com.google.common.collect.HashBiMap;
 import com.google.common.collect.ImmutableBiMap;
 import com.google.common.collect.ImmutableSet;
 import java.util.HashMap;
@@ -15,7 +14,7 @@ public class ItemInteractions
 	 * broken items which don't have models
 	 */
 	public static final Set<Integer> BAD_ITEM_IDS = ImmutableSet.of(1410, 2513, 4024, 4025, 4026, 4027, 4028, 4029,
-		4030, 4031, 4284, 4285, 7957, 10595, 10596, 10888, 19525, 24265, 25155);
+		4030, 4031, 4284, 4285, 7957, 10595, 10596, 10888, 19525, 24265, 25155, 25582, 25584);
 
 	/**
 	 * items that cannot be normally obtained/equipped in the overworld, also includes degraded/redundant items

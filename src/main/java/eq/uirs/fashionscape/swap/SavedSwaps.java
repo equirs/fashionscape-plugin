@@ -88,11 +88,6 @@ class SavedSwaps
 		return swappedColorIds.containsKey(type);
 	}
 
-	Integer getItemOrDefault(KitType slot, Integer fallback)
-	{
-		return swappedItemIds.getOrDefault(slot, fallback);
-	}
-
 	Integer getKitOrDefault(KitType slot, Integer fallback)
 	{
 		return swappedKitIds.getOrDefault(slot, fallback);

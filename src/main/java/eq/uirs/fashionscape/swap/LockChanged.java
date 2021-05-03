@@ -16,6 +16,6 @@ public class LockChanged extends SwapEvent
 	{
 		ITEM,
 		KIT,
-		BOTH;
+		BOTH
 	}
 }

@@ -155,7 +155,7 @@ public class SwapManager
 		hoverSwapDiff = null;
 		savedSwaps.clear();
 		realKitIds.clear();
-		realColorIds.clear();;
+		realColorIds.clear();
 		swapDiffHistory.clear();
 	}
 
@@ -1640,16 +1640,6 @@ public class SwapManager
 		}
 		Integer kitId = kitIdFor(kitType);
 		return kitId != null && kitId >= 0 ? kitId + 256 : 0;
-	}
-
-	/**
-	 * Returns the equipment id of whatever kit is currently in this slot, bypassing the equipment id of the item in
-	 * that slot. The id could be that of a swapped kit or the player's actual kit. There is no guarantee that
-	 * the returned kit id is currently being shown.
-	 */
-	private int equipmentIdForKit(KitType slot)
-	{
-		return savedSwaps.getKitOrDefault(slot, realKitIds.getOrDefault(slot, -256)) + 256;
 	}
 
 	/**
