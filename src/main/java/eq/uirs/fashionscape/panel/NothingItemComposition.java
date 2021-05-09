@@ -4,7 +4,10 @@ import net.runelite.api.ItemComposition;
 import net.runelite.api.IterableHashTable;
 import net.runelite.api.Node;
 
-public class NothingItemComposition implements ItemComposition
+/**
+ * ItemComposition representing "nothing". Only to be displayed in search results.
+ */
+class NothingItemComposition implements ItemComposition
 {
 	@Override
 	public String getName()

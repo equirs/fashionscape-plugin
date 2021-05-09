@@ -1,6 +1,6 @@
 # Fashionscape
 
-Docs for version: ***1.1.4***
+Docs for version: ***1.1.5***
 
 Ever spend countless hours on a grind for an untradeable item, only to realize that it doesn't look good with literally 
 any other item in the game? This plugin was made for you. It allows anyone to preview combinations of equipment to 

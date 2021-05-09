@@ -187,7 +187,6 @@ class SavedSwaps
 	// this differs from removing, which leaves the slot open for the real item/kit to show
 	void putNothing(KitType slot)
 	{
-		// todo bug: equip hair/jar kit, clear "nothing" in head, equip helm, voila clipping...
 		if (lockedItems.contains(slot))
 		{
 			return;

@@ -23,12 +23,6 @@ class SwapDiffHistory
 	private final LinkedList<SwapDiff> redoSwapDiffs = new LinkedList<>();
 	private final List<Consumer<Integer>> redoCountListeners = new LinkedList<>();
 
-	void clear()
-	{
-		undoSwapDiffs.clear();
-		redoSwapDiffs.clear();
-	}
-
 	void addUndoQueueChangeListener(Consumer<Integer> listener)
 	{
 		undoCountListeners.add(listener);

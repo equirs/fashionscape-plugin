@@ -322,12 +322,16 @@ public class SwapManager
 		}
 	}
 
+	/**
+	 * Sanity checks after changing equipment:
+	 * <p>
+	 * If there's an actual item in a slot and no virtual swap in that slot, BUT other kit swaps hide
+	 * the item, do a one-off unsaved swap to hide this newly-equipped item.
+	 */
 	public void onEquipmentChanged()
 	{
 		for (KitType kitType : KitType.values())
 		{
-			/* edge case: when equipping an item, if there's no virtual swap in that slot but other kit swaps hide
-			 * the item, do a one-off unsaved swap to hide this newly-equipped item */
 			Integer inventoryItemId = inventoryItemId(kitType);
 			Integer virtualItemId = savedSwaps.getItem(kitType);
 			Integer virtualKitId = savedSwaps.getKit(kitType);
@@ -653,7 +657,8 @@ public class SwapManager
 	}
 
 	/**
-	 * Reverts all item/kit slots and colors. Unless `removeLocks` is true, locked slots will remain.
+	 * Reverts all item/kit slots and colors. Unless `removeLocks` is true, locked slots will remain. If `preview`
+	 * is true, saved swaps will be unaffected.
 	 * <p>
 	 * Can only be called from the client thread.
 	 */
@@ -1856,22 +1861,6 @@ public class SwapManager
 		}
 		Item item = inventory.getItem(kitType.getIndex());
 		return item != null && item.getId() >= 0 ? item.getId() : null;
-	}
-
-	@Nullable
-	private Integer getEquipmentId(KitType slot)
-	{
-		Player player = client.getLocalPlayer();
-		if (player == null)
-		{
-			return null;
-		}
-		PlayerComposition composition = player.getPlayerComposition();
-		if (composition == null)
-		{
-			return null;
-		}
-		return composition.getEquipmentId(slot);
 	}
 
 	@Nullable
