@@ -108,7 +108,7 @@ class SwapsPanel extends JPanel
 				}
 				Integer itemId = swapManager.swappedItemIdIn(slot);
 				BufferedImage image;
-				if (itemId != null)
+				if (itemId != null && itemId >= 0)
 				{
 					ItemComposition itemComposition = itemManager.getItemComposition(itemId);
 					image = itemManager.getImage(itemComposition.getId());

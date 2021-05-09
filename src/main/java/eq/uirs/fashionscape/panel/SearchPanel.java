@@ -19,6 +19,7 @@ import java.awt.GridLayout;
 import java.awt.event.ItemEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -34,6 +35,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.swing.ImageIcon;
 import javax.swing.JComboBox;
@@ -47,6 +49,8 @@ import javax.swing.event.DocumentListener;
 import lombok.Value;
 import net.runelite.api.Client;
 import net.runelite.api.ItemComposition;
+import net.runelite.api.IterableHashTable;
+import net.runelite.api.Node;
 import net.runelite.api.kit.KitType;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.game.ItemManager;
@@ -103,7 +107,8 @@ class SearchPanel extends JPanel
 		{
 			for (SearchItemPanel item : searchPanels)
 			{
-				if (Objects.equals(item.itemId, swapManager.swappedItemIdIn(slot)))
+				if (Objects.equals(item.itemId, swapManager.swappedItemIdIn(slot)) ||
+					(item.itemId < 0 && swapManager.isHidden(slot)))
 				{
 					item.resetBackground();
 				}
@@ -125,7 +130,7 @@ class SearchPanel extends JPanel
 	private static class Result
 	{
 		ItemComposition itemComposition;
-		AsyncBufferedImage icon;
+		BufferedImage icon;
 		KitType slot;
 	}
 
@@ -454,6 +459,12 @@ class SearchPanel extends JPanel
 					{
 					}
 				}
+			}
+			if (selectedSlot != null && SwapManager.ALLOWS_NOTHING.contains(selectedSlot) && !results.isEmpty())
+			{
+				ItemComposition nothing = new NothingItemComposition();
+				BufferedImage image = ImageUtil.loadImageResource(getClass(), selectedSlot.name().toLowerCase() + ".png");
+				results.add(0, new Result(nothing, image, selectedSlot));
 			}
 
 			searchPanels.clear();

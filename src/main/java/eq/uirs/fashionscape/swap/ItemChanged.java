@@ -9,6 +9,6 @@ import net.runelite.api.kit.KitType;
 public class ItemChanged extends SwapEvent
 {
 	KitType slot;
-	// will be null if an item has been removed
+	// will be null if a virtual item has been removed, and -1 when item is hidden (over a real item)
 	Integer itemId;
 }

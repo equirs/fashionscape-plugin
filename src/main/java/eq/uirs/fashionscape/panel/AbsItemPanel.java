@@ -27,8 +27,15 @@ abstract class AbsItemPanel extends AbsIconLabelPanel
 			String itemName = "Not set";
 			if (itemId != null)
 			{
-				ItemComposition itemComposition = itemManager.getItemComposition(itemId);
-				itemName = itemComposition.getName();
+				if (itemId >= 0)
+				{
+					ItemComposition itemComposition = itemManager.getItemComposition(itemId);
+					itemName = itemComposition.getName();
+				}
+				else
+				{
+					itemName = "Nothing";
+				}
 			}
 			label.setText(itemName);
 		});

@@ -16,10 +16,12 @@ import lombok.Value;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
+import net.runelite.api.InventoryID;
 import net.runelite.api.ItemComposition;
 import net.runelite.api.MenuAction;
 import net.runelite.api.Player;
 import net.runelite.api.events.GameStateChanged;
+import net.runelite.api.events.ItemContainerChanged;
 import net.runelite.api.events.MenuOptionClicked;
 import net.runelite.api.events.PlayerChanged;
 import net.runelite.api.events.UsernameChanged;
@@ -45,7 +47,7 @@ import net.runelite.http.api.item.ItemStats;
 public class FashionscapePlugin extends Plugin
 {
 	public static final File OUTFITS_DIR = new File(RuneLite.RUNELITE_DIR, "outfits");
-	public static final Pattern PROFILE_PATTERN = Pattern.compile("^(\\w+):(\\d+).*");
+	public static final Pattern PROFILE_PATTERN = Pattern.compile("^(\\w+):(-?\\d+).*");
 
 	private static final String CONFIG_GROUP = "fashionscape";
 	private static final String COPY_PLAYER = "Copy-outfit";
@@ -140,6 +142,15 @@ public class FashionscapePlugin extends Plugin
 			{
 				panel.onPlayerChanged(player);
 			}
+		}
+	}
+
+	@Subscribe
+	public void onItemContainerChanged(ItemContainerChanged event)
+	{
+		if (event.getContainerId() == InventoryID.EQUIPMENT.getId())
+		{
+			swapManager.onEquipmentChanged();
 		}
 	}
 

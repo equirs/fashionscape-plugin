@@ -16,6 +16,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.inject.Singleton;
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.kit.KitType;
 import org.apache.commons.lang3.SerializationUtils;
@@ -38,6 +39,9 @@ class SavedSwaps
 	private final HashMap<KitType, Integer> swappedItemIds = new HashMap<>();
 	private final HashMap<KitType, Integer> swappedKitIds = new HashMap<>();
 	private final HashMap<ColorType, Integer> swappedColorIds = new HashMap<>();
+	// currently only applicable for slots that exclusively hold items
+	@Getter
+	private final HashSet<KitType> hiddenSlots = new HashSet<>();
 
 	private final Set<KitType> lockedKits = new HashSet<>();
 	// If kit is locked, item must also be locked. If item is unlocked, kit must also be unlocked.
@@ -107,6 +111,15 @@ class SavedSwaps
 		return ImmutableSet.copyOf(swappedItemIds.entrySet());
 	}
 
+	Set<Map.Entry<KitType, Integer>> hiddenSlotEntries()
+	{
+		return ImmutableSet.copyOf(
+			hiddenSlots.stream()
+				.collect(Collectors.toMap(v -> v, v -> 0))
+				.entrySet()
+		);
+	}
+
 	Set<Map.Entry<KitType, Integer>> kitEntries()
 	{
 		return ImmutableSet.copyOf(swappedKitIds.entrySet());
@@ -142,14 +155,14 @@ class SavedSwaps
 		return swappedItemIds.containsKey(slot);
 	}
 
+	boolean isHidden(KitType slot)
+	{
+		return hiddenSlots.contains(slot);
+	}
+
 	boolean containsColor(ColorType type)
 	{
 		return swappedColorIds.containsKey(type);
-	}
-
-	Integer getKitOrDefault(KitType slot, Integer fallback)
-	{
-		return swappedKitIds.getOrDefault(slot, fallback);
 	}
 
 	void putItem(KitType slot, Integer itemId)
@@ -159,6 +172,7 @@ class SavedSwaps
 			return;
 		}
 		Integer oldId = swappedItemIds.put(slot, itemId);
+		hiddenSlots.remove(slot);
 		if (!itemId.equals(oldId))
 		{
 			fireEvent(new ItemChanged(slot, itemId));
@@ -166,6 +180,23 @@ class SavedSwaps
 		if (swappedKitIds.containsKey(slot))
 		{
 			removeKit(slot);
+		}
+		saveEquipmentConfigDebounced();
+	}
+
+	// this differs from removing, which leaves the slot open for the real item/kit to show
+	void putNothing(KitType slot)
+	{
+		// todo bug: equip hair/jar kit, clear "nothing" in head, equip helm, voila clipping...
+		if (lockedItems.contains(slot))
+		{
+			return;
+		}
+		Integer oldId = swappedItemIds.remove(slot);
+		boolean wasNotHidden = hiddenSlots.add(slot);
+		if (oldId != null || wasNotHidden)
+		{
+			fireEvent(new ItemChanged(slot, -1));
 		}
 		saveEquipmentConfigDebounced();
 	}
@@ -211,7 +242,8 @@ class SavedSwaps
 			return;
 		}
 		Integer oldId = swappedItemIds.remove(slot);
-		if (oldId != null)
+		boolean wasHidden = hiddenSlots.remove(slot);
+		if (oldId != null || wasHidden)
 		{
 			fireEvent(new ItemChanged(slot, null));
 		}
@@ -244,7 +276,8 @@ class SavedSwaps
 
 	void clear()
 	{
-		Set<KitType> itemSlots = Sets.difference(new HashSet<>(swappedItemIds.keySet()), lockedItems);
+		Set<KitType> swappedItems = Sets.union(new HashSet<>(swappedItemIds.keySet()), new HashSet<>(hiddenSlots));
+		Set<KitType> itemSlots = Sets.difference(swappedItems, lockedItems);
 		itemSlots.forEach(this::removeItem);
 		Set<KitType> kitSlots = Sets.difference(new HashSet<>(swappedKitIds.keySet()), lockedKits);
 		kitSlots.forEach(this::removeKit);
@@ -360,8 +393,11 @@ class SavedSwaps
 				.collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue() + 512));
 			Map<KitType, Integer> kitEquips = swappedKitIds.entrySet().stream()
 				.collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue() + 256));
+			Map<KitType, Integer> hides = hiddenSlots.stream()
+				.collect(Collectors.toMap(v -> v, v -> 0));
 			HashMap<KitType, Integer> equips = new HashMap<>(itemEquips);
 			equips.putAll(kitEquips);
+			equips.putAll(hides);
 			byte[] bytes = SerializationUtils.serialize(equips);
 			config.setCurrentEquipment(bytes);
 		}, DEBOUNCE_DELAY_MS, TimeUnit.MILLISECONDS);

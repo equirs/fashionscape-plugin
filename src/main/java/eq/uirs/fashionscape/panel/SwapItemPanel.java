@@ -186,7 +186,7 @@ class SwapItemPanel extends AbsItemPanel
 
 	private void setItemIcon(Integer itemId)
 	{
-		if (itemId != null)
+		if (itemId != null && itemId >= 0)
 		{
 			clientThread.invokeLater(() -> {
 				ItemComposition itemComposition = itemManager.getItemComposition(itemId);

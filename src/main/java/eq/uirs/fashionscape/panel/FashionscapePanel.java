@@ -411,11 +411,12 @@ public class FashionscapePanel extends PluginPanel
 	private boolean hasNonEmpty()
 	{
 		long numSlotSwaps = Arrays.stream(KitType.values())
-			.map(slot -> {
+			.filter(slot -> {
 				Integer item = swapManager.swappedItemIdIn(slot);
-				return item != null ? item : swapManager.swappedKitIdIn(slot);
+				Integer kit = swapManager.swappedKitIdIn(slot);
+				boolean containsNothing = swapManager.isHidden(slot);
+				return item != null || kit != null || containsNothing;
 			})
-			.filter(Objects::nonNull)
 			.count();
 		long numColorSwaps = Arrays.stream(ColorType.values())
 			.map(swapManager::swappedColorIdIn)

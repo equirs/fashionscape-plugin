@@ -8,6 +8,7 @@ import java.awt.Dimension;
 import java.awt.GridLayout;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.awt.image.BufferedImage;
 import java.text.DecimalFormat;
 import java.util.Objects;
 import javax.annotation.Nullable;
@@ -25,7 +26,7 @@ class SearchItemPanel extends AbsItemPanel
 	private final SwapManager swapManager;
 	private final KitType slot;
 
-	public SearchItemPanel(@Nullable Integer itemId, AsyncBufferedImage icon, KitType slot,
+	public SearchItemPanel(@Nullable Integer itemId, BufferedImage icon, KitType slot,
 						   ItemManager itemManager, SwapManager swapManager, ClientThread clientThread,
 						   OnSelectionChangingListener listener, Double score)
 	{
@@ -64,7 +65,7 @@ class SearchItemPanel extends AbsItemPanel
 			public void mouseReleased(MouseEvent e)
 			{
 				// pre-emptively set background
-				boolean isAlreadySelected = Objects.equals(swapManager.swappedItemIdIn(slot), itemId);
+				boolean isAlreadySelected = isMatch();
 				Color bg = isAlreadySelected ? nonHighlightColor : ColorScheme.MEDIUM_GRAY_COLOR;
 				for (JPanel panel : highlightPanels)
 				{
@@ -120,13 +121,25 @@ class SearchItemPanel extends AbsItemPanel
 
 	private Color defaultBackgroundColor()
 	{
-		if (Objects.equals(swapManager.swappedItemIdIn(slot), itemId))
+		if (isMatch())
 		{
 			return ColorScheme.MEDIUM_GRAY_COLOR;
 		}
 		else
 		{
 			return nonHighlightColor;
+		}
+	}
+
+	private boolean isMatch()
+	{
+		if (itemId < 0)
+		{
+			return swapManager.isHidden(slot);
+		}
+		else
+		{
+			return Objects.equals(swapManager.swappedItemIdIn(slot), itemId);
 		}
 	}
 

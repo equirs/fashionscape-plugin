@@ -13,7 +13,6 @@ import org.apache.commons.lang3.SerializationUtils;
 @ConfigGroup("fashionscape")
 public interface FashionscapeConfig extends Config
 {
-
 	String KEY_EXCLUDE_NON_STANDARD = "excludeNonStandardItems";
 	String KEY_IMPORT_MENU_ENTRY = "copyMenuEntry";
 
@@ -40,7 +39,7 @@ public interface FashionscapeConfig extends Config
 	}
 
 	@ConfigSection(
-		name = "Randomizer Settings",
+		name = "Randomizer",
 		description = "Settings relating to the outfit randomizer",
 		position = 2
 	)
@@ -69,6 +68,8 @@ public interface FashionscapeConfig extends Config
 	{
 		return false;
 	}
+
+	// region Hidden stuff
 
 	@ConfigItem(
 		keyName = "currentEquipment",
@@ -107,5 +108,7 @@ public interface FashionscapeConfig extends Config
 		hidden = true
 	)
 	void setCurrentColors(byte[] colorMapBytes);
+
+	// endregion
 
 }
