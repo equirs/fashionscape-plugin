@@ -186,6 +186,7 @@ public class FashionscapePlugin extends Plugin
 		if (event.getGameState() == GameState.LOGGED_IN)
 		{
 			populateDupes();
+			swapManager.onEquipmentChanged();
 		}
 		if (panel != null)
 		{
