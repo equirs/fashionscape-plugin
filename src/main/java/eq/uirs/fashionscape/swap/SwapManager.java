@@ -771,6 +771,13 @@ public class SwapManager
 				}
 			}
 		}
+		// if not explicitly included, items without data should be explicitly hidden
+		ALLOWS_NOTHING.forEach(slot -> {
+			if (!itemImports.containsKey(slot))
+			{
+				removes.add(slot);
+			}
+		});
 		if (!itemImports.isEmpty() || !kitImports.isEmpty() || !colorImports.isEmpty())
 		{
 			importSwaps(itemImports, kitImports, colorImports, removes);
