@@ -909,13 +909,13 @@ public class SwapManager
 		int size = intelligence.getDepth();
 		if (size > 1)
 		{
-			Map<KitType, Integer> lockedSwaps = Arrays.stream(KitType.values())
-				.filter(s -> savedSwaps.isItemLocked(s) && (savedSwaps.containsItem(s) || savedSwaps.isHidden(s)))
+			Map<KitType, Integer> lockedItems = Arrays.stream(KitType.values())
+				.filter(s -> savedSwaps.isItemLocked(s) && savedSwaps.containsItem(s))
 				.collect(Collectors.toMap(s -> s, savedSwaps::getItem));
 			Map<ColorType, Colorable> lockedColors = swappedColorsMap().entrySet().stream()
 				.filter(e -> savedSwaps.isColorLocked(e.getKey()) && savedSwaps.containsColor(e.getKey()))
 				.collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-			colorScorer.setPlayerInfo(lockedSwaps, lockedColors);
+			colorScorer.setPlayerInfo(lockedItems, lockedColors);
 		}
 		Map<KitType, Boolean> itemSlotsToRevert = Arrays.stream(KitType.values())
 			.collect(Collectors.toMap(slot -> slot, savedSwaps::isItemLocked));

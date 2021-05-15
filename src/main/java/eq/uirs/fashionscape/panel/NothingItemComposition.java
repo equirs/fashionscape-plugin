@@ -9,16 +9,19 @@ import net.runelite.api.Node;
  */
 class NothingItemComposition implements ItemComposition
 {
+	public static String NAME = "Nothing";
+	public static int ID = -1;
+
 	@Override
 	public String getName()
 	{
-		return "Nothing";
+		return NAME;
 	}
 
 	@Override
 	public int getId()
 	{
-		return -1;
+		return ID;
 	}
 
 	@Override

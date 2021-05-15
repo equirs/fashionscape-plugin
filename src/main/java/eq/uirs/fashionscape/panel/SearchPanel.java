@@ -457,7 +457,8 @@ class SearchPanel extends JPanel
 					}
 				}
 			}
-			if (selectedSlot != null && SwapManager.ALLOWS_NOTHING.contains(selectedSlot) && !results.isEmpty())
+			if (selectedSlot != null && SwapManager.ALLOWS_NOTHING.contains(selectedSlot) &&
+				NothingItemComposition.NAME.toLowerCase().contains(search))
 			{
 				ItemComposition nothing = new NothingItemComposition();
 				BufferedImage image = ImageUtil.loadImageResource(getClass(), selectedSlot.name().toLowerCase() + ".png");

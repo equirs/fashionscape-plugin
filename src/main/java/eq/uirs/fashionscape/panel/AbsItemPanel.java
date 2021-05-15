@@ -34,7 +34,7 @@ abstract class AbsItemPanel extends AbsIconLabelPanel
 				}
 				else
 				{
-					itemName = "Nothing";
+					itemName = NothingItemComposition.NAME;
 				}
 			}
 			label.setText(itemName);

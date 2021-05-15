@@ -1,6 +1,6 @@
 # Fashionscape
 
-Docs for version: ***1.1.5***
+Docs for version: ***1.1.6***
 
 Ever spend countless hours on a grind for an untradeable item, only to realize that it doesn't look good with literally 
 any other item in the game? This plugin was made for you. It allows anyone to preview combinations of equipment to 
@@ -38,7 +38,9 @@ everything *except* locked slots, there's a right-click option to soft clear.
 "Items" shows every item you're wearing via the plugin. Note that certain slots, like ammo, are not shown because no
 items equipped in those slots change your appearance. Each item shows an icon that can be clicked to bring up a search
 for new items in that slot. You can also "lock" and clear out each slot with the controls on the right (see 
-"lock mechanics" for more on locks).
+"lock mechanics" for more on locks). If nothing is set in a slot, it will display "Not set" and will display whatever
+your character is actually wearing. If you'd like to override what you're wearing to display nothing, this is possible
+by selecting "Nothing" in the search results (note: this is only possible for certain items).
 
 ![Base tab](base_panel.png)
 
@@ -94,7 +96,7 @@ non-standard items".
 The randomizer has a few "intelligence" settings. Higher intelligence means the randomizer results will yield items
 that are similar in color. Lower intelligence settings are computationally faster.
 
-There is right-click option to "copy-outfit" on other players, which imports their entire look on your character,
+There is a right-click option to "copy-outfit" on other players, which imports their entire look on your character,
 including items, colors, and (if your genders match) base models. Since many other plugins provide player menu entries,
 this feature can be toggled off.
 
