@@ -1,6 +1,6 @@
 package eq.uirs.fashionscape.panel;
 
-enum SortBy
+public enum SortBy
 {
 	COLOR_MATCH,
 	ALPHABETICAL,

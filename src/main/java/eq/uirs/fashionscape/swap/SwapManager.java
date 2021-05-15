@@ -41,6 +41,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Singleton;
+import lombok.Setter;
 import lombok.Value;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.ChatMessageType;
@@ -72,9 +73,7 @@ public class SwapManager
 	// item-only slots that can always contain an equipment id of 0
 	public static final List<KitType> ALLOWS_NOTHING = ImmutableList.of(KitType.HEAD, KitType.CAPE, KitType.AMULET,
 		KitType.WEAPON, KitType.SHIELD);
-	// when player's kit info is not known, fall back to showing some default values
-	private static final Map<KitType, Integer> FALLBACK_MALE_KITS = new HashMap<>();
-	private static final Map<KitType, Integer> FALLBACK_FEMALE_KITS = new HashMap<>();
+
 	private static final Map<KitType, List<Kit>> KIT_TYPE_TO_KITS;
 	private static final List<KitType> NEVER_ZERO_SLOTS_FEMALE = ImmutableList.of(KitType.TORSO, KitType.LEGS,
 		KitType.HAIR, KitType.HANDS, KitType.BOOTS);
@@ -85,22 +84,6 @@ public class SwapManager
 
 	static
 	{
-		FALLBACK_MALE_KITS.put(KitType.HAIR, Kit.BALD.getKitId());
-		FALLBACK_MALE_KITS.put(KitType.JAW, Kit.GOATEE.getKitId());
-		FALLBACK_MALE_KITS.put(KitType.TORSO, Kit.PLAIN.getKitId());
-		FALLBACK_MALE_KITS.put(KitType.ARMS, Kit.REGULAR.getKitId());
-		FALLBACK_MALE_KITS.put(KitType.LEGS, Kit.PLAIN_L.getKitId());
-		FALLBACK_MALE_KITS.put(KitType.HANDS, Kit.PLAIN_H.getKitId());
-		FALLBACK_MALE_KITS.put(KitType.BOOTS, Kit.SMALL.getKitId());
-
-		FALLBACK_FEMALE_KITS.put(KitType.HAIR, Kit.PIGTAILS.getKitId());
-		FALLBACK_FEMALE_KITS.put(KitType.JAW, -256);
-		FALLBACK_FEMALE_KITS.put(KitType.TORSO, Kit.SIMPLE.getKitId());
-		FALLBACK_FEMALE_KITS.put(KitType.ARMS, Kit.SHORT_SLEEVES.getKitId());
-		FALLBACK_FEMALE_KITS.put(KitType.LEGS, Kit.PLAIN_LF.getKitId());
-		FALLBACK_FEMALE_KITS.put(KitType.HANDS, Kit.PLAIN_HF.getKitId());
-		FALLBACK_FEMALE_KITS.put(KitType.BOOTS, Kit.SMALL_F.getKitId());
-
 		KIT_TYPE_TO_KITS = Arrays.stream(Kit.values())
 			.collect(Collectors.groupingBy(Kit::getKitType));
 
@@ -132,12 +115,10 @@ public class SwapManager
 	private SavedSwaps savedSwaps;
 
 	private final SwapDiffHistory swapDiffHistory = new SwapDiffHistory(s -> this.restore(s, true));
-	// player's real kit ids, e.g., hairstyles, base clothing
-	private final Map<KitType, Integer> realKitIds = new HashMap<>();
-	// player's real base colors
-	private final Map<ColorType, Integer> realColorIds = new HashMap<>();
 
+	@Setter
 	private Boolean isFemale;
+	private String lastKnownPlayerName = null;
 	private SwapDiff hoverSwapDiff;
 
 	@Value
@@ -221,7 +202,7 @@ public class SwapManager
 	// this should only be called from the client thread
 	public void refreshAllSwaps()
 	{
-		Map<KitType, Integer> savedItemEquipIds = savedSwaps.itemEntries().stream().collect(
+		Map<KitType, Integer> savedEquipmentIds = savedSwaps.itemEntries().stream().collect(
 			Collectors.toMap(Map.Entry::getKey, e -> e.getValue() + 512)
 		);
 		Map<KitType, Integer> savedKitEquipIds = savedSwaps.kitEntries().stream().collect(
@@ -230,9 +211,9 @@ public class SwapManager
 		Map<KitType, Integer> hiddenEquipIds = savedSwaps.getHiddenSlots().stream().collect(
 			Collectors.toMap(v -> v, v -> 0)
 		);
-		savedItemEquipIds.putAll(savedKitEquipIds);
-		savedItemEquipIds.putAll(hiddenEquipIds);
-		for (CompoundSwap c : CompoundSwap.fromMap(sanitize(savedItemEquipIds)))
+		savedEquipmentIds.putAll(savedKitEquipIds);
+		savedEquipmentIds.putAll(hiddenEquipIds);
+		for (CompoundSwap c : CompoundSwap.fromMap(sanitize(savedEquipmentIds)))
 		{
 			swap(c, SwapMode.PREVIEW);
 		}
@@ -294,11 +275,20 @@ public class SwapManager
 			return;
 		}
 		boolean female = playerComposition.isFemale();
-		if (!Objects.equals(female, isFemale))
+		if (isFemale != null && female != isFemale)
 		{
-			realKitIds.clear();
+			savedSwaps.clearRealKits();
 		}
 		isFemale = female;
+		if (isFemale)
+		{
+			savedSwaps.removeSlot(KitType.JAW);
+		}
+		if (!Objects.equals(lastKnownPlayerName, player.getName()))
+		{
+			savedSwaps.loadRSProfileConfig();
+			lastKnownPlayerName = player.getName();
+		}
 		for (KitType kitType : KitType.values())
 		{
 			Integer kitId = kitIdFor(kitType);
@@ -307,7 +297,7 @@ public class SwapManager
 				if (kitId >= 0 && (!savedSwaps.containsSlot(kitType) ||
 					!Objects.equals(savedSwaps.getKit(kitType), kitId)))
 				{
-					realKitIds.put(kitType, kitId);
+					savedSwaps.putRealKit(kitType, kitId);
 				}
 			}
 		}
@@ -317,7 +307,7 @@ public class SwapManager
 			if (colorId != null && (!savedSwaps.containsColor(colorType) ||
 				!Objects.equals(savedSwaps.getColor(colorType), colorId)))
 			{
-				realColorIds.put(colorType, colorId);
+				savedSwaps.putRealColor(colorType, colorId);
 			}
 		}
 	}
@@ -352,7 +342,7 @@ public class SwapManager
 						if (savedSwaps.containsSlot(KitType.ARMS) &&
 							!ItemInteractions.ARMS_TORSOS.contains(inventoryItemId))
 						{
-							int kitId = realKitIds.getOrDefault(kitType, getFallbackKitId(kitType));
+							int kitId = savedSwaps.getRealKit(kitType, isFemale);
 							swap(CompoundSwap.single(kitType, kitId + 256), SwapMode.PREVIEW);
 						}
 						break;
@@ -361,15 +351,6 @@ public class SwapManager
 				}
 			}
 		}
-	}
-
-	/**
-	 * Called when logged in account changes. Clears all remembered actual kit and color ids.
-	 */
-	public void clearRealIds()
-	{
-		realKitIds.clear();
-		realColorIds.clear();
 	}
 
 	public void importSwaps(
@@ -673,8 +654,11 @@ public class SwapManager
 			.filter(slot -> !savedSwaps.isSlotLocked(slot))
 			.collect(Collectors.toMap(slot -> slot, slot -> {
 				Integer itemId = inventoryItemId(slot);
-				int kitId = realKitIds.getOrDefault(slot, getFallbackKitId(slot));
-				return itemId != null && itemId != 0 ? itemId + 512 : kitId + 256;
+				if (itemId != null && itemId != 0)
+				{
+					return itemId + 512;
+				}
+				return savedSwaps.getRealKit(slot, isFemale) + 256;
 			}));
 		SwapDiff kitsDiff = CompoundSwap.fromMap(equipIdsToRevert).stream()
 			.map(c -> this.swap(c, mode))
@@ -683,7 +667,7 @@ public class SwapManager
 		SwapDiff colorsDiff = Arrays.stream(ColorType.values())
 			.filter(type -> !savedSwaps.isColorLocked(type))
 			.map(type -> {
-				Integer colorId = realColorIds.get(type);
+				Integer colorId = savedSwaps.getRealColor(type);
 				return colorId != null ? swap(type, colorId, mode) : SwapDiff.blank();
 			})
 			.reduce(SwapDiff::mergeOver)
@@ -692,24 +676,7 @@ public class SwapManager
 		if (mode == SwapMode.REVERT)
 		{
 			swapDiffHistory.appendToUndo(totalDiff);
-			savedSwaps.clear();
-		}
-	}
-
-	/**
-	 * @return a default kit id for the player's gender, if known. For slots without default values, or when
-	 * gender is unknown, returns -256 (i.e., equipment id 0)
-	 */
-	private int getFallbackKitId(KitType slot)
-	{
-		if (isFemale != null && slot != null)
-		{
-			Map<KitType, Integer> map = isFemale ? FALLBACK_FEMALE_KITS : FALLBACK_MALE_KITS;
-			return map.getOrDefault(slot, -256);
-		}
-		else
-		{
-			return -256;
+			savedSwaps.clearSwapped();
 		}
 	}
 
@@ -872,15 +839,15 @@ public class SwapManager
 				}
 			}
 		});
-		Map<KitType, Integer> itemEquipIds = equipmentIds.entrySet().stream()
+		Map<KitType, Integer> allEquipIds = equipmentIds.entrySet().stream()
 			.filter(e -> e.getValue() >= 512)
 			.collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 		Map<KitType, Integer> removals = equipmentIds.entrySet().stream()
 			.filter(e -> e.getValue() == 0 && !getNonZeroSlots().contains(e.getKey()))
 			.collect(Collectors.toMap(Map.Entry::getKey, entry -> 0));
-		itemEquipIds.putAll(newKitEquipIds);
-		itemEquipIds.putAll(removals);
-		return itemEquipIds;
+		allEquipIds.putAll(newKitEquipIds);
+		allEquipIds.putAll(removals);
+		return allEquipIds;
 	}
 
 	/**
@@ -1334,7 +1301,7 @@ public class SwapManager
 			}
 			else
 			{
-				int revertHairId = realKitIds.getOrDefault(KitType.HAIR, getFallbackKitId(KitType.HAIR)) + 256;
+				int revertHairId = savedSwaps.getRealKit(KitType.HAIR, isFemale) + 256;
 				SwapDiff.Change result = swap(KitType.HAIR, revertHairId, SwapMode.REVERT);
 				if (result != null)
 				{
@@ -1355,7 +1322,7 @@ public class SwapManager
 			}
 			else
 			{
-				int revertJawId = realKitIds.getOrDefault(KitType.JAW, getFallbackKitId(KitType.JAW)) + 256;
+				int revertJawId = savedSwaps.getRealKit(KitType.JAW, isFemale) + 256;
 				SwapDiff.Change result = swap(KitType.JAW, revertJawId, SwapMode.REVERT);
 				if (result != null)
 				{
@@ -1432,7 +1399,7 @@ public class SwapManager
 				finalArmsId > 0;
 			if (torsoForbidsArms)
 			{
-				int revertTorsoId = realKitIds.getOrDefault(KitType.TORSO, getFallbackKitId(KitType.TORSO)) + 256;
+				int revertTorsoId = savedSwaps.getRealKit(KitType.TORSO, isFemale) + 256;
 				SwapDiff.Change result = swap(KitType.TORSO, revertTorsoId, SwapMode.REVERT);
 				if (result != null)
 				{
@@ -1463,7 +1430,7 @@ public class SwapManager
 			}
 			else
 			{
-				int revertArmsId = realKitIds.getOrDefault(KitType.ARMS, getFallbackKitId(KitType.ARMS)) + 256;
+				int revertArmsId = savedSwaps.getRealKit(KitType.ARMS, isFemale) + 256;
 				SwapDiff.Change result = swap(KitType.ARMS, revertArmsId, SwapMode.REVERT);
 				if (result != null)
 				{
@@ -1521,8 +1488,7 @@ public class SwapManager
 		if (weaponEquipId == null || savedSwaps.isItemLocked(KitType.WEAPON))
 		{
 			finalShieldId = shieldEquipId;
-			if (shieldEquipId != null && shieldEquipId > 0 &&
-				weaponForbidsShields.apply(equipmentIdInSlot(KitType.WEAPON)))
+			if (shieldEquipId != null && weaponForbidsShields.apply(equipmentIdInSlot(KitType.WEAPON)))
 			{
 				if (!savedSwaps.isItemLocked(KitType.WEAPON))
 				{
@@ -1707,7 +1673,7 @@ public class SwapManager
 			}
 		}
 		Integer originalItemId = inventoryItemId(slot);
-		Integer originalKitId = realKitIds.getOrDefault(slot, getFallbackKitId(slot));
+		Integer originalKitId = savedSwaps.getRealKit(slot, isFemale);
 		if (originalKitId == -256)
 		{
 			originalKitId = null;
@@ -1730,7 +1696,7 @@ public class SwapManager
 
 	private SwapDiff doRevert(ColorType type)
 	{
-		Integer originalColorId = realColorIds.getOrDefault(type, 0);
+		Integer originalColorId = savedSwaps.getRealColor(type);
 		return swap(type, originalColorId, SwapMode.REVERT);
 	}
 

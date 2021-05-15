@@ -4,6 +4,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 import eq.uirs.fashionscape.FashionscapeConfig;
 import eq.uirs.fashionscape.data.ColorType;
+import eq.uirs.fashionscape.data.Kit;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -19,6 +20,7 @@ import javax.inject.Singleton;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.kit.KitType;
+import net.runelite.client.config.ConfigManager;
 import org.apache.commons.lang3.SerializationUtils;
 
 /**
@@ -28,13 +30,43 @@ import org.apache.commons.lang3.SerializationUtils;
 @Slf4j
 class SavedSwaps
 {
-	private static final int DEBOUNCE_DELAY_MS = 200;
+	private static final int DEBOUNCE_DELAY_MS = 500;
+	// when player's kit info is not known, fall back to showing some default values
+	private static final Map<KitType, Integer> FALLBACK_MALE_KITS = new HashMap<>();
+	private static final Map<KitType, Integer> FALLBACK_FEMALE_KITS = new HashMap<>();
+
+	static
+	{
+		FALLBACK_MALE_KITS.put(KitType.HAIR, Kit.BALD.getKitId());
+		FALLBACK_MALE_KITS.put(KitType.JAW, Kit.GOATEE.getKitId());
+		FALLBACK_MALE_KITS.put(KitType.TORSO, Kit.PLAIN.getKitId());
+		FALLBACK_MALE_KITS.put(KitType.ARMS, Kit.REGULAR.getKitId());
+		FALLBACK_MALE_KITS.put(KitType.LEGS, Kit.PLAIN_L.getKitId());
+		FALLBACK_MALE_KITS.put(KitType.HANDS, Kit.PLAIN_H.getKitId());
+		FALLBACK_MALE_KITS.put(KitType.BOOTS, Kit.SMALL.getKitId());
+
+		FALLBACK_FEMALE_KITS.put(KitType.HAIR, Kit.PIGTAILS.getKitId());
+		FALLBACK_FEMALE_KITS.put(KitType.JAW, -256);
+		FALLBACK_FEMALE_KITS.put(KitType.TORSO, Kit.SIMPLE.getKitId());
+		FALLBACK_FEMALE_KITS.put(KitType.ARMS, Kit.SHORT_SLEEVES.getKitId());
+		FALLBACK_FEMALE_KITS.put(KitType.LEGS, Kit.PLAIN_LF.getKitId());
+		FALLBACK_FEMALE_KITS.put(KitType.HANDS, Kit.PLAIN_HF.getKitId());
+		FALLBACK_FEMALE_KITS.put(KitType.BOOTS, Kit.SMALL_F.getKitId());
+	}
 
 	@Inject
 	private FashionscapeConfig config;
 
 	@Inject
+	private ConfigManager configManager;
+
+	@Inject
 	private ScheduledExecutorService executor;
+
+	// player's real kit ids, e.g., hairstyles, base clothing
+	private final HashMap<KitType, Integer> realKitIds = new HashMap<>();
+	// player's real base colors
+	private final Map<ColorType, Integer> realColorIds = new HashMap<>();
 
 	private final HashMap<KitType, Integer> swappedItemIds = new HashMap<>();
 	private final HashMap<KitType, Integer> swappedKitIds = new HashMap<>();
@@ -54,6 +86,7 @@ class SavedSwaps
 	// should only load once since config might be behind local state
 	private boolean hasLoadedConfig = false;
 	private Future<?> colorSaveFuture = null;
+	private Future<?> kitsSaveFuture = null;
 	private Future<?> equipSaveFuture = null;
 
 	/**
@@ -86,6 +119,23 @@ class SavedSwaps
 			});
 			Map<ColorType, Integer> colorIds = SerializationUtils.deserialize(colors);
 			colorIds.forEach(this::putColor);
+		}
+		catch (Exception ignored)
+		{
+			// ignore
+		}
+	}
+
+	/**
+	 * Loads default kits from config. Called during pre-refresh check, on first login and on rsn change
+	 */
+	void loadRSProfileConfig()
+	{
+		byte[] realKits = configManager.getRSProfileConfiguration(FashionscapeConfig.GROUP,
+			FashionscapeConfig.KEY_REAL_KITS, byte[].class);
+		try
+		{
+			realKitIds.putAll(SerializationUtils.deserialize(realKits));
 		}
 		catch (Exception ignored)
 		{
@@ -145,6 +195,43 @@ class SavedSwaps
 		return swappedColorIds.get(type);
 	}
 
+	Integer getRealColor(ColorType type)
+	{
+		return realColorIds.get(type);
+	}
+
+	/**
+	 * Returns the player's actual kit id in the given slot, or null if it's not known.
+	 */
+	Integer getRealKit(KitType slot)
+	{
+		return realKitIds.get(slot);
+	}
+
+	/**
+	 * Returns the player's actual kit id in the given slot, or a fallback kit id if it's not known
+	 */
+	int getRealKit(KitType slot, Boolean isFemale)
+	{
+		Integer realKit = getRealKit(slot);
+		return realKit != null ? realKit : getFallbackKit(slot, isFemale);
+	}
+
+	int getFallbackKit(KitType slot, Boolean isFemale)
+	{
+		if (isFemale == null || slot == null)
+		{
+			return -256;
+		}
+		Map<KitType, Integer> map = isFemale ? FALLBACK_FEMALE_KITS : FALLBACK_MALE_KITS;
+		int result = map.getOrDefault(slot, -256);
+		if (result != -256)
+		{
+			fireEvent(new KnownKitChanged(true, slot));
+		}
+		return result;
+	}
+
 	boolean containsSlot(KitType slot)
 	{
 		return swappedKitIds.containsKey(slot) || swappedItemIds.containsKey(slot);
@@ -173,15 +260,15 @@ class SavedSwaps
 		}
 		Integer oldId = swappedItemIds.put(slot, itemId);
 		hiddenSlots.remove(slot);
-		if (!itemId.equals(oldId))
-		{
-			fireEvent(new ItemChanged(slot, itemId));
-		}
 		if (swappedKitIds.containsKey(slot))
 		{
 			removeKit(slot);
 		}
-		saveEquipmentConfigDebounced();
+		if (!itemId.equals(oldId))
+		{
+			fireEvent(new ItemChanged(slot, itemId));
+			saveEquipmentConfigDebounced();
+		}
 	}
 
 	// this differs from removing, which leaves the slot open for the real item/kit to show
@@ -196,8 +283,8 @@ class SavedSwaps
 		if (oldId != null || wasNotHidden)
 		{
 			fireEvent(new ItemChanged(slot, -1));
+			saveEquipmentConfigDebounced();
 		}
-		saveEquipmentConfigDebounced();
 	}
 
 	void putKit(KitType slot, Integer kitId)
@@ -207,15 +294,15 @@ class SavedSwaps
 			return;
 		}
 		Integer oldId = swappedKitIds.put(slot, kitId);
-		if (!kitId.equals(oldId))
-		{
-			fireEvent(new KitChanged(slot, kitId));
-		}
 		if (swappedItemIds.containsKey(slot))
 		{
 			removeItem(slot);
 		}
-		saveEquipmentConfigDebounced();
+		if (!kitId.equals(oldId))
+		{
+			fireEvent(new KitChanged(slot, kitId));
+			saveEquipmentConfigDebounced();
+		}
 	}
 
 	void putColor(ColorType type, Integer colorId)
@@ -224,8 +311,23 @@ class SavedSwaps
 		if (!colorId.equals(oldId))
 		{
 			fireEvent(new ColorChanged(type, colorId));
+			saveColorConfigDebounced();
 		}
-		saveColorConfigDebounced();
+	}
+
+	void putRealKit(KitType slot, Integer kitId)
+	{
+		fireEvent(new KnownKitChanged(false, slot));
+		Integer oldKitId = realKitIds.put(slot, kitId);
+		if (!kitId.equals(oldKitId))
+		{
+			saveRealKitsDebounced();
+		}
+	}
+
+	void putRealColor(ColorType type, Integer colorId)
+	{
+		realColorIds.put(type, colorId);
 	}
 
 	void removeSlot(KitType slot)
@@ -245,8 +347,8 @@ class SavedSwaps
 		if (oldId != null || wasHidden)
 		{
 			fireEvent(new ItemChanged(slot, null));
+			saveEquipmentConfigDebounced();
 		}
-		saveEquipmentConfigDebounced();
 	}
 
 	private void removeKit(KitType slot)
@@ -259,8 +361,8 @@ class SavedSwaps
 		if (oldId != null)
 		{
 			fireEvent(new KitChanged(slot, null));
+			saveEquipmentConfigDebounced();
 		}
-		saveEquipmentConfigDebounced();
 	}
 
 	void removeColor(ColorType type)
@@ -269,11 +371,11 @@ class SavedSwaps
 		if (oldId != null)
 		{
 			fireEvent(new ColorChanged(type, null));
+			saveColorConfigDebounced();
 		}
-		saveColorConfigDebounced();
 	}
 
-	void clear()
+	void clearSwapped()
 	{
 		Set<KitType> swappedItems = Sets.union(new HashSet<>(swappedItemIds.keySet()), new HashSet<>(hiddenSlots));
 		Set<KitType> itemSlots = Sets.difference(swappedItems, lockedItems);
@@ -282,6 +384,16 @@ class SavedSwaps
 		kitSlots.forEach(this::removeKit);
 		Set<ColorType> colorTypes = Sets.difference(new HashSet<>(swappedColorIds.keySet()), lockedColors);
 		colorTypes.forEach(this::removeColor);
+	}
+
+	void clearRealKits()
+	{
+		boolean realKitsNeedRefresh = realKitIds.isEmpty();
+		realKitIds.clear();
+		if (realKitsNeedRefresh)
+		{
+			saveRealKitsImmediate();
+		}
 	}
 
 	boolean isSlotLocked(KitType slot)
@@ -380,6 +492,13 @@ class SavedSwaps
 		listeners.getOrDefault(key, new LinkedList<>()).forEach(listener -> listener.onEvent(event));
 	}
 
+	// this needs to be immediate so that changes are reflected when loading from config
+	void saveRealKitsImmediate()
+	{
+		byte[] bytes = SerializationUtils.serialize(realKitIds);
+		configManager.setRSProfileConfiguration(FashionscapeConfig.GROUP, FashionscapeConfig.KEY_REAL_KITS, bytes);
+	}
+
 	private void saveEquipmentConfigDebounced()
 	{
 		Future<?> future = equipSaveFuture;
@@ -412,6 +531,19 @@ class SavedSwaps
 		colorSaveFuture = executor.schedule(() -> {
 			byte[] bytes = SerializationUtils.serialize(swappedColorIds);
 			config.setCurrentColors(bytes);
+		}, DEBOUNCE_DELAY_MS, TimeUnit.MILLISECONDS);
+	}
+
+	private void saveRealKitsDebounced()
+	{
+		Future<?> future = kitsSaveFuture;
+		if (future != null)
+		{
+			future.cancel(false);
+		}
+		kitsSaveFuture = executor.schedule(() -> {
+			byte[] bytes = SerializationUtils.serialize(realKitIds);
+			configManager.setRSProfileConfiguration(FashionscapeConfig.GROUP, FashionscapeConfig.KEY_REAL_KITS, bytes);
 		}, DEBOUNCE_DELAY_MS, TimeUnit.MILLISECONDS);
 	}
 

@@ -1,14 +1,21 @@
 package eq.uirs.fashionscape.panel;
 
+import eq.uirs.fashionscape.swap.KnownKitChangedListener;
 import eq.uirs.fashionscape.swap.SwapManager;
 import java.awt.BorderLayout;
+import java.awt.Dimension;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import javax.swing.JLabel;
 import javax.swing.JPanel;
+import javax.swing.JScrollPane;
 import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
 import lombok.Getter;
@@ -20,6 +27,7 @@ import net.runelite.client.callback.ClientThread;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.util.ImageUtil;
+import net.runelite.client.util.Text;
 
 /**
  * Tab panel that houses all equipment swaps and the main controls
@@ -34,8 +42,10 @@ class SwapsPanel extends JPanel
 
 	@Getter
 	private final List<SwapItemPanel> itemPanels = new ArrayList<>();
+	private final Set<KitType> unknownSlots = new HashSet<>();
 
 	private JPanel slotsPanel;
+	private JPanel warningsPanel;
 
 	@Value
 	private static class SlotResult
@@ -53,28 +63,42 @@ class SwapsPanel extends JPanel
 		this.searchOpener = searchOpener;
 		this.clientThread = clientThread;
 
-		setLayout(new GridBagLayout());
+		setLayout(new BorderLayout());
 		setBackground(ColorScheme.DARK_GRAY_COLOR);
 		setBorder(new EmptyBorder(5, 10, 5, 10));
 
-		GridBagConstraints c = new GridBagConstraints();
-		c.fill = GridBagConstraints.HORIZONTAL;
-		c.anchor = GridBagConstraints.PAGE_START;
-		c.weightx = 1;
-		c.weighty = 1;
-		c.gridx = 0;
-		c.gridy = 0;
+		JPanel swapsPanel = setUpContentPanel();
+		JPanel scrollWrapper = new JPanel(new BorderLayout());
+		scrollWrapper.setBackground(ColorScheme.DARK_GRAY_COLOR);
+		scrollWrapper.add(swapsPanel, BorderLayout.NORTH);
 
-		JPanel buttonPanel = setUpButtonPanel();
-		add(buttonPanel, c);
-		c.gridy++;
+		JScrollPane scrollPane = new JScrollPane(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
+			JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+		scrollPane.setBackground(ColorScheme.DARK_GRAY_COLOR);
+		scrollPane.getVerticalScrollBar().setPreferredSize(new Dimension(10, 0));
+		scrollPane.setViewportView(scrollWrapper);
+
+		add(scrollPane, BorderLayout.CENTER);
+
+		swapManager.addEventListener(new KnownKitChangedListener(e -> {
+			KitType slot = e.getSlot();
+			if (e.isUnknown())
+			{
+				this.unknownSlots.add(slot);
+			}
+			else
+			{
+				this.unknownSlots.remove(slot);
+			}
+			SwingUtilities.invokeLater(this::refreshWarnings);
+		}));
 	}
 
-	private JPanel setUpButtonPanel()
+	private JPanel setUpContentPanel()
 	{
-		JPanel buttonContainer = new JPanel();
-		buttonContainer.setLayout(new GridBagLayout());
-		buttonContainer.setBackground(ColorScheme.DARK_GRAY_COLOR);
+		JPanel contentContainer = new JPanel();
+		contentContainer.setLayout(new GridBagLayout());
+		contentContainer.setBackground(ColorScheme.DARK_GRAY_COLOR);
 
 		GridBagConstraints c = new GridBagConstraints();
 		c.fill = GridBagConstraints.HORIZONTAL;
@@ -84,15 +108,21 @@ class SwapsPanel extends JPanel
 		c.gridx = 0;
 		c.gridy = 0;
 
-		// Add slots directly under buttons (kinda hacky but w/e, aligning panels sucks)
-
 		slotsPanel = new JPanel();
 		slotsPanel.setLayout(new GridBagLayout());
 		slotsPanel.setBackground(ColorScheme.DARK_GRAY_COLOR);
 		populateSwapSlots();
-		buttonContainer.add(slotsPanel, c);
+		contentContainer.add(slotsPanel, c);
+		c.gridy++;
 
-		return buttonContainer;
+		warningsPanel = new JPanel();
+		warningsPanel.setLayout(new GridBagLayout());
+		warningsPanel.setBorder(new EmptyBorder(5, 5, 5, 5));
+		warningsPanel.setBackground(ColorScheme.DARK_GRAY_COLOR);
+		refreshWarnings();
+		contentContainer.add(warningsPanel, c);
+
+		return contentContainer;
 	}
 
 	private void populateSwapSlots()
@@ -145,6 +175,39 @@ class SwapsPanel extends JPanel
 			slotsPanel.add(marginWrapper, c);
 			c.gridy++;
 		}
+	}
+
+	public void refreshWarnings()
+	{
+		warningsPanel.removeAll();
+
+		if (!unknownSlots.isEmpty())
+		{
+			GridBagConstraints c = new GridBagConstraints();
+			c.fill = GridBagConstraints.HORIZONTAL;
+			c.anchor = GridBagConstraints.PAGE_START;
+			c.weightx = 1;
+			c.weighty = 0;
+			c.gridx = 0;
+			c.gridy = 0;
+
+			JLabel label = new JLabel("<html>Some base models can't be determined. Remove " +
+				"some of your in-game equipment to detect them:</html>");
+			label.setPreferredSize(new Dimension(100, 60));
+			label.setForeground(ColorScheme.BRAND_ORANGE);
+			warningsPanel.add(label, c);
+			c.gridy++;
+
+			unknownSlots.stream()
+				.sorted(Comparator.comparing(KitType::name))
+				.forEach(slot -> {
+					JLabel slotLabel = new JLabel(Text.titleCase(slot));
+					slotLabel.setForeground(ColorScheme.BRAND_ORANGE);
+					warningsPanel.add(slotLabel, c);
+					c.gridy++;
+				});
+		}
+		revalidate();
 	}
 
 }

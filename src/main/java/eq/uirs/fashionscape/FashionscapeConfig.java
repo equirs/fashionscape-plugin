@@ -1,6 +1,7 @@
 package eq.uirs.fashionscape;
 
 import eq.uirs.fashionscape.data.ColorType;
+import eq.uirs.fashionscape.panel.SortBy;
 import eq.uirs.fashionscape.swap.RandomizerIntelligence;
 import java.util.HashMap;
 import net.runelite.api.kit.KitType;
@@ -10,11 +11,13 @@ import net.runelite.client.config.ConfigItem;
 import net.runelite.client.config.ConfigSection;
 import org.apache.commons.lang3.SerializationUtils;
 
-@ConfigGroup("fashionscape")
+@ConfigGroup(FashionscapeConfig.GROUP)
 public interface FashionscapeConfig extends Config
 {
+	String GROUP = "fashionscape";
 	String KEY_EXCLUDE_NON_STANDARD = "excludeNonStandardItems";
 	String KEY_IMPORT_MENU_ENTRY = "copyMenuEntry";
+	String KEY_REAL_KITS = "realKitIds";
 
 	@ConfigItem(
 		position = 0,
@@ -30,8 +33,8 @@ public interface FashionscapeConfig extends Config
 	@ConfigItem(
 		position = 1,
 		keyName = KEY_IMPORT_MENU_ENTRY,
-		name = "Copy menu entry",
-		description = "Adds 'copy-outfit' menu option to other players"
+		name = "\"Copy-outfit\" entry",
+		description = "Adds \"copy-outfit\" right click option to other players"
 	)
 	default boolean copyMenuEntry()
 	{
@@ -61,7 +64,7 @@ public interface FashionscapeConfig extends Config
 		position = 1,
 		keyName = "excludeBaseModels",
 		name = "Exclude base models",
-		description = "Randomizer will not shuffle base models if checked",
+		description = "Randomizer will not shuffle base models (e.g., hair) if checked",
 		section = randomizerSettings
 	)
 	default boolean excludeBaseModels()
@@ -70,6 +73,25 @@ public interface FashionscapeConfig extends Config
 	}
 
 	// region Hidden stuff
+
+	@ConfigItem(
+		keyName = "preferredSort",
+		name = "Preferred sort order",
+		description = "Last used result sort order (hidden)",
+		hidden = true
+	)
+	default SortBy preferredSort()
+	{
+		return SortBy.COLOR_MATCH;
+	}
+
+	@ConfigItem(
+		keyName = "preferredSort",
+		name = "Preferred sort order",
+		description = "Last used result sort order (hidden)",
+		hidden = true
+	)
+	void setPreferredSort(SortBy sort);
 
 	@ConfigItem(
 		keyName = "currentEquipment",
@@ -91,9 +113,10 @@ public interface FashionscapeConfig extends Config
 	void setCurrentEquipment(byte[] equipIdsMapBytes);
 
 	@ConfigItem(
+		// key name is not very accurate, oops
 		keyName = "currentItems",
-		name = "Current items",
-		description = "The player's item ids set by the plugin (hidden)",
+		name = "Current colors",
+		description = "The player's color ids set by the plugin (hidden)",
 		hidden = true
 	)
 	default byte[] currentColors()
@@ -102,12 +125,24 @@ public interface FashionscapeConfig extends Config
 	}
 
 	@ConfigItem(
+		// key name is not very accurate, oops
 		keyName = "currentItems",
-		name = "Current items",
-		description = "The player's item ids set by the plugin (hidden)",
+		name = "Current colors",
+		description = "The player's color ids set by the plugin (hidden)",
 		hidden = true
 	)
 	void setCurrentColors(byte[] colorMapBytes);
+	
+	@ConfigItem(
+		keyName = KEY_REAL_KITS,
+		name = "Real kit ids",
+		description = "Known kit ids of the current player (hidden, per-profile)",
+		hidden = true
+	)
+	default byte[] realKitIds()
+	{
+		return SerializationUtils.serialize(new HashMap<KitType, Integer>());
+	}
 
 	// endregion
 

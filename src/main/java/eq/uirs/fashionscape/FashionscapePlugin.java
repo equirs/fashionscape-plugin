@@ -24,7 +24,6 @@ import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.ItemContainerChanged;
 import net.runelite.api.events.MenuOptionClicked;
 import net.runelite.api.events.PlayerChanged;
-import net.runelite.api.events.UsernameChanged;
 import net.runelite.client.RuneLite;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
@@ -48,6 +47,7 @@ public class FashionscapePlugin extends Plugin
 {
 	public static final File OUTFITS_DIR = new File(RuneLite.RUNELITE_DIR, "outfits");
 	public static final Pattern PROFILE_PATTERN = Pattern.compile("^(\\w+):(-?\\d+).*");
+	private static final Pattern PAREN_REPLACE = Pattern.compile("\\(.*\\)");
 
 	private static final String CONFIG_GROUP = "fashionscape";
 	private static final String COPY_PLAYER = "Copy-outfit";
@@ -65,12 +65,19 @@ public class FashionscapePlugin extends Plugin
 		return result;
 	}
 
+	private static String stripName(String name)
+	{
+		String noParens = PAREN_REPLACE.matcher(name).replaceAll("");
+		return noParens.replaceAll("[^A-Za-z]+", "");
+	}
+
 	@Value
-	private static class ItemIcon
+	private static class ItemDupeData
 	{
 		int modelId;
 		short[] colorsToReplace;
 		short[] texturesToReplace;
+		String strippedName;
 	}
 
 	@Inject
@@ -155,12 +162,6 @@ public class FashionscapePlugin extends Plugin
 	}
 
 	@Subscribe
-	public void onUsernameChanged(UsernameChanged event)
-	{
-		swapManager.clearRealIds();
-	}
-
-	@Subscribe
 	public void onConfigChanged(ConfigChanged event)
 	{
 		if (event.getGroup().equals(CONFIG_GROUP))
@@ -187,6 +188,10 @@ public class FashionscapePlugin extends Plugin
 		{
 			populateDupes();
 			swapManager.onEquipmentChanged();
+		}
+		else if (event.getGameState() == GameState.LOGIN_SCREEN)
+		{
+			swapManager.setIsFemale(null);
 		}
 		if (panel != null)
 		{
@@ -216,6 +221,7 @@ public class FashionscapePlugin extends Plugin
 				return;
 			}
 			swapManager.copyOutfit(p.getPlayerComposition());
+			panel.reloadResults();
 		}
 	}
 
@@ -223,7 +229,7 @@ public class FashionscapePlugin extends Plugin
 	{
 		ITEM_ID_DUPES.clear();
 		Set<Integer> ids = new HashSet<>();
-		Set<ItemIcon> itemIcons = new HashSet<>();
+		Set<ItemDupeData> itemUniques = new HashSet<>();
 		Set<Integer> skips = FashionscapePlugin.getItemIdsToExclude(config);
 		for (int i = 0; i < client.getItemCount(); i++)
 		{
@@ -236,15 +242,18 @@ public class FashionscapePlugin extends Plugin
 			ItemStats itemStats = itemManager.getItemStats(canonical, false);
 			if (!ids.contains(itemComposition.getId()) && itemStats != null && itemStats.isEquipable())
 			{
-				// Check if the results already contain the same item image
-				ItemIcon itemIcon = new ItemIcon(itemComposition.getInventoryModel(),
-					itemComposition.getColorToReplaceWith(), itemComposition.getTextureToReplaceWith());
-				if (itemIcons.contains(itemIcon))
+				ItemDupeData itemDupeData = new ItemDupeData(
+					itemComposition.getInventoryModel(),
+					itemComposition.getColorToReplaceWith(),
+					itemComposition.getTextureToReplaceWith(),
+					stripName(itemComposition.getName())
+				);
+				if (itemUniques.contains(itemDupeData))
 				{
 					ITEM_ID_DUPES.add(canonical);
 					continue;
 				}
-				itemIcons.add(itemIcon);
+				itemUniques.add(itemDupeData);
 				ids.add(itemComposition.getId());
 			}
 		}

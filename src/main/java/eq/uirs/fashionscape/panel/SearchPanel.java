@@ -116,7 +116,7 @@ class SearchPanel extends JPanel
 	private Future<?> searchFuture = null;
 	private Function<ItemComposition, Boolean> filter;
 	private boolean allowShortQueries = false;
-	private SortBy sort = SortBy.values()[0];
+	private SortBy sort;
 	private KitType selectedSlot = null;
 	private boolean hasSearched = false;
 	private final Map<Integer, Double> scores = new HashMap<>();
@@ -143,6 +143,7 @@ class SearchPanel extends JPanel
 		this.executor = executor;
 		this.config = config;
 		this.colorScorer = colorScorer;
+		this.sort = config.preferredSort();
 
 		setLayout(new BorderLayout());
 		setBackground(ColorScheme.DARK_GRAY_COLOR);
@@ -203,13 +204,16 @@ class SearchPanel extends JPanel
 		sortBar.add(sortLabel);
 
 		JComboBox<SortBy> sortBox = new JComboBox<>(SortBy.values());
+		sortBox.setSelectedItem(this.sort);
 		sortBox.setPreferredSize(new Dimension(sortBox.getPreferredSize().width, 25));
 		sortBox.setForeground(Color.WHITE);
 		sortBox.setFocusable(false);
 		sortBox.addItemListener(e -> {
 			if (e.getStateChange() == ItemEvent.SELECTED)
 			{
-				sort = (SortBy) sortBox.getSelectedItem();
+				SortBy selectedSort = (SortBy) sortBox.getSelectedItem();
+				config.setPreferredSort(selectedSort);
+				sort = selectedSort;
 				updateSearchDebounced();
 			}
 		});
