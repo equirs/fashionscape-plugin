@@ -16,7 +16,8 @@ public enum PanelKitSlot
 	ARMS(KitType.ARMS, ColorType.TORSO),
 	HANDS(KitType.HANDS, null),
 	LEGS(KitType.LEGS, ColorType.LEGS),
-	BOOTS(KitType.BOOTS, ColorType.BOOTS);
+	BOOTS(KitType.BOOTS, ColorType.BOOTS),
+	ICON(null, null);
 
 	@Getter
 	private final KitType kitType;

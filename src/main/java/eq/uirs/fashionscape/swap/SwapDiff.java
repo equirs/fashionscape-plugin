@@ -21,8 +21,17 @@ class SwapDiff
 	@Value
 	public static class Change
 	{
+		public enum Type
+		{
+
+			EQUIPMENT,
+			COLOR,
+			ICON
+
+		}
+
 		/**
-		 * The changed equipment id or color id (depending on context)
+		 * The changed equipment id, color id, or icon id (depending on type)
 		 */
 		int id;
 		/**
@@ -33,7 +42,7 @@ class SwapDiff
 
 	public static SwapDiff blank()
 	{
-		return new SwapDiff(new HashMap<>(), new HashMap<>(), null);
+		return new SwapDiff(new HashMap<>(), new HashMap<>(), null, null);
 	}
 
 	@Getter
@@ -41,11 +50,13 @@ class SwapDiff
 	@Getter
 	private final Map<ColorType, Change> colorChanges;
 	@Getter
+	private final Change iconChange;
+	@Getter
 	private final Integer changedIdleAnimationId;
 
 	boolean isBlank()
 	{
-		return changedIdleAnimationId == null && slotChanges.isEmpty() && colorChanges.isEmpty();
+		return changedIdleAnimationId == null && iconChange == null && slotChanges.isEmpty() && colorChanges.isEmpty();
 	}
 
 	// This diff will take priority of the other diff in the event of a collision.
@@ -57,11 +68,16 @@ class SwapDiff
 		Map<ColorType, Change> mergedColors = new HashMap<>();
 		mergedColors.putAll(other.colorChanges);
 		mergedColors.putAll(this.colorChanges);
+		Change iconChange = this.iconChange;
+		if (iconChange == null)
+		{
+			iconChange = other.iconChange;
+		}
 		Integer idleId = this.changedIdleAnimationId;
 		if (idleId == null)
 		{
 			idleId = other.changedIdleAnimationId;
 		}
-		return new SwapDiff(mergedSlots, mergedColors, idleId);
+		return new SwapDiff(mergedSlots, mergedColors, iconChange, idleId);
 	}
 }

@@ -1,7 +1,7 @@
 package eq.uirs.fashionscape.panel;
 
-import eq.uirs.fashionscape.swap.KnownKitChangedListener;
 import eq.uirs.fashionscape.swap.SwapManager;
+import eq.uirs.fashionscape.swap.event.KnownKitChangedListener;
 import java.awt.BorderLayout;
 import java.awt.Dimension;
 import java.awt.GridBagConstraints;
@@ -18,7 +18,6 @@ import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
-import lombok.Getter;
 import lombok.Value;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.ItemComposition;
@@ -40,8 +39,6 @@ class SwapsPanel extends JPanel
 	private final ClientThread clientThread;
 	private final SearchOpener searchOpener;
 
-	@Getter
-	private final List<SwapItemPanel> itemPanels = new ArrayList<>();
 	private final Set<KitType> unknownSlots = new HashSet<>();
 
 	private JPanel slotsPanel;
@@ -167,7 +164,6 @@ class SwapsPanel extends JPanel
 		{
 			SwapItemPanel itemPanel = new SwapItemPanel(s.itemId, s.image, itemManager,
 				clientThread, swapManager, s.slot, searchOpener);
-			itemPanels.add(itemPanel);
 			JPanel marginWrapper = new JPanel(new BorderLayout());
 			marginWrapper.setBackground(ColorScheme.DARK_GRAY_COLOR);
 			marginWrapper.setBorder(new EmptyBorder(5, 0, 0, 0));

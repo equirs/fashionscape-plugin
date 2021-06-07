@@ -3,13 +3,13 @@ package eq.uirs.fashionscape.panel;
 import com.google.common.base.Objects;
 import eq.uirs.fashionscape.data.ColorType;
 import eq.uirs.fashionscape.data.Colorable;
-import eq.uirs.fashionscape.data.Kit;
-import eq.uirs.fashionscape.swap.ColorChangedListener;
-import eq.uirs.fashionscape.swap.ColorLockChangedListener;
-import eq.uirs.fashionscape.swap.KitChangedListener;
-import eq.uirs.fashionscape.swap.LockChanged;
-import eq.uirs.fashionscape.swap.LockChangedListener;
+import eq.uirs.fashionscape.data.kit.Kit;
 import eq.uirs.fashionscape.swap.SwapManager;
+import eq.uirs.fashionscape.swap.event.ColorChangedListener;
+import eq.uirs.fashionscape.swap.event.ColorLockChangedListener;
+import eq.uirs.fashionscape.swap.event.KitChangedListener;
+import eq.uirs.fashionscape.swap.event.LockChanged;
+import eq.uirs.fashionscape.swap.event.LockChangedListener;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Cursor;
@@ -45,12 +45,9 @@ import net.runelite.client.util.Text;
  * Could represent either a player's kit, a color, or both for a given slot.
  */
 @Slf4j
-public class KitItemPanel extends AbsIconLabelPanel
+public class KitItemPanel extends DropdownIconPanel
 {
 	private static final Dimension COLOR_CHOOSER_SIZE = new Dimension(15, 15);
-	private static final Dimension ICON_SIZE = new Dimension(32, 32);
-	private static final Dimension BUTTON_SIZE = new Dimension(16, 16);
-	private static final int ICON_CORNER_RADIUS = 15;
 
 	@Getter
 	private final ColorType type;
@@ -58,14 +55,11 @@ public class KitItemPanel extends AbsIconLabelPanel
 	private final KitType slot;
 
 	private final SwapManager swapManager;
+	private final KitColorOpener kitColorOpener;
 
 	private final Map<Integer, Colorable> colorMap = new HashMap<>();
 
-	private final JButton lockKitButton = new JButton();
 	private final JButton lockColorButton = new JButton();
-	private final JButton xButton = new JButton();
-	// constrain items in the list of dropdown results
-	private final JPanel optionsContainer = new JPanel();
 	private final List<Kit> allKits = new ArrayList<>();
 
 	private Integer colorId;
@@ -77,10 +71,18 @@ public class KitItemPanel extends AbsIconLabelPanel
 	{
 		super(image, clientThread);
 		this.swapManager = swapManager;
+		this.kitColorOpener = kitColorOpener;
 		this.slot = slot;
 		this.type = type;
 		this.colorId = colorId;
 		this.kitId = kitId;
+		if (type != null)
+		{
+			for (Colorable colorable : type.getColorables())
+			{
+				colorMap.put(colorable.getColorId(type), colorable);
+			}
+		}
 
 		JPanel rightPanel = new JPanel(new BorderLayout());
 		rightPanel.setBackground(nonHighlightColor);
@@ -88,28 +90,7 @@ public class KitItemPanel extends AbsIconLabelPanel
 		highlightPanels.add(rightPanel);
 		rightPanel.add(label, BorderLayout.CENTER);
 
-		icon.setPreferredSize(ICON_SIZE);
 		setIconTooltip();
-		icon.addMouseListener(new MouseAdapter()
-		{
-			@Override
-			public void mouseEntered(MouseEvent e)
-			{
-				setCursor(new Cursor(Cursor.HAND_CURSOR));
-			}
-
-			@Override
-			public void mouseExited(MouseEvent e)
-			{
-				setCursor(new Cursor(Cursor.DEFAULT_CURSOR));
-			}
-
-			@Override
-			public void mouseReleased(MouseEvent e)
-			{
-				kitColorOpener.openOptions(slot, type);
-			}
-		});
 
 		int cols = type != null && slot != null ? 3 : 2;
 		JPanel buttons = new JPanel(new GridLayout(1, cols, 2, 0));
@@ -118,9 +99,7 @@ public class KitItemPanel extends AbsIconLabelPanel
 		if (slot != null)
 		{
 			allKits.clear();
-			Arrays.stream(Kit.values())
-				.filter(kit -> kit.getKitType().equals(slot))
-				.forEach(allKits::add);
+			allKits.addAll(Arrays.asList(Kit.allInSlot(slot, false)));
 			setKitName();
 			setIcon(icon, image);
 			swapManager.addEventListener(new KitChangedListener(e -> {
@@ -131,18 +110,13 @@ public class KitItemPanel extends AbsIconLabelPanel
 					updateXButton();
 				}
 			}));
-			lockKitButton.setBorder(new EmptyBorder(0, 2, 0, 2));
-			lockKitButton.setBackground(ColorScheme.DARKER_GRAY_COLOR);
-			lockKitButton.setPreferredSize(BUTTON_SIZE);
-			lockKitButton.setFocusPainted(false);
-			lockKitButton.setBorderPainted(false);
-			lockKitButton.setContentAreaFilled(false);
-			lockKitButton.addActionListener(e -> {
+			configureButton(lockButton);
+			lockButton.addActionListener(e -> {
 				swapManager.toggleKitLocked(slot);
-				updateKitLockButton();
+				updateLockButton();
 				updateXButton();
 			});
-			buttons.add(lockKitButton);
+			buttons.add(lockButton);
 		}
 		else if (type != null)
 		{
@@ -153,10 +127,6 @@ public class KitItemPanel extends AbsIconLabelPanel
 
 		if (type != null)
 		{
-			for (Colorable colorable : type.getColorables())
-			{
-				colorMap.put(colorable.getColorId(type), colorable);
-			}
 			setIconColor();
 			swapManager.addEventListener(new ColorChangedListener(e -> {
 				if (Objects.equal(type, e.getType()))
@@ -171,12 +141,7 @@ public class KitItemPanel extends AbsIconLabelPanel
 					updateXButton();
 				}
 			}));
-			lockColorButton.setBorder(new EmptyBorder(0, 2, 0, 2));
-			lockColorButton.setBackground(ColorScheme.DARKER_GRAY_COLOR);
-			lockColorButton.setPreferredSize(BUTTON_SIZE);
-			lockColorButton.setFocusPainted(false);
-			lockColorButton.setBorderPainted(false);
-			lockColorButton.setContentAreaFilled(false);
+			configureButton(lockColorButton);
 			lockColorButton.addActionListener(e -> {
 				swapManager.toggleColorLocked(type);
 				updateColorLockButton();
@@ -189,24 +154,19 @@ public class KitItemPanel extends AbsIconLabelPanel
 			icon.setBorder(new RoundedBorder(ColorScheme.LIGHT_GRAY_COLOR, ICON_CORNER_RADIUS));
 		}
 
-		xButton.setPreferredSize(BUTTON_SIZE);
-		xButton.setBorder(new EmptyBorder(0, 2, 0, 2));
-		xButton.setBackground(ColorScheme.DARKER_GRAY_COLOR);
-		xButton.setFocusPainted(false);
-		xButton.setBorderPainted(false);
-		xButton.setContentAreaFilled(false);
+		configureButton(xButton);
 		xButton.setIcon(new ImageIcon(ImageUtil.loadImageResource(this.getClass(), "x.png")));
 		xButton.addActionListener(e -> clientThread.invokeLater(() -> {
 			swapManager.revert(slot, type);
 			SwingUtilities.invokeLater(() -> {
-				updateKitLockButton();
+				updateLockButton();
 				updateColorLockButton();
 				updateXButton();
 			});
 		}));
 		buttons.add(xButton);
 
-		updateKitLockButton();
+		updateLockButton();
 		updateColorLockButton();
 		updateXButton();
 
@@ -220,7 +180,7 @@ public class KitItemPanel extends AbsIconLabelPanel
 		swapManager.addEventListener(new LockChangedListener(e -> {
 			if (Objects.equal(e.getSlot(), slot) && e.getType() != LockChanged.Type.ITEM)
 			{
-				updateKitLockButton();
+				updateLockButton();
 			}
 		}));
 		swapManager.addEventListener(new ColorLockChangedListener(e -> {
@@ -231,9 +191,14 @@ public class KitItemPanel extends AbsIconLabelPanel
 		}));
 	}
 
+	@Override
+	void openDropdown()
+	{
+		kitColorOpener.openOptions(slot, type);
+	}
+
 	public void openOptions(boolean isFemale)
 	{
-
 		optionsContainer.removeAll();
 		if (optionsContainer.isVisible())
 		{
@@ -447,16 +412,16 @@ public class KitItemPanel extends AbsIconLabelPanel
 		icon.setToolTipText(sb.toString());
 	}
 
-	private void updateKitLockButton()
+	private void updateLockButton()
 	{
 		if (slot != null)
 		{
 			boolean locked = swapManager.isKitLocked(slot);
 			String lockIcon = locked ? "lock" : "unlock";
-			lockKitButton.setIcon(
+			lockButton.setIcon(
 				new ImageIcon(ImageUtil.loadImageResource(this.getClass(), lockIcon + ".png")));
 			String action = locked ? "Unlock" : "Lock";
-			lockKitButton.setToolTipText(action + " " + slot.name().toLowerCase() + " slot");
+			lockButton.setToolTipText(action + " " + slot.name().toLowerCase() + " slot");
 		}
 	}
 
@@ -503,5 +468,4 @@ public class KitItemPanel extends AbsIconLabelPanel
 		}
 		return filledImage;
 	}
-
 }

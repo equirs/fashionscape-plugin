@@ -3,6 +3,13 @@ package eq.uirs.fashionscape.data;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.ImmutableBiMap;
 import com.google.common.collect.ImmutableSet;
+import eq.uirs.fashionscape.data.kit.ArmsKit;
+import eq.uirs.fashionscape.data.kit.BootsKit;
+import eq.uirs.fashionscape.data.kit.HairKit;
+import eq.uirs.fashionscape.data.kit.HandsKit;
+import eq.uirs.fashionscape.data.kit.Kit;
+import eq.uirs.fashionscape.data.kit.LegsKit;
+import eq.uirs.fashionscape.data.kit.TorsoKit;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -15,6 +22,13 @@ public class ItemInteractions
 	 */
 	public static final Set<Integer> BAD_ITEM_IDS = ImmutableSet.of(1410, 2513, 4024, 4025, 4026, 4027, 4028, 4029,
 		4030, 4031, 4284, 4285, 7957, 10595, 10596, 10888, 19525, 24265, 24619, 25155, 25582, 25584);
+
+	/**
+	 * items which are always hidden (icons are hidden because they have their own dedicated slots which don't
+	 * go through item manager)
+	 */
+	public static final Set<String> BAD_ITEM_NAMES = ImmutableSet.of("attacker icon", "defender icon",
+		"collector icon", "healer icon", "red icon", "blue icon");
 
 	/**
 	 * items that cannot be normally obtained/equipped in the overworld, also includes degraded/redundant items
@@ -33,12 +47,10 @@ public class ItemInteractions
 		23851, 23852, 23853, 23854, 23855, 23856, 23857, 23861, 23886, 23887, 23888, 23889, 23890, 23891, 23892, 23893,
 		23894, 23895, 23896, 23897, 23898, 23899, 23900, 23901, 23902, 23903, 23907, 25106, 25108, 25282);
 
-	// region Hair Jaw Arms
-
 	/**
 	 * item ids of helm-slot items that DON'T hide the player's hair
 	 */
-	public static Set<Integer> HAIR_HELMS = ImmutableSet.of(
+	public static final Set<Integer> HAIR_HELMS = ImmutableSet.of(
 		579, 656, 658, 660, 662, 664, 1017, 1025, 1037, 1038, 1040, 1042, 1044, 1046, 1048, 1050, 1949, 2581, 2631,
 		2633, 2635, 2637, 2639, 2641, 2643, 2645, 2647, 2649, 2651, 2900, 2910, 2920, 2930, 2940, 2978, 2979, 2980,
 		2981, 2982, 2983, 2984, 2985, 2986, 2987, 2988, 2989, 2990, 2991, 2992, 2993, 2994, 2995, 3057, 3327, 3329,
@@ -66,7 +78,7 @@ public class ItemInteractions
 	/**
 	 * item ids of helm-slot items that DO hide the player's jaw
 	 */
-	public static Set<Integer> NO_JAW_HELMS = ImmutableSet.of(
+	public static final Set<Integer> NO_JAW_HELMS = ImmutableSet.of(
 		1053, 1055, 1057, 1153, 1155, 1157, 1159, 1161, 1163, 1165, 1506, 2587, 2595, 2605, 2613, 2619, 2627, 2657,
 		2665, 2673, 3057, 3486, 4164, 4551, 4611, 4724, 4732, 4745, 4753, 4904, 4905, 4906, 4907, 4908, 4928, 4929,
 		4930, 4931, 4932, 4952, 4953, 4954, 4955, 4956, 4976, 4977, 4978, 4979, 4980, 5554, 5574, 6188, 6623, 7534,
@@ -98,52 +110,64 @@ public class ItemInteractions
 		20208, 20417, 20423, 20566, 23264, 23381
 	);
 
-	// endregion
+	/**
+	 * kit ids of boot-slot items that, when detected in-game, will disable the boots, weapon and shield slots
+	 */
+	public static final Set<Integer> DISABLE_BOOT_KITS = ImmutableSet.of(BootsKit.MINECART.getKitId(),
+		BootsKit.MINECART_F.getKitId());
+
+	/**
+	 * item ids of weapon-slot items that, when detected in-game, will disable the weapon and shield slots
+	 */
+	public static final Set<Integer> DISABLE_WEAPONS = ImmutableSet.of(ItemID.MAGIC_CARPET);
 
 	// region Gender Swap Kits
 
 	public static final BiMap<Kit, Kit> MALE_TO_FEMALE_KITS;
 
-	static {
+	static
+	{
 		Map<Kit, Kit> mToF = new HashMap<>();
-		mToF.put(Kit.BALD, Kit.BALD_F);
-		mToF.put(Kit.DREADLOCKS, Kit.DREADLOCKS_F);
-		mToF.put(Kit.LONG, Kit.LONG_F);
-		mToF.put(Kit.MEDIUM, Kit.MEDIUM_F);
-		mToF.put(Kit.SHORT, Kit.SHORT_F);
-		mToF.put(Kit.CROPPED, Kit.CROPPED_F);
-		mToF.put(Kit.WILD_SPIKES, Kit.WILD_SPIKES_F);
-		mToF.put(Kit.SPIKES, Kit.SPIKY);
-		mToF.put(Kit.WIND_BRAIDS, Kit.WIND_BRAIDS_F);
-		mToF.put(Kit.CURTAINS, Kit.CURTAINS_F);
-		mToF.put(Kit.FRONT_SPLIT, Kit.FRONT_SPLIT_F);
-		mToF.put(Kit.PLAIN, Kit.PLAIN_F);
-		mToF.put(Kit.SHIRT, Kit.SHIRT_F);
-		mToF.put(Kit.TORN, Kit.TORN_F);
-		mToF.put(Kit.SWEATER, Kit.SWEATER_F);
-		mToF.put(Kit.VEST, Kit.VEST_F);
-		mToF.put(Kit.REGULAR, Kit.SHORT_SLEEVES);
-		mToF.put(Kit.MUSCLEBOUND, Kit.MUSCLEY);
-		mToF.put(Kit.LOOSE_SLEEVED, Kit.FRILLY_A);
-		mToF.put(Kit.LARGE_CUFFED, Kit.LARGE_CUFFS);
-		mToF.put(Kit.THIN, Kit.LONG_SLEEVED);
-		mToF.put(Kit.SHOULDER_PADS, Kit.BARE_ARMS);
-		mToF.put(Kit.THIN_STRIPE, Kit.THIN_STRIPE_F);
-		mToF.put(Kit.THICK_STRIPE, Kit.SWEATER_A);
-		mToF.put(Kit.WHITE_CUFFS, Kit.WHITE_CUFFS_F);
-		mToF.put(Kit.TATTY, Kit.TATTY_F);
-		mToF.put(Kit.RIPPED, Kit.BARE_SHOULDERS);
-		mToF.put(Kit.PLAIN_L, Kit.PLAIN_LF);
-		mToF.put(Kit.SHORTS, Kit.SHORT_SKIRT);
-		mToF.put(Kit.FLARES, Kit.FLARES_F);
-		mToF.put(Kit.TURN_UPS, Kit.TURN_UPS_F);
-		mToF.put(Kit.TATTY_L, Kit.TATTY_LF);
-		mToF.put(Kit.RIPPED_L, Kit.TORN_SKIRT);
-		mToF.put(Kit.PATCHED, Kit.PATCHED_SKIRT);
-		mToF.put(Kit.PLAIN_H, Kit.PLAIN_HF);
-		mToF.put(Kit.BRACERS, Kit.BRACERS_F);
-		mToF.put(Kit.SMALL, Kit.SMALL_F);
-		mToF.put(Kit.LARGE, Kit.LARGE_F);
+		mToF.put(HairKit.BALD, HairKit.BALD_F);
+		mToF.put(HairKit.DREADLOCKS, HairKit.DREADLOCKS_F);
+		mToF.put(HairKit.LONG, HairKit.LONG_F);
+		mToF.put(HairKit.MEDIUM, HairKit.MEDIUM_F);
+		mToF.put(HairKit.SHORT, HairKit.SHORT_F);
+		mToF.put(HairKit.CROPPED, HairKit.CROPPED_F);
+		mToF.put(HairKit.WILD_SPIKES, HairKit.WILD_SPIKES_F);
+		mToF.put(HairKit.SPIKES, HairKit.SPIKY);
+		mToF.put(HairKit.WIND_BRAIDS, HairKit.WIND_BRAIDS_F);
+		mToF.put(HairKit.CURTAINS, HairKit.CURTAINS_F);
+		mToF.put(HairKit.FRONT_SPLIT, HairKit.FRONT_SPLIT_F);
+		mToF.put(TorsoKit.PLAIN, TorsoKit.PLAIN_F);
+		mToF.put(TorsoKit.SHIRT, TorsoKit.SHIRT_F);
+		mToF.put(TorsoKit.TORN, TorsoKit.TORN_F);
+		mToF.put(TorsoKit.SWEATER, TorsoKit.SWEATER_F);
+		mToF.put(TorsoKit.VEST, TorsoKit.VEST_F);
+		mToF.put(ArmsKit.REGULAR, ArmsKit.SHORT_SLEEVES);
+		mToF.put(ArmsKit.MUSCLEBOUND, ArmsKit.MUSCLEY);
+		mToF.put(ArmsKit.LOOSE_SLEEVED, ArmsKit.FRILLY_A);
+		mToF.put(ArmsKit.LARGE_CUFFED, ArmsKit.LARGE_CUFFS);
+		mToF.put(ArmsKit.THIN, ArmsKit.LONG_SLEEVED);
+		mToF.put(ArmsKit.SHOULDER_PADS, ArmsKit.BARE_ARMS);
+		mToF.put(ArmsKit.THIN_STRIPE, ArmsKit.THIN_STRIPE_F);
+		mToF.put(ArmsKit.THICK_STRIPE, ArmsKit.SWEATER_A);
+		mToF.put(ArmsKit.WHITE_CUFFS, ArmsKit.WHITE_CUFFS_F);
+		mToF.put(ArmsKit.TATTY, ArmsKit.TATTY_F);
+		mToF.put(ArmsKit.RIPPED, ArmsKit.BARE_SHOULDERS);
+		mToF.put(LegsKit.PLAIN_L, LegsKit.PLAIN_LF);
+		mToF.put(LegsKit.SHORTS, LegsKit.SHORT_SKIRT);
+		mToF.put(LegsKit.FLARES, LegsKit.FLARES_F);
+		mToF.put(LegsKit.TURN_UPS, LegsKit.TURN_UPS_F);
+		mToF.put(LegsKit.TATTY_L, LegsKit.TATTY_LF);
+		mToF.put(LegsKit.RIPPED_L, LegsKit.TORN_SKIRT);
+		mToF.put(LegsKit.PATCHED, LegsKit.PATCHED_SKIRT);
+		mToF.put(HandsKit.PLAIN_H, HandsKit.PLAIN_HF);
+		mToF.put(HandsKit.BRACERS, HandsKit.BRACERS_F);
+		mToF.put(BootsKit.SMALL, BootsKit.SMALL_F);
+		mToF.put(BootsKit.LARGE, BootsKit.LARGE_F);
+		mToF.put(BootsKit.LARGE_2, BootsKit.LARGE_F2);
+		mToF.put(BootsKit.MINECART, BootsKit.MINECART_F);
 		MALE_TO_FEMALE_KITS = new ImmutableBiMap.Builder<Kit, Kit>()
 			.putAll(mToF)
 			.build();
@@ -266,6 +290,7 @@ public class ItemInteractions
 		WEAPON_TO_IDLE.put(ItemID.VERACS_FLAIL_25, IdleAnimationID.VERACS_FLAIL);
 		WEAPON_TO_IDLE.put(ItemID.VERACS_FLAIL_0, IdleAnimationID.VERACS_FLAIL);
 		WEAPON_TO_IDLE.put(ItemID.BONE_SPEAR, IdleAnimationID.UPRIGHT_WEAPON);
+		WEAPON_TO_IDLE.put(ItemID.MAGIC_CARPET, IdleAnimationID.MAGIC_CARPET);
 		WEAPON_TO_IDLE.put(ItemID.BRONZE_SPEARP_5704, IdleAnimationID.UPRIGHT_WEAPON);
 		WEAPON_TO_IDLE.put(ItemID.IRON_SPEARP_5706, IdleAnimationID.UPRIGHT_WEAPON);
 		WEAPON_TO_IDLE.put(ItemID.STEEL_SPEARP_5708, IdleAnimationID.UPRIGHT_WEAPON);
@@ -605,6 +630,22 @@ public class ItemInteractions
 		WEAPON_TO_IDLE.put(ItemID.GIANT_BOULDER, IdleAnimationID.HEAVY_ITEM);
 		WEAPON_TO_IDLE.put(ItemID.CURSED_BANANA, IdleAnimationID.CURSED_BANANA);
 		WEAPON_TO_IDLE.put(ItemID.GREGGS_EASTDOOR, IdleAnimationID.DINHS_BULWARK);
+		WEAPON_TO_IDLE.put(ItemID.CLAN_VEXILLUM, IdleAnimationID.CLAN_VEXILLUM);
+		WEAPON_TO_IDLE.put(ItemID.CLAN_VEXILLUM_25723, IdleAnimationID.CLAN_VEXILLUM);
+		WEAPON_TO_IDLE.put(ItemID.CLAN_VEXILLUM_25724, IdleAnimationID.CLAN_VEXILLUM);
+		WEAPON_TO_IDLE.put(ItemID.CLAN_VEXILLUM_25725, IdleAnimationID.CLAN_VEXILLUM);
+		WEAPON_TO_IDLE.put(ItemID.CLAN_VEXILLUM_25726, IdleAnimationID.CLAN_VEXILLUM);
+		WEAPON_TO_IDLE.put(ItemID.CLAN_VEXILLUM_25727, IdleAnimationID.CLAN_VEXILLUM);
+		WEAPON_TO_IDLE.put(ItemID.CLAN_VEXILLUM_25728, IdleAnimationID.CLAN_VEXILLUM);
+		WEAPON_TO_IDLE.put(ItemID.CLAN_VEXILLUM_25729, IdleAnimationID.CLAN_VEXILLUM);
+		WEAPON_TO_IDLE.put(ItemID.HOLY_SANGUINESTI_STAFF, IdleAnimationID.UPRIGHT_WEAPON);
+		WEAPON_TO_IDLE.put(ItemID.HOLY_SANGUINESTI_STAFF_UNCHARGED, IdleAnimationID.UPRIGHT_WEAPON);
+		WEAPON_TO_IDLE.put(ItemID.HOLY_GHRAZI_RAPIER, IdleAnimationID.TALL_SWORD);
+		WEAPON_TO_IDLE.put(ItemID.HOLY_SCYTHE_OF_VITUR, IdleAnimationID.SCYTHE_OF_VITUR);
+		WEAPON_TO_IDLE.put(ItemID.HOLY_SCYTHE_OF_VITUR_UNCHARGED, IdleAnimationID.SCYTHE_OF_VITUR);
+		WEAPON_TO_IDLE.put(ItemID.SANGUINE_SCYTHE_OF_VITUR, IdleAnimationID.SCYTHE_OF_VITUR);
+		WEAPON_TO_IDLE.put(ItemID.SANGUINE_SCYTHE_OF_VITUR_UNCHARGED, IdleAnimationID.SCYTHE_OF_VITUR);
+		WEAPON_TO_IDLE.put(ItemID.PROTEST_BANNER, IdleAnimationID.CLAN_VEXILLUM);
 	}
 
 	// endregion

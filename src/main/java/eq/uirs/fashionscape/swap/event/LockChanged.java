@@ -1,4 +1,4 @@
-package eq.uirs.fashionscape.swap;
+package eq.uirs.fashionscape.swap.event;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;

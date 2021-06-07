@@ -16,6 +16,7 @@ public interface FashionscapeConfig extends Config
 {
 	String GROUP = "fashionscape";
 	String KEY_EXCLUDE_NON_STANDARD = "excludeNonStandardItems";
+	String KEY_EXCLUDE_MEMBERS = "excludeMembersItems";
 	String KEY_IMPORT_MENU_ENTRY = "copyMenuEntry";
 	String KEY_REAL_KITS = "realKitIds";
 
@@ -32,6 +33,17 @@ public interface FashionscapeConfig extends Config
 
 	@ConfigItem(
 		position = 1,
+		keyName = KEY_EXCLUDE_MEMBERS,
+		name = "Exclude members items",
+		description = "Filters out members-only objects"
+	)
+	default boolean excludeMembersItems()
+	{
+		return false;
+	}
+
+	@ConfigItem(
+		position = 2,
 		keyName = KEY_IMPORT_MENU_ENTRY,
 		name = "\"Copy-outfit\" entry",
 		description = "Adds \"copy-outfit\" right click option to other players"
@@ -44,7 +56,7 @@ public interface FashionscapeConfig extends Config
 	@ConfigSection(
 		name = "Randomizer",
 		description = "Settings relating to the outfit randomizer",
-		position = 2
+		position = 3
 	)
 	String randomizerSettings = "randomizerSettings";
 
@@ -113,6 +125,25 @@ public interface FashionscapeConfig extends Config
 	void setCurrentEquipment(byte[] equipIdsMapBytes);
 
 	@ConfigItem(
+		keyName = "currentIcon",
+		name = "Current icon",
+		description = "The player's jaw icon set by the plugin (hidden)",
+		hidden = true
+	)
+	default Integer currentIcon()
+	{
+		return null;
+	}
+
+	@ConfigItem(
+		keyName = "currentIcon",
+		name = "Current icon",
+		description = "The player's jaw icon set by the plugin (hidden)",
+		hidden = true
+	)
+	void setCurrentIcon(Integer iconId);
+
+	@ConfigItem(
 		// key name is not very accurate, oops
 		keyName = "currentItems",
 		name = "Current colors",
@@ -132,7 +163,7 @@ public interface FashionscapeConfig extends Config
 		hidden = true
 	)
 	void setCurrentColors(byte[] colorMapBytes);
-	
+
 	@ConfigItem(
 		keyName = KEY_REAL_KITS,
 		name = "Real kit ids",

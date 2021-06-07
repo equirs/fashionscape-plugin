@@ -1,7 +1,9 @@
 package eq.uirs.fashionscape.panel;
 
 import com.google.common.base.Objects;
+import eq.uirs.fashionscape.FashionscapeConfig;
 import eq.uirs.fashionscape.data.ColorType;
+import eq.uirs.fashionscape.data.kit.JawIcon;
 import eq.uirs.fashionscape.swap.SwapManager;
 import java.awt.BorderLayout;
 import java.awt.Dimension;
@@ -24,6 +26,7 @@ import net.runelite.api.Player;
 import net.runelite.api.PlayerComposition;
 import net.runelite.api.kit.KitType;
 import net.runelite.client.callback.ClientThread;
+import net.runelite.client.game.ItemManager;
 import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.util.ImageUtil;
 
@@ -35,11 +38,14 @@ public class KitsPanel extends JPanel
 {
 	private final SwapManager swapManager;
 	private final ClientThread clientThread;
+	private final ItemManager itemManager;
 	private final Client client;
+	private final FashionscapeConfig config;
 
 	private final JPanel resultsPanel = new JPanel();
 	private final JScrollPane scrollPane = new JScrollPane();
 	private final List<KitItemPanel> kitPanels = new ArrayList<>();
+	private JawIconPanel jawIconPanel = null;
 
 	private Boolean isFemale = null;
 	private final KitColorOpener kitColorOpener = (slot, type) -> {
@@ -57,6 +63,17 @@ public class KitsPanel extends JPanel
 				panel.closeOptions();
 			}
 		});
+		if (jawIconPanel != null)
+		{
+			if (slot == null && type == null)
+			{
+				jawIconPanel.openOptions();
+			}
+			else
+			{
+				jawIconPanel.closeOptions();
+			}
+		}
 		updateUI();
 		scrollPane.revalidate();
 	};
@@ -65,18 +82,21 @@ public class KitsPanel extends JPanel
 	private static class KitColorResult
 	{
 		KitType slot;
-		Integer kitId;
+		Integer id; // icon id if icon, kit id otherwise
 
 		ColorType colorType;
 		Integer colorId;
 	}
 
 	@Inject
-	public KitsPanel(SwapManager swapManager, ClientThread clientThread, Client client)
+	public KitsPanel(SwapManager swapManager, ClientThread clientThread, Client client, FashionscapeConfig config,
+					 ItemManager itemManager)
 	{
 		this.swapManager = swapManager;
 		this.clientThread = clientThread;
 		this.client = client;
+		this.config = config;
+		this.itemManager = itemManager;
 
 		setLayout(new GridLayout(1, 1));
 		setBackground(ColorScheme.DARK_GRAY_COLOR);
@@ -107,31 +127,44 @@ public class KitsPanel extends JPanel
 		scrollPane.revalidate();
 	}
 
-	private void populateKitSlots()
+	void populateKitSlots()
 	{
 		clientThread.invokeLater(() -> {
 			List<KitColorResult> results = new ArrayList<>();
 			for (PanelKitSlot slot : PanelKitSlot.values())
 			{
 				KitType kitType = slot.getKitType();
+				ColorType colorType = slot.getColorType();
+				Integer kitId = null;
+				Integer colorId = null;
+
 				if (KitType.JAW.equals(kitType) && Objects.equal(isFemale(), true))
 				{
 					continue;
 				}
-				Integer kitId = null;
-				if (kitType != null)
+				if (kitType == null && colorType == null)
 				{
-					kitId = swapManager.swappedKitIdIn(kitType);
+					if (config.excludeNonStandardItems() || config.excludeMembersItems())
+					{
+						continue;
+					}
+					JawIcon jawIcon = swapManager.swappedIcon();
+					Integer iconId = jawIcon != null ? jawIcon.getId() : null;
+					results.add(new KitColorResult(null, iconId, null, null));
 				}
-				ColorType colorType = slot.getColorType();
-				Integer colorId = null;
-				if (colorType != null)
+				else
 				{
-					colorId = swapManager.swappedColorIdIn(colorType);
+					if (kitType != null)
+					{
+						kitId = swapManager.swappedKitIdIn(kitType);
+					}
+					if (colorType != null)
+					{
+						colorId = swapManager.swappedColorIdIn(colorType);
+					}
+					results.add(new KitColorResult(kitType, kitId, colorType, colorId));
 				}
-				results.add(new KitColorResult(kitType, kitId, colorType, colorId));
 			}
-
 			SwingUtilities.invokeLater(() -> addKitSlotPanels(results));
 		});
 	}
@@ -151,13 +184,26 @@ public class KitsPanel extends JPanel
 		for (KitColorResult result : results)
 		{
 			BufferedImage image = null;
-			if (result.slot != null)
+			JPanel panel;
+			if (result.colorType == null && result.slot == null)
 			{
-				image = ImageUtil.loadImageResource(getClass(), result.slot.name().toLowerCase() + ".png");
+				image = ImageUtil.loadImageResource(getClass(), "icon.png");
+				JawIconPanel jawPanel = new JawIconPanel(image, clientThread, swapManager, itemManager, kitColorOpener,
+					result.id);
+				jawIconPanel = jawPanel;
+				panel = jawPanel;
 			}
-			KitItemPanel panel = new KitItemPanel(swapManager, result.colorType, result.colorId, result.slot,
-				result.kitId, kitColorOpener, image, clientThread);
-			kitPanels.add(panel);
+			else
+			{
+				if (result.slot != null)
+				{
+					image = ImageUtil.loadImageResource(getClass(), result.slot.name().toLowerCase() + ".png");
+				}
+				KitItemPanel kitPanel = new KitItemPanel(swapManager, result.colorType, result.colorId, result.slot,
+					result.id, kitColorOpener, image, clientThread);
+				kitPanels.add(kitPanel);
+				panel = kitPanel;
+			}
 			JPanel marginWrapper = new JPanel(new BorderLayout());
 			marginWrapper.setBackground(ColorScheme.DARK_GRAY_COLOR);
 			marginWrapper.setBorder(new EmptyBorder(5, 0, 0, 0));

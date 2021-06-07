@@ -12,8 +12,12 @@ import eq.uirs.fashionscape.data.Colorable;
 import eq.uirs.fashionscape.data.HairColor;
 import eq.uirs.fashionscape.data.IdleAnimationID;
 import eq.uirs.fashionscape.data.ItemInteractions;
-import eq.uirs.fashionscape.data.Kit;
 import eq.uirs.fashionscape.data.SkinColor;
+import eq.uirs.fashionscape.data.kit.JawIcon;
+import eq.uirs.fashionscape.data.kit.JawKit;
+import eq.uirs.fashionscape.data.kit.Kit;
+import eq.uirs.fashionscape.swap.event.SwapEvent;
+import eq.uirs.fashionscape.swap.event.SwapEventListener;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.PrintWriter;
@@ -81,15 +85,18 @@ public class SwapManager
 		KitType.HAIR, KitType.HANDS, KitType.BOOTS, KitType.JAW);
 	private static final String KIT_SUFFIX = "_KIT";
 	private static final String COLOR_SUFFIX = "_COLOR";
+	private static final String ICON_KEY = "ICON";
 
 	static
 	{
-		KIT_TYPE_TO_KITS = Arrays.stream(Kit.values())
-			.collect(Collectors.groupingBy(Kit::getKitType));
-
-		for (Kit value : Kit.values())
+		KIT_TYPE_TO_KITS = Arrays.stream(KitType.values())
+			.collect(Collectors.toMap(s -> s, s -> Arrays.asList(Kit.allInSlot(s, true))));
+		for (KitType slot : KitType.values())
 		{
-			KIT_ID_TO_KIT.put(value.getKitId(), value);
+			for (Kit value : Kit.allInSlot(slot, true))
+			{
+				KIT_ID_TO_KIT.put(value.getKitId(), value);
+			}
 		}
 	}
 
@@ -120,6 +127,10 @@ public class SwapManager
 	private Boolean isFemale;
 	private String lastKnownPlayerName = null;
 	private SwapDiff hoverSwapDiff;
+	// slot -> override equipment id, used to disable the plugin's functionality per slot
+	private final Map<KitType, Integer> disabledSlots = new HashMap<>();
+	// idle anim id to switch to when weapon slot is disabled (sometimes sourced from non-weapons like minecart)
+	private Integer disabledAnimationId = null;
 
 	@Value
 	private static class Candidate
@@ -184,6 +195,11 @@ public class SwapManager
 		return savedSwaps.isColorLocked(type);
 	}
 
+	public boolean isIconLocked()
+	{
+		return savedSwaps.isIconLocked();
+	}
+
 	public void toggleItemLocked(KitType slot)
 	{
 		savedSwaps.toggleItemLocked(slot);
@@ -197,6 +213,11 @@ public class SwapManager
 	public void toggleColorLocked(ColorType type)
 	{
 		savedSwaps.toggleColorLocked(type);
+	}
+
+	public void toggleIconLocked()
+	{
+		savedSwaps.toggleIconLocked();
 	}
 
 	// this should only be called from the client thread
@@ -213,7 +234,7 @@ public class SwapManager
 		);
 		savedEquipmentIds.putAll(savedKitEquipIds);
 		savedEquipmentIds.putAll(hiddenEquipIds);
-		for (CompoundSwap c : CompoundSwap.fromMap(sanitize(savedEquipmentIds)))
+		for (CompoundSwap c : CompoundSwap.fromMap(sanitize(savedEquipmentIds), savedSwaps.getSwappedIcon()))
 		{
 			swap(c, SwapMode.PREVIEW);
 		}
@@ -261,6 +282,8 @@ public class SwapManager
 	 * Check for:
 	 * - player's gender, match against last known (non-null) gender. if no match, revert and clear all kit swaps
 	 * - player's real kit ids and real colors so that they can be reverted
+	 * - player's real icon in the jaw slot (playing Barbarian Assault or Soul Wars)
+	 * - any kit/item ids that should disable swaps (e.g., minecart, magic carpet)
 	 */
 	public void doPreRefreshCheck()
 	{
@@ -310,6 +333,65 @@ public class SwapManager
 				savedSwaps.putRealColor(colorType, colorId);
 			}
 		}
+		int jawEquipId = playerComposition.getEquipmentIds()[KitType.JAW.getIndex()];
+		if (jawEquipId >= 512)
+		{
+			JawIcon icon = JawKit.iconFromItemId(jawEquipId - 512);
+			savedSwaps.putRealIcon(icon);
+		}
+		int bootKitId = playerComposition.getKitId(KitType.BOOTS);
+		int weaponItemId = playerComposition.getEquipmentIds()[KitType.WEAPON.getIndex()] - 512;
+		if (ItemInteractions.DISABLE_BOOT_KITS.contains(bootKitId))
+		{
+			disabledAnimationId = IdleAnimationID.MINECART;
+			disabledSlots.put(KitType.BOOTS, bootKitId + 256);
+			disabledSlots.put(KitType.WEAPON, 0);
+			disabledSlots.put(KitType.SHIELD, 0);
+		}
+		else if (ItemInteractions.DISABLE_WEAPONS.contains(weaponItemId))
+		{
+			disabledSlots.put(KitType.WEAPON, weaponItemId + 512);
+			disabledSlots.put(KitType.SHIELD, 0);
+		}
+		else
+		{
+			disabledAnimationId = null;
+			disabledSlots.clear();
+		}
+		refreshDisabledSlots();
+	}
+
+	private void refreshDisabledSlots()
+	{
+		if (!disabledSlots.isEmpty())
+		{
+			// temporarily remove locks while swapping disabled slots
+			Set<KitType> lockedItems = savedSwaps.getAllLockedItems();
+			Set<KitType> lockedKits = savedSwaps.getAllLockedKits();
+			boolean iconLocked = savedSwaps.isIconLocked();
+			for (KitType slot : disabledSlots.keySet())
+			{
+				savedSwaps.removeSlotLock(slot);
+				savedSwaps.removeIconLock();
+			}
+			if (!disabledSlots.isEmpty())
+			{
+				CompoundSwap.fromMap(disabledSlots, null)
+					.forEach(c -> swap(c, true, SwapMode.PREVIEW));
+			}
+			if (disabledAnimationId != null)
+			{
+				Player player = client.getLocalPlayer();
+				if (player != null)
+				{
+					setIdleAnimationId(player, disabledAnimationId, true);
+				}
+				disabledAnimationId = null;
+			}
+			savedSwaps.setLockedItems(lockedItems);
+			savedSwaps.setLockedKits(lockedKits);
+			savedSwaps.setIconLocked(iconLocked);
+		}
 	}
 
 	/**
@@ -337,6 +419,11 @@ public class SwapManager
 						{
 							swap(CompoundSwap.single(KitType.HEAD, 0), SwapMode.PREVIEW);
 						}
+						else if (savedSwaps.containsIcon())
+						{
+							// if icon is swapped but not hair/jaw, just refresh (head is not in conflict)
+							swap(CompoundSwap.single(KitType.HEAD, inventoryItemId + 512), SwapMode.PREVIEW);
+						}
 						break;
 					case TORSO:
 						if (savedSwaps.containsSlot(KitType.ARMS) &&
@@ -357,6 +444,7 @@ public class SwapManager
 		Map<KitType, Integer> newItems,
 		Map<KitType, Integer> newKits,
 		Map<ColorType, Integer> newColors,
+		JawIcon icon,
 		Set<KitType> slotsToRemove)
 	{
 		clientThread.invokeLater(() -> {
@@ -376,6 +464,7 @@ public class SwapManager
 
 			// remove locks and revert everything on player
 			savedSwaps.removeAllLocks();
+			SwapDiff iconRevert = doRevertIcon();
 			SwapDiff kitRevert = Arrays.stream(KitType.values())
 				.map(this::doRevert)
 				.filter(Objects::nonNull)
@@ -386,7 +475,7 @@ public class SwapManager
 				.reduce(SwapDiff::mergeOver)
 				.orElse(SwapDiff.blank());
 
-			SwapDiff equips = CompoundSwap.fromMap(sanitize(equipSwaps)).stream()
+			SwapDiff equips = CompoundSwap.fromMap(sanitize(equipSwaps), icon).stream()
 				.map(c -> this.swap(c, SwapMode.SAVE))
 				.reduce(SwapDiff::mergeOver)
 				.orElse(SwapDiff.blank());
@@ -402,7 +491,8 @@ public class SwapManager
 				.map(e -> this.swapColor(e.getKey(), e.getValue(), true))
 				.reduce(SwapDiff::mergeOver)
 				.orElse(SwapDiff.blank());
-			SwapDiff total = kitRevert
+			SwapDiff total = iconRevert
+				.mergeOver(kitRevert)
 				.mergeOver(colorRevert)
 				.mergeOver(equips)
 				.mergeOver(colors);
@@ -452,8 +542,15 @@ public class SwapManager
 					.orElse("");
 			})
 			.collect(Collectors.toList());
+		List<String> icons = new ArrayList<>();
+		JawIcon icon = savedSwaps.getSwappedIcon();
+		if (savedSwaps.containsIcon())
+		{
+			icons.add(ICON_KEY + ":" + icon.getId() + " (" + icon.getDisplayName() + ")");
+		}
 		items.addAll(kits);
 		items.addAll(colors);
+		items.addAll(icons);
 		return items;
 	}
 
@@ -461,6 +558,12 @@ public class SwapManager
 	public Integer swappedItemIdIn(KitType slot)
 	{
 		return savedSwaps.getItem(slot);
+	}
+
+	@Nullable
+	public JawIcon swappedIcon()
+	{
+		return savedSwaps.getSwappedIcon();
 	}
 
 	public boolean isHidden(KitType slot)
@@ -528,15 +631,22 @@ public class SwapManager
 		swapDiffHistory.appendToUndo(s);
 	}
 
+	public void revertIcon()
+	{
+		savedSwaps.removeIconLock();
+		SwapDiff s = doRevertIcon();
+		swapDiffHistory.appendToUndo(s);
+	}
+
 	public void hoverOverItem(KitType slot, Integer itemId)
 	{
 		hoverOver(() -> {
 			int id = itemId < 0 ? -512 : itemId;
-			return swapItem(slot, id, false);
+			return swapItem(slot, id, false, false);
 		});
 	}
 
-	public void hoverOverKit(KitType slot, Integer kitId)
+	public void hoverOverKit(KitType slot, int kitId)
 	{
 		hoverOver(() -> swapKit(slot, kitId, false));
 	}
@@ -544,6 +654,11 @@ public class SwapManager
 	public void hoverOverColor(ColorType type, Integer colorId)
 	{
 		hoverOver(() -> swapColor(type, colorId, false));
+	}
+
+	public void hoverOverIcon(JawIcon icon)
+	{
+		hoverOver(() -> swapIcon(icon, false));
 	}
 
 	private void hoverOver(Supplier<SwapDiff> diffCallable)
@@ -572,18 +687,18 @@ public class SwapManager
 			{
 				return savedSwaps.isHidden(slot) ?
 					doRevert(slot) :
-					swapItem(slot, -512, true);
+					swapItem(slot, -512, true, false);
 			}
 			else
 			{
 				return Objects.equals(savedSwaps.getItem(slot), itemId) ?
 					doRevert(slot) :
-					swapItem(slot, itemId, true);
+					swapItem(slot, itemId, true, false);
 			}
 		});
 	}
 
-	public void hoverSelectKit(KitType slot, Integer kitId)
+	public void hoverSelectKit(KitType slot, int kitId)
 	{
 		hoverSelect(() -> {
 			if (savedSwaps.isKitLocked(slot))
@@ -606,6 +721,19 @@ public class SwapManager
 			return Objects.equals(savedSwaps.getColor(type), colorId) ?
 				doRevert(type) :
 				swapColor(type, colorId, true);
+		});
+	}
+
+	public void hoverSelectIcon(JawIcon icon)
+	{
+		hoverSelect(() -> {
+			if (savedSwaps.isIconLocked())
+			{
+				return SwapDiff.blank();
+			}
+			return Objects.equals(savedSwaps.getSwappedIcon(), icon) ?
+				doRevertIcon() :
+				swapIcon(icon, true);
 		});
 	}
 
@@ -637,20 +765,21 @@ public class SwapManager
 		});
 	}
 
-	/**
-	 * Reverts all item/kit slots and colors. Unless `removeLocks` is true, locked slots will remain. If `preview`
-	 * is true, saved swaps will be unaffected.
-	 * <p>
-	 * Can only be called from the client thread.
-	 */
-	public void revertSwaps(boolean removeLocks, boolean preview)
+	// reverts only the given swaps. if removeLocks is true, only removes locks for those slots.
+	private void revertSwaps(List<KitType> slots, boolean removeLocks, boolean preview)
 	{
 		if (removeLocks)
 		{
-			savedSwaps.removeAllLocks();
+			slots.forEach(slot -> savedSwaps.removeSlotLock(slot));
+			savedSwaps.removeIconLock();
 		}
 		SwapMode mode = preview ? SwapMode.PREVIEW : SwapMode.REVERT;
-		Map<KitType, Integer> equipIdsToRevert = Arrays.stream(KitType.values())
+		JawIcon icon = null;
+		if (!savedSwaps.isIconLocked())
+		{
+			icon = JawIcon.NOTHING;
+		}
+		Map<KitType, Integer> equipIdsToRevert = slots.stream()
 			.filter(slot -> !savedSwaps.isSlotLocked(slot))
 			.collect(Collectors.toMap(slot -> slot, slot -> {
 				Integer itemId = inventoryItemId(slot);
@@ -660,8 +789,8 @@ public class SwapManager
 				}
 				return savedSwaps.getRealKit(slot, isFemale) + 256;
 			}));
-		SwapDiff kitsDiff = CompoundSwap.fromMap(equipIdsToRevert).stream()
-			.map(c -> this.swap(c, mode))
+		SwapDiff kitsDiff = CompoundSwap.fromMap(equipIdsToRevert, icon).stream()
+			.map(c -> this.swap(c, false, (s) -> mode, mode))
 			.reduce(SwapDiff::mergeOver)
 			.orElse(SwapDiff.blank());
 		SwapDiff colorsDiff = Arrays.stream(ColorType.values())
@@ -672,12 +801,23 @@ public class SwapManager
 			})
 			.reduce(SwapDiff::mergeOver)
 			.orElse(SwapDiff.blank());
-		SwapDiff totalDiff = kitsDiff.mergeOver(colorsDiff);
+		SwapDiff totalDiff = kitsDiff
+			.mergeOver(colorsDiff);
 		if (mode == SwapMode.REVERT)
 		{
 			swapDiffHistory.appendToUndo(totalDiff);
 			savedSwaps.clearSwapped();
 		}
+	}
+
+	/**
+	 * Reverts all item/kit slots, colors, and icon. Unless `removeLocks` is true, locked slots will remain.
+	 * If `preview` is true, saved swaps will be unaffected.
+	 * Can only be called from the client thread.
+	 */
+	public void revertSwaps(boolean removeLocks, boolean preview)
+	{
+		revertSwaps(Arrays.asList(KitType.values()), removeLocks, preview);
 	}
 
 	@Nullable
@@ -697,6 +837,7 @@ public class SwapManager
 		Map<KitType, Integer> itemImports = new HashMap<>();
 		Map<KitType, Integer> kitImports = new HashMap<>();
 		Map<ColorType, Integer> colorImports = new HashMap<>();
+		JawIcon icon = null;
 		Set<KitType> removes = new HashSet<>();
 		for (String line : allLines)
 		{
@@ -732,6 +873,10 @@ public class SwapManager
 				{
 					colorImports.put(colorType, id);
 				}
+				else if (slotStr.equals(ICON_KEY))
+				{
+					icon = JawIcon.fromId(id);
+				}
 				else
 				{
 					sendHighlightedMessage("Could not import line: " + line);
@@ -747,7 +892,7 @@ public class SwapManager
 		});
 		if (!itemImports.isEmpty() || !kitImports.isEmpty() || !colorImports.isEmpty())
 		{
-			importSwaps(itemImports, kitImports, colorImports, removes);
+			importSwaps(itemImports, kitImports, colorImports, icon, removes);
 		}
 	}
 
@@ -761,7 +906,7 @@ public class SwapManager
 				{
 					out.println(line);
 				}
-				sendHighlightedMessage("Outfit saved to " + selected.getName());
+				sendHighlightedMessage("Saved fashionscape to " + selected.getName());
 			}
 			catch (FileNotFoundException e)
 			{
@@ -793,9 +938,17 @@ public class SwapManager
 		Map<ColorType, Integer> colorImports = IntStream.range(0, colors.length).boxed()
 			.collect(Collectors.toMap(i -> types[i], i -> colors[i]));
 
+		JawIcon icon = null;
+		Integer jawItemId = itemImports.get(KitType.JAW);
+		if (jawItemId != null)
+		{
+			icon = JawKit.iconFromItemId(jawItemId);
+			itemImports.remove(KitType.JAW);
+		}
+
 		if (!itemImports.isEmpty() || !kitImports.isEmpty() || !colorImports.isEmpty() || !removals.isEmpty())
 		{
-			importSwaps(itemImports, kitImports, colorImports, removals);
+			importSwaps(itemImports, kitImports, colorImports, icon, removals);
 		}
 	}
 
@@ -839,15 +992,12 @@ public class SwapManager
 				}
 			}
 		});
-		Map<KitType, Integer> allEquipIds = equipmentIds.entrySet().stream()
-			.filter(e -> e.getValue() >= 512)
-			.collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 		Map<KitType, Integer> removals = equipmentIds.entrySet().stream()
 			.filter(e -> e.getValue() == 0 && !getNonZeroSlots().contains(e.getKey()))
 			.collect(Collectors.toMap(Map.Entry::getKey, entry -> 0));
-		allEquipIds.putAll(newKitEquipIds);
-		allEquipIds.putAll(removals);
-		return allEquipIds;
+		equipmentIds.putAll(newKitEquipIds);
+		equipmentIds.putAll(removals);
+		return equipmentIds;
 	}
 
 	/**
@@ -879,6 +1029,14 @@ public class SwapManager
 			Map<KitType, Integer> lockedItems = Arrays.stream(KitType.values())
 				.filter(s -> savedSwaps.isItemLocked(s) && savedSwaps.containsItem(s))
 				.collect(Collectors.toMap(s -> s, savedSwaps::getItem));
+			if (savedSwaps.isIconLocked() && savedSwaps.containsIcon())
+			{
+				Integer iconItemId = JawKit.NO_JAW.getIconItemId(savedSwaps.getSwappedIcon());
+				if (iconItemId != null)
+				{
+					lockedItems.put(KitType.JAW, iconItemId);
+				}
+			}
 			Map<ColorType, Colorable> lockedColors = swappedColorsMap().entrySet().stream()
 				.filter(e -> savedSwaps.isColorLocked(e.getKey()) && savedSwaps.containsColor(e.getKey()))
 				.collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
@@ -1027,7 +1185,7 @@ public class SwapManager
 			.collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue() + 512));
 
 		// swap items now before moving on to kits
-		SwapDiff itemsDiff = CompoundSwap.fromMap(newEquipSwaps).stream()
+		SwapDiff itemsDiff = CompoundSwap.fromMap(newEquipSwaps, null).stream()
 			.map(c -> this.swap(c, SwapMode.SAVE))
 			.reduce(SwapDiff::mergeOver)
 			.orElse(SwapDiff.blank());
@@ -1050,13 +1208,38 @@ public class SwapManager
 			Map<KitType, Integer> kitEquipSwaps = kitSwaps.entrySet().stream()
 				.collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue() + 256));
 
-			SwapDiff kitsDiff = CompoundSwap.fromMap(kitEquipSwaps)
+			SwapDiff kitsDiff = CompoundSwap.fromMap(kitEquipSwaps, null)
 				.stream()
 				.map(c -> this.swap(c, SwapMode.SAVE))
 				.reduce(SwapDiff::mergeOver)
 				.orElse(SwapDiff.blank());
 
 			totalDiff = totalDiff.mergeOver(kitsDiff);
+		}
+
+		if (!config.excludeNonStandardItems() && !config.excludeMembersItems() && !savedSwaps.isIconLocked())
+		{
+			List<JawIcon> icons = Arrays.asList(JawIcon.values());
+			Collections.shuffle(icons);
+			int limit = icons.size();
+			if (intelligence == RandomizerIntelligence.NONE)
+			{
+				limit = 1;
+			}
+			Map<JawIcon, Double> scores = icons.stream()
+				.limit(limit)
+				.collect(Collectors.toMap(i -> i, i -> {
+					Integer itemId = JawKit.NO_JAW.getIconItemId(i);
+					return itemId != null ? colorScorer.score(itemId, null) : 0;
+				}));
+			// only icon swap if >75% match (if intelligence is > NONE)
+			JawIcon icon = scores.entrySet().stream()
+				.filter(e -> intelligence == RandomizerIntelligence.NONE || e.getValue() > 0.75)
+				.max(Comparator.comparingDouble(Map.Entry::getValue))
+				.map(Map.Entry::getKey)
+				.orElse(JawIcon.NOTHING);
+			SwapDiff iconDiff = swap(CompoundSwap.fromIcon(icon), SwapMode.PREVIEW, SwapMode.SAVE);
+			totalDiff = totalDiff.mergeOver(iconDiff);
 		}
 
 		SwapDiff colorsDiff = newColors.entrySet().stream()
@@ -1071,7 +1254,7 @@ public class SwapManager
 	}
 
 	// this should only be called from the client thread
-	public SwapDiff swapItem(KitType slot, Integer itemId, boolean save)
+	public SwapDiff swapItem(KitType slot, Integer itemId, boolean save, boolean saveIcon)
 	{
 		if (itemId == null)
 		{
@@ -1079,7 +1262,8 @@ public class SwapManager
 		}
 		int equipmentId = itemId + 512;
 		SwapMode swapMode = save ? SwapMode.SAVE : SwapMode.PREVIEW;
-		SwapDiff swapDiff = swap(CompoundSwap.single(slot, equipmentId), swapMode);
+		SwapMode iconSwapMode = saveIcon ? SwapMode.SAVE : SwapMode.PREVIEW;
+		SwapDiff swapDiff = swap(CompoundSwap.single(slot, equipmentId), swapMode, iconSwapMode);
 		if (hoverSwapDiff != null)
 		{
 			swapDiff = swapDiff.mergeOver(hoverSwapDiff);
@@ -1096,7 +1280,7 @@ public class SwapManager
 		}
 		int equipmentId = kitId + 256;
 		SwapMode swapMode = save ? SwapMode.SAVE : SwapMode.PREVIEW;
-		SwapDiff swapDiff = swap(CompoundSwap.single(slot, equipmentId), swapMode);
+		SwapDiff swapDiff = swap(CompoundSwap.single(slot, equipmentId), swapMode, SwapMode.PREVIEW);
 		if (hoverSwapDiff != null)
 		{
 			swapDiff = swapDiff.mergeOver(hoverSwapDiff);
@@ -1104,6 +1288,23 @@ public class SwapManager
 		return swapDiff;
 	}
 
+	// this should only be called from the client thread
+	public SwapDiff swapIcon(JawIcon icon, boolean save)
+	{
+		if (icon == null)
+		{
+			return SwapDiff.blank();
+		}
+		SwapMode swapMode = save ? SwapMode.SAVE : SwapMode.PREVIEW;
+		SwapDiff swapDiff = swap(CompoundSwap.fromIcon(icon), SwapMode.PREVIEW, swapMode);
+		if (hoverSwapDiff != null)
+		{
+			swapDiff = swapDiff.mergeOver(hoverSwapDiff);
+		}
+		return swapDiff;
+	}
+
+	// this should only be called from the client thread
 	public SwapDiff swapColor(ColorType type, Integer colorId, boolean save)
 	{
 		if (colorId == null)
@@ -1154,7 +1355,7 @@ public class SwapManager
 				case PREVIEW:
 					break;
 			}
-			return new SwapDiff(new HashMap<>(), changes, null);
+			return new SwapDiff(new HashMap<>(), changes, null, null);
 		}
 		catch (Exception e)
 		{
@@ -1168,10 +1369,24 @@ public class SwapManager
 	 */
 	private SwapDiff swap(CompoundSwap s, SwapMode swapMode)
 	{
-		return swap(s, (ignore) -> swapMode);
+		return swap(s, false, swapMode);
 	}
 
-	private SwapDiff swap(CompoundSwap s, Function<KitType, SwapMode> swapModeProvider)
+	private SwapDiff swap(CompoundSwap s, SwapMode swapMode, SwapMode iconSwapMode)
+	{
+		return swap(s, false, (ignore) -> swapMode, iconSwapMode);
+	}
+
+	private SwapDiff swap(CompoundSwap s, boolean allowDisabledSwaps, SwapMode swapMode)
+	{
+		return swap(s, allowDisabledSwaps, (ignore) -> swapMode, swapMode);
+	}
+
+	private SwapDiff swap(
+		CompoundSwap s,
+		boolean allowDisabledSwaps,
+		Function<KitType, SwapMode> swapModeProvider,
+		SwapMode iconSwapMode)
 	{
 		switch (s.getType())
 		{
@@ -1179,30 +1394,35 @@ public class SwapManager
 				Integer headEquipId = s.getEquipmentIds().get(KitType.HEAD);
 				Integer hairEquipId = s.getEquipmentIds().get(KitType.HAIR);
 				Integer jawEquipId = s.getEquipmentIds().get(KitType.JAW);
-				return swapHead(headEquipId, hairEquipId, jawEquipId, swapModeProvider);
+				JawIcon icon = s.getIcon();
+				return swapHead(headEquipId, hairEquipId, jawEquipId, icon, allowDisabledSwaps, swapModeProvider,
+					iconSwapMode);
 			case TORSO:
 				Integer torsoEquipId = s.getEquipmentIds().get(KitType.TORSO);
 				Integer armsEquipId = s.getEquipmentIds().get(KitType.ARMS);
-				return swapTorso(torsoEquipId, armsEquipId, swapModeProvider);
+				return swapTorso(torsoEquipId, armsEquipId, allowDisabledSwaps, swapModeProvider);
 			case WEAPONS:
 				Integer weaponEquipId = s.getEquipmentIds().get(KitType.WEAPON);
 				Integer shieldEquipId = s.getEquipmentIds().get(KitType.SHIELD);
-				return swapWeapons(weaponEquipId, shieldEquipId, swapModeProvider);
+				return swapWeapons(weaponEquipId, shieldEquipId, allowDisabledSwaps, swapModeProvider);
 			case SINGLE:
-				return swapSingle(s.getKitType(), s.getEquipmentId(), swapModeProvider.apply(s.getKitType()));
+				return swapSingle(s.getKitType(), s.getEquipmentId(), allowDisabledSwaps,
+					swapModeProvider.apply(s.getKitType()));
 		}
 		return SwapDiff.blank();
 	}
 
-	private SwapDiff swapSingle(KitType slot, Integer equipmentId, SwapMode swapMode)
+	private SwapDiff swapSingle(KitType slot, Integer equipmentId, boolean allowDisabledSwaps, SwapMode swapMode)
 	{
-		SwapDiff.Change result = swap(slot, equipmentId, swapMode);
+		Map<SwapDiff.Change.Type, SwapDiff.Change> results = swap(slot, equipmentId, swapMode, SwapMode.PREVIEW,
+			allowDisabledSwaps);
 		Map<KitType, SwapDiff.Change> changes = new HashMap<>();
-		if (result != null)
+		SwapDiff.Change iconChange = results.get(SwapDiff.Change.Type.ICON);
+		if (results.containsKey(SwapDiff.Change.Type.EQUIPMENT))
 		{
-			changes.put(slot, result);
+			changes.put(slot, results.get(SwapDiff.Change.Type.EQUIPMENT));
 		}
-		return new SwapDiff(changes, new HashMap<>(), null);
+		return new SwapDiff(changes, new HashMap<>(), iconChange, null);
 	}
 
 	/**
@@ -1224,37 +1444,64 @@ public class SwapManager
 		Integer headEquipId,
 		Integer hairEquipId,
 		Integer jawEquipId,
-		Function<KitType, SwapMode> swapModeProvider)
+		JawIcon icon,
+		boolean allowDisabledSwaps,
+		Function<KitType, SwapMode> swapModeProvider,
+		SwapMode iconSwapMode)
 	{
 		// equipment ids that will be used in the swap
 		Integer finalHeadId = null;
 		Integer finalHairId;
 		Integer finalJawId;
 
+		Function<Integer, Boolean> isJawlessIcon = (equipId) ->
+			equipId >= 512 && JawKit.isNoJawIcon(equipId - 512);
 		Function<Integer, Boolean> headAllowsHair = (equipId) ->
 			equipId < 512 || ItemInteractions.HAIR_HELMS.contains(equipId - 512);
 		Function<Integer, Boolean> headAllowsJaw = (equipId) ->
 			equipId < 512 || !ItemInteractions.NO_JAW_HELMS.contains(equipId - 512);
 
 		int currentHeadEquipId = equipmentIdInSlot(KitType.HEAD);
+
+		Integer adjustedJawEquipId = !savedSwaps.isKitLocked(KitType.JAW) ? jawEquipId : null;
+		JawIcon adjustedIcon = !savedSwaps.isIconLocked() ? icon : null;
+		if (adjustedJawEquipId != null || icon != null)
+		{
+			adjustedJawEquipId = combineJawIcon(adjustedJawEquipId, adjustedIcon);
+		}
+
+		Integer adjustedHairEquipId = !savedSwaps.isKitLocked(KitType.HAIR) ? hairEquipId : null;
+
 		if (savedSwaps.isItemLocked(KitType.HEAD))
 		{
 			// only change hair/jaw and only if current head item allows
-			if (!savedSwaps.isKitLocked(KitType.HAIR) && hairEquipId != null)
+			if (adjustedHairEquipId != null)
 			{
-				boolean hairAllowed = (headAllowsHair.apply(currentHeadEquipId) && hairEquipId > 0) ||
-					(!headAllowsHair.apply(currentHeadEquipId) && hairEquipId <= 0);
-				finalHairId = hairAllowed ? hairEquipId : null;
+				boolean hairAllowed = (headAllowsHair.apply(currentHeadEquipId) && adjustedHairEquipId > 0) ||
+					(!headAllowsHair.apply(currentHeadEquipId) && adjustedHairEquipId <= 0);
+				finalHairId = hairAllowed ? adjustedHairEquipId : null;
 			}
 			else
 			{
 				finalHairId = null;
 			}
-			if (!savedSwaps.isKitLocked(KitType.JAW) && jawEquipId != null)
+			if (adjustedJawEquipId != null)
 			{
-				boolean jawAllowed = (headAllowsJaw.apply(currentHeadEquipId) && jawEquipId > 0) ||
-					(!headAllowsJaw.apply(currentHeadEquipId) && jawEquipId <= 0);
-				finalJawId = jawAllowed ? jawEquipId : null;
+				boolean jawAllowed = (headAllowsJaw.apply(currentHeadEquipId) && adjustedJawEquipId > 0) ||
+					(!headAllowsJaw.apply(currentHeadEquipId) && (adjustedJawEquipId <= 0 ||
+						isJawlessIcon.apply(adjustedJawEquipId)));
+				if (jawAllowed)
+				{
+					finalJawId = adjustedJawEquipId;
+				}
+				else if (adjustedJawEquipId >= 512)
+				{
+					finalJawId = combineJawIcon(0, adjustedIcon);
+				}
+				else
+				{
+					finalJawId = null;
+				}
 			}
 			else
 			{
@@ -1264,13 +1511,36 @@ public class SwapManager
 		else if (headEquipId == null)
 		{
 			// prioritize showing hair/jaw and hiding current helm if new kits conflict with it.
-			finalHairId = !savedSwaps.isKitLocked(KitType.HAIR) ? hairEquipId : null;
-			finalJawId = !savedSwaps.isKitLocked(KitType.JAW) ? jawEquipId : null;
-			boolean headForbidsHair = !headAllowsHair.apply(currentHeadEquipId) && finalHairId != null &&
-				finalHairId > 0;
-			boolean headForbidsJaw = !headAllowsJaw.apply(currentHeadEquipId) && finalJawId != null &&
-				finalJawId > 0;
-			finalHeadId = headForbidsHair || headForbidsJaw ? 0 : null;
+			finalHairId = adjustedHairEquipId;
+			finalJawId = adjustedJawEquipId;
+			boolean headForbidsHair = finalHairId != null && finalHairId > 0 &&
+				!headAllowsHair.apply(currentHeadEquipId);
+			if (headForbidsHair)
+			{
+				finalHeadId = 0;
+			}
+			else
+			{
+				boolean headForbidsJaw = finalJawId != null && finalJawId > 0 && !isJawlessIcon.apply(finalJawId) &&
+					!headAllowsJaw.apply(currentHeadEquipId);
+				if (headForbidsJaw)
+				{
+					// if not actually requesting jaw kit, use only icon and keep head item
+					if (jawEquipId == null)
+					{
+						finalJawId = combineJawIcon(0, adjustedIcon);
+						finalHeadId = null;
+					}
+					else
+					{
+						finalHeadId = 0;
+					}
+				}
+				else
+				{
+					finalHeadId = null;
+				}
+			}
 		}
 		else
 		{
@@ -1279,13 +1549,17 @@ public class SwapManager
 			boolean jawDisallowed = !headAllowsJaw.apply(headEquipId) && savedSwaps.isKitLocked(KitType.JAW);
 			finalHeadId = hairDisallowed || jawDisallowed ? null : headEquipId;
 			Integer headIdToCheck = hairDisallowed || jawDisallowed ? currentHeadEquipId : headEquipId;
-			Integer potentialHairId = headAllowsHair.apply(headIdToCheck) ? hairEquipId : Integer.valueOf(0);
+			Integer potentialHairId = headAllowsHair.apply(headIdToCheck) ? adjustedHairEquipId : Integer.valueOf(0);
 			finalHairId = !savedSwaps.isKitLocked(KitType.HAIR) ? potentialHairId : null;
-			Integer potentialJawId = headAllowsJaw.apply(headIdToCheck) ? jawEquipId : Integer.valueOf(0);
+			Integer potentialJawId = headAllowsJaw.apply(headIdToCheck) ||
+				(adjustedJawEquipId != null && isJawlessIcon.apply(adjustedJawEquipId)) ?
+				adjustedJawEquipId :
+				(Integer) combineJawIcon(0, adjustedIcon);
 			finalJawId = !savedSwaps.isKitLocked(KitType.JAW) ? potentialJawId : null;
 		}
 
 		Map<KitType, SwapDiff.Change> changes = new HashMap<>();
+		final SwapDiff.Change[] iconChange = {null};
 
 		// edge cases:
 		// if not changing hair but hair can be shown, make sure that at least something is displayed there
@@ -1302,15 +1576,18 @@ public class SwapManager
 			else
 			{
 				int revertHairId = savedSwaps.getRealKit(KitType.HAIR, isFemale) + 256;
-				SwapDiff.Change result = swap(KitType.HAIR, revertHairId, SwapMode.REVERT);
-				if (result != null)
+				Map<SwapDiff.Change.Type, SwapDiff.Change> result = swap(KitType.HAIR, revertHairId, SwapMode.REVERT,
+					SwapMode.PREVIEW, allowDisabledSwaps);
+				if (result.containsKey(SwapDiff.Change.Type.EQUIPMENT))
 				{
-					changes.put(KitType.HAIR, result);
+					changes.put(KitType.HAIR, result.get(SwapDiff.Change.Type.EQUIPMENT));
 				}
 			}
 		}
-		// if not changing jaw but jaw can be shown, make sure that at least something is displayed there
-		if (finalJawId == null && equipmentIdInSlot(KitType.JAW) == 0 &&
+
+		int currentJawEquipId = equipmentIdInSlot(KitType.JAW);
+		// if not changing jaw but jaw should be shown, make sure that at least something is displayed there
+		if (finalJawId == null && (currentJawEquipId == 0 || isJawlessIcon.apply(currentJawEquipId)) &&
 			((finalHeadId == null && headAllowsJaw.apply(currentHeadEquipId)) ||
 				(finalHeadId != null && headAllowsJaw.apply(finalHeadId))))
 		{
@@ -1322,11 +1599,13 @@ public class SwapManager
 			}
 			else
 			{
-				int revertJawId = savedSwaps.getRealKit(KitType.JAW, isFemale) + 256;
-				SwapDiff.Change result = swap(KitType.JAW, revertJawId, SwapMode.REVERT);
-				if (result != null)
+				int realKitId = savedSwaps.getRealKit(KitType.JAW, isFemale);
+				int fallbackJawId = combineJawIcon(realKitId + 256, adjustedIcon);
+				Map<SwapDiff.Change.Type, SwapDiff.Change> result = swap(KitType.JAW, fallbackJawId, SwapMode.REVERT,
+					SwapMode.PREVIEW, allowDisabledSwaps);
+				if (result.containsKey(SwapDiff.Change.Type.EQUIPMENT))
 				{
-					changes.put(KitType.JAW, result);
+					changes.put(KitType.JAW, result.get(SwapDiff.Change.Type.EQUIPMENT));
 				}
 			}
 		}
@@ -1334,17 +1613,22 @@ public class SwapManager
 		BiConsumer<KitType, Integer> attemptChange = (slot, equipId) -> {
 			if (equipId != null && equipId >= 0)
 			{
-				SwapDiff.Change result = swap(slot, equipId, swapModeProvider.apply(slot));
-				if (result != null)
+				Map<SwapDiff.Change.Type, SwapDiff.Change> result = swap(slot, equipId, swapModeProvider.apply(slot),
+					iconSwapMode, allowDisabledSwaps);
+				if (result.containsKey(SwapDiff.Change.Type.EQUIPMENT))
 				{
-					changes.put(slot, result);
+					changes.put(slot, result.get(SwapDiff.Change.Type.EQUIPMENT));
+				}
+				if (result.containsKey(SwapDiff.Change.Type.ICON))
+				{
+					iconChange[0] = result.get(SwapDiff.Change.Type.ICON);
 				}
 			}
 		};
 		attemptChange.accept(KitType.HEAD, finalHeadId);
 		attemptChange.accept(KitType.HAIR, finalHairId);
 		attemptChange.accept(KitType.JAW, finalJawId);
-		return new SwapDiff(changes, new HashMap<>(), null);
+		return new SwapDiff(changes, new HashMap<>(), iconChange[0], null);
 	}
 
 	/**
@@ -1365,6 +1649,7 @@ public class SwapManager
 	private SwapDiff swapTorso(
 		Integer torsoEquipId,
 		Integer armsEquipId,
+		boolean allowDisabledSwaps,
 		Function<KitType, SwapMode> swapModeProvider)
 	{
 		Integer finalTorsoId = null;
@@ -1400,10 +1685,11 @@ public class SwapManager
 			if (torsoForbidsArms)
 			{
 				int revertTorsoId = savedSwaps.getRealKit(KitType.TORSO, isFemale) + 256;
-				SwapDiff.Change result = swap(KitType.TORSO, revertTorsoId, SwapMode.REVERT);
-				if (result != null)
+				Map<SwapDiff.Change.Type, SwapDiff.Change> result = swap(KitType.TORSO, revertTorsoId, SwapMode.REVERT,
+					SwapMode.PREVIEW, allowDisabledSwaps);
+				if (result.containsKey(SwapDiff.Change.Type.EQUIPMENT))
 				{
-					changes.put(KitType.TORSO, result);
+					changes.put(KitType.TORSO, result.get(SwapDiff.Change.Type.EQUIPMENT));
 				}
 			}
 		}
@@ -1431,10 +1717,11 @@ public class SwapManager
 			else
 			{
 				int revertArmsId = savedSwaps.getRealKit(KitType.ARMS, isFemale) + 256;
-				SwapDiff.Change result = swap(KitType.ARMS, revertArmsId, SwapMode.REVERT);
-				if (result != null)
+				Map<SwapDiff.Change.Type, SwapDiff.Change> result = swap(KitType.ARMS, revertArmsId, SwapMode.REVERT,
+					SwapMode.PREVIEW, allowDisabledSwaps);
+				if (result.containsKey(SwapDiff.Change.Type.EQUIPMENT))
 				{
-					changes.put(KitType.ARMS, result);
+					changes.put(KitType.ARMS, result.get(SwapDiff.Change.Type.EQUIPMENT));
 				}
 			}
 		}
@@ -1442,16 +1729,17 @@ public class SwapManager
 		BiConsumer<KitType, Integer> attemptChange = (slot, equipId) -> {
 			if (equipId != null && equipId >= 0)
 			{
-				SwapDiff.Change result = swap(slot, equipId, swapModeProvider.apply(slot));
-				if (result != null)
+				Map<SwapDiff.Change.Type, SwapDiff.Change> result = swap(slot, equipId, swapModeProvider.apply(slot),
+					SwapMode.PREVIEW, allowDisabledSwaps);
+				if (result.containsKey(SwapDiff.Change.Type.EQUIPMENT))
 				{
-					changes.put(slot, result);
+					changes.put(slot, result.get(SwapDiff.Change.Type.EQUIPMENT));
 				}
 			}
 		};
 		attemptChange.accept(KitType.TORSO, finalTorsoId);
 		attemptChange.accept(KitType.ARMS, finalArmsId);
-		return new SwapDiff(changes, new HashMap<>(), null);
+		return new SwapDiff(changes, new HashMap<>(), null, null);
 	}
 
 	/**
@@ -1470,6 +1758,7 @@ public class SwapManager
 	private SwapDiff swapWeapons(
 		Integer weaponEquipId,
 		Integer shieldEquipId,
+		boolean allowDisabledSwaps,
 		Function<KitType, SwapMode> swapModeProvider)
 	{
 		Integer finalWeaponId = null;
@@ -1519,10 +1808,11 @@ public class SwapManager
 		BiConsumer<KitType, Integer> attemptChange = (slot, equipId) -> {
 			if (equipId != null && equipId >= 0)
 			{
-				SwapDiff.Change result = swap(slot, equipId, swapModeProvider.apply(slot));
-				if (result != null)
+				Map<SwapDiff.Change.Type, SwapDiff.Change> results = swap(slot, equipId, swapModeProvider.apply(slot),
+					SwapMode.PREVIEW, allowDisabledSwaps);
+				if (results.containsKey(SwapDiff.Change.Type.EQUIPMENT))
 				{
-					changes.put(slot, result);
+					changes.put(slot, results.get(SwapDiff.Change.Type.EQUIPMENT));
 				}
 			}
 		};
@@ -1535,14 +1825,14 @@ public class SwapManager
 			Player player = client.getLocalPlayer();
 			if (player != null)
 			{
-				changedAnim = setIdleAnimationId(player, finalAnimId);
+				changedAnim = setIdleAnimationId(player, finalAnimId, allowDisabledSwaps);
 				if (changedAnim.equals(finalAnimId))
 				{
 					changedAnim = null;
 				}
 			}
 		}
-		return new SwapDiff(changes, new HashMap<>(), changedAnim);
+		return new SwapDiff(changes, new HashMap<>(), null, changedAnim);
 	}
 
 	/**
@@ -1554,34 +1844,58 @@ public class SwapManager
 	 * 256-511 for a base kit model (i.e., kitId + 256)
 	 * >=512 for an item (i.e., itemId + 512)
 	 * <p>
-	 * save should only be false when previewing. forceClear should be true when reverting
 	 *
-	 * @return the previously occupied equipment id and whether the change was natural if the equipment has
-	 * successfully been changed, otherwise null
+	 * @return a map of changes performed, keyed by type (potentially empty if no changes)
 	 */
-	@Nullable
-	private SwapDiff.Change swap(KitType slot, int equipmentId, SwapMode swapMode)
+	private Map<SwapDiff.Change.Type, SwapDiff.Change> swap(
+		KitType slot, int equipmentId, SwapMode swapMode, SwapMode iconSwapMode, boolean allowDisabledSwaps)
 	{
+		Map<SwapDiff.Change.Type, SwapDiff.Change> changes = new HashMap<>();
 		if (slot == null)
 		{
-			return null;
+			return changes;
 		}
 		Player player = client.getLocalPlayer();
 		if (player == null)
 		{
-			return null;
+			return changes;
 		}
 		PlayerComposition composition = player.getPlayerComposition();
 		if (composition == null)
 		{
-			return null;
+			return changes;
 		}
-		int oldId = setEquipmentId(composition, slot, equipmentId);
-		boolean oldUnnatural = savedSwaps.containsSlot(slot) || savedSwaps.isHidden(slot);
+		// returns equipment id of jaw kit (without icon)
+		Function<Integer, Integer> deIconJaw = (equipId) -> {
+			JawKit kit = JawKit.fromEquipmentId(equipId);
+			if (kit != null)
+			{
+				return kit.getKitId() + 256;
+			}
+			else
+			{
+				return equipId;
+			}
+		};
+		// adjust equipment ids for jaw swaps since diff could be icon-only
+		int saveId = equipmentId;
+		if (slot == KitType.JAW && equipmentId >= 512)
+		{
+			saveId = deIconJaw.apply(equipmentId);
+		}
+		Supplier<Boolean> unnaturalCheck = () -> savedSwaps.containsSlot(slot) || savedSwaps.isHidden(slot);
+		Supplier<Boolean> unnaturalIconCheck = () -> savedSwaps.containsIcon();
+		int oldId = setEquipmentId(composition, slot, equipmentId, allowDisabledSwaps);
+		int oldSaveId = oldId;
+		if (slot == KitType.JAW && oldId >= 512)
+		{
+			oldSaveId = deIconJaw.apply(oldId);
+		}
+		boolean oldUnnatural = unnaturalCheck.get();
 		switch (swapMode)
 		{
 			case SAVE:
-				if (equipmentId <= 0)
+				if (saveId <= 0)
 				{
 					if (ALLOWS_NOTHING.contains(slot))
 					{
@@ -1592,13 +1906,13 @@ public class SwapManager
 						savedSwaps.removeSlot(slot);
 					}
 				}
-				else if (equipmentId < 512)
+				else if (saveId < 512)
 				{
-					savedSwaps.putKit(slot, equipmentId - 256);
+					savedSwaps.putKit(slot, saveId - 256);
 				}
 				else
 				{
-					savedSwaps.putItem(slot, equipmentId - 512);
+					savedSwaps.putItem(slot, saveId - 512);
 				}
 				break;
 			case REVERT:
@@ -1607,22 +1921,65 @@ public class SwapManager
 			case PREVIEW:
 				break;
 		}
-		boolean unnatural = savedSwaps.containsSlot(slot) || savedSwaps.isHidden(slot);
-		return (oldId == equipmentId && oldUnnatural == unnatural) ?
-			null :
-			new SwapDiff.Change(oldId, oldUnnatural);
+		if (slot == KitType.JAW)
+		{
+			boolean oldUnnaturalIcon = unnaturalIconCheck.get();
+			JawIcon oldIcon = oldId >= 512 ? JawKit.iconFromItemId(oldId - 512) : JawIcon.NOTHING;
+			JawIcon icon = equipmentId >= 512 ? JawKit.iconFromItemId(equipmentId - 512) : JawIcon.NOTHING;
+			switch (iconSwapMode)
+			{
+				case SAVE:
+					if (equipmentId < 512)
+					{
+						savedSwaps.removeIcon();
+					}
+					else
+					{
+						savedSwaps.putIcon(icon);
+					}
+					break;
+				case REVERT:
+					savedSwaps.removeIcon();
+					break;
+				case PREVIEW:
+					break;
+			}
+			boolean unnaturalIcon = unnaturalIconCheck.get();
+			if (!Objects.equals(icon, oldIcon) || oldUnnaturalIcon != unnaturalIcon)
+			{
+				changes.put(SwapDiff.Change.Type.ICON, new SwapDiff.Change(oldIcon.getId(), oldUnnaturalIcon));
+			}
+		}
+		boolean unnatural = unnaturalCheck.get();
+		if (oldSaveId != saveId || oldUnnatural != unnatural)
+		{
+			changes.put(SwapDiff.Change.Type.EQUIPMENT, new SwapDiff.Change(oldSaveId, oldUnnatural));
+		}
+		return changes;
 	}
 
-	// Sets equipment id for slot and returns equipment id of previously occupied item.
-	private int setEquipmentId(@Nonnull PlayerComposition composition, @Nonnull KitType slot, int equipmentId)
+	/**
+	 * Sets equipment id for slot and returns equipment id of previously occupied item.
+	 * If allowDisabledSwaps is false or if the slot is disabled, no actual change occurs.
+	 */
+	private int setEquipmentId(
+		@Nonnull PlayerComposition composition,
+		@Nonnull KitType slot,
+		int equipmentId,
+		boolean allowDisabledSwaps)
 	{
 		int previousId = composition.getEquipmentIds()[slot.getIndex()];
-		composition.getEquipmentIds()[slot.getIndex()] = equipmentId;
-		composition.setHash();
+		if (allowDisabledSwaps || !disabledSlots.containsKey(slot))
+		{
+			composition.getEquipmentIds()[slot.getIndex()] = equipmentId;
+			composition.setHash();
+		}
 		return previousId;
 	}
 
-	// Sets color id for slot and returns color id before replacement.
+	/**
+	 * Sets color id for slot and returns color id before replacement.
+	 */
 	private int setColorId(@Nonnull PlayerComposition composition, @Nonnull ColorType type, int colorId)
 	{
 		int[] colors = composition.getColors();
@@ -1632,11 +1989,17 @@ public class SwapManager
 		return previousId;
 	}
 
-	// Sets idle animation id for current player and returns previous idle animation
-	private int setIdleAnimationId(@Nonnull Player player, int animationId)
+	/**
+	 * Sets idle animation id for current player and returns previous idle animation.
+	 * If allowDisabledSwaps is false or the weapon slot is disabled, no actual anim change occurs.
+	 */
+	private int setIdleAnimationId(@Nonnull Player player, int animationId, boolean allowDisabledSwaps)
 	{
 		int previousId = player.getIdlePoseAnimation();
-		player.setIdlePoseAnimation(animationId);
+		if (allowDisabledSwaps || !disabledSlots.containsKey(KitType.WEAPON))
+		{
+			player.setIdlePoseAnimation(animationId);
+		}
 		return previousId;
 	}
 
@@ -1653,7 +2016,7 @@ public class SwapManager
 			Integer headItemId = inventoryItemId(KitType.HEAD);
 			if (headItemId != null && headItemId >= 0 && !ItemInteractions.HAIR_HELMS.contains(headItemId))
 			{
-				return swap(CompoundSwap.single(KitType.HEAD, headItemId + 512), SwapMode.REVERT);
+				return swap(CompoundSwap.single(KitType.HEAD, headItemId + 512), SwapMode.REVERT, SwapMode.PREVIEW);
 			}
 		}
 		else if (slot == KitType.JAW)
@@ -1661,7 +2024,7 @@ public class SwapManager
 			Integer headItemId = inventoryItemId(KitType.HEAD);
 			if (headItemId != null && headItemId >= 0 && ItemInteractions.NO_JAW_HELMS.contains(headItemId))
 			{
-				return swap(CompoundSwap.single(KitType.HEAD, headItemId + 512), SwapMode.REVERT);
+				return swap(CompoundSwap.single(KitType.HEAD, headItemId + 512), SwapMode.REVERT, SwapMode.PREVIEW);
 			}
 		}
 		else if (slot == KitType.ARMS)
@@ -1669,7 +2032,7 @@ public class SwapManager
 			Integer torsoItemId = inventoryItemId(KitType.TORSO);
 			if (torsoItemId != null && torsoItemId >= 0 && !ItemInteractions.ARMS_TORSOS.contains(torsoItemId))
 			{
-				return swap(CompoundSwap.single(KitType.TORSO, torsoItemId + 512), SwapMode.REVERT);
+				return swap(CompoundSwap.single(KitType.TORSO, torsoItemId + 512), SwapMode.REVERT, SwapMode.PREVIEW);
 			}
 		}
 		Integer originalItemId = inventoryItemId(slot);
@@ -1691,13 +2054,84 @@ public class SwapManager
 		{
 			equipmentId = 0;
 		}
-		return swap(CompoundSwap.single(slot, equipmentId), SwapMode.REVERT);
+		return swap(CompoundSwap.single(slot, equipmentId), SwapMode.REVERT, SwapMode.PREVIEW);
 	}
 
 	private SwapDiff doRevert(ColorType type)
 	{
 		Integer originalColorId = savedSwaps.getRealColor(type);
 		return swap(type, originalColorId, SwapMode.REVERT);
+	}
+
+	private SwapDiff doRevertIcon()
+	{
+		JawIcon revertIcon = savedSwaps.getRealIcon();
+		if (revertIcon == null)
+		{
+			revertIcon = JawIcon.NOTHING;
+		}
+		int jawEquipId = combineJawIcon(null, revertIcon);
+		JawKit kit = JawKit.fromEquipmentId(jawEquipId);
+		if (kit != null)
+		{
+			Map<SwapDiff.Change.Type, SwapDiff.Change> changes = swap(KitType.JAW, kit.getKitId() + 256,
+				SwapMode.PREVIEW, SwapMode.REVERT, false);
+			SwapDiff.Change iconChange = changes.get(SwapDiff.Change.Type.ICON);
+			return new SwapDiff(new HashMap<>(), new HashMap<>(), iconChange, null);
+		}
+		return SwapDiff.blank();
+	}
+
+	/**
+	 * Combines given jaw equipment id and icon to one equipment id. If either are null, will use current saved
+	 * values.
+	 */
+	private int combineJawIcon(Integer jawEquipId, @Nullable JawIcon icon)
+	{
+		int finalJawId;
+		if (jawEquipId != null)
+		{
+			finalJawId = jawEquipId;
+		}
+		else
+		{
+			Integer jawKitId = savedSwaps.getKit(KitType.JAW);
+			if (jawKitId != null)
+			{
+				finalJawId = jawKitId + 256;
+			}
+			else
+			{
+				finalJawId = savedSwaps.getRealKit(KitType.JAW, isFemale) + 256;
+			}
+		}
+		JawIcon finalJawIcon;
+		if (icon != null)
+		{
+			finalJawIcon = icon;
+		}
+		else
+		{
+			finalJawIcon = savedSwaps.getSwappedIcon();
+			if (finalJawIcon == null)
+			{
+				finalJawIcon = savedSwaps.getRealIcon();
+			}
+			if (finalJawIcon == null)
+			{
+				finalJawIcon = JawIcon.NOTHING;
+			}
+		}
+		JawKit kit = JawKit.fromEquipmentId(finalJawId);
+		if (kit != null)
+		{
+			Integer itemId = kit.getIconItemId(finalJawIcon);
+			if (itemId != null)
+			{
+				return itemId + 512;
+			}
+		}
+		return finalJawId;
 	}
 
 	@Nullable
@@ -1807,6 +2241,16 @@ public class SwapManager
 				return realItemId + 512;
 			}
 		}
+		if (kitType == KitType.JAW)
+		{
+			int jawEquipId = combineJawIcon(null, null);
+			int headEquipId = equipmentIdInSlot(KitType.HEAD);
+			boolean jawlessIcon = jawEquipId >= 512 && JawKit.isNoJawIcon(jawEquipId - 512);
+			if (!ItemInteractions.NO_JAW_HELMS.contains(headEquipId - 512) || jawEquipId <= 0 || jawlessIcon)
+			{
+				return jawEquipId;
+			}
+		}
 		Integer kitId = kitIdFor(kitType);
 		return kitId != null && kitId >= 0 ? kitId + 256 : 0;
 	}
@@ -1874,14 +2318,18 @@ public class SwapManager
 				SwapMode.SAVE :
 				SwapMode.REVERT;
 		};
+		SwapDiff.Change iconChange = swapDiff.getIconChange();
+		SwapMode iconSwapMode = (!save || iconChange == null) ? SwapMode.PREVIEW :
+			iconChange.isUnnatural() ? SwapMode.SAVE : SwapMode.REVERT;
+		JawIcon icon = iconChange != null ? JawIcon.fromId(iconChange.getId()) : null;
 		// restore kits and items
 		Map<KitType, Integer> restoreEquipIds = sanitize(
 			swapDiff.getSlotChanges().entrySet().stream().collect(
 				Collectors.toMap(Map.Entry::getKey, e -> e.getValue().getId()))
 		);
-		SwapDiff slotRestore = CompoundSwap.fromMap(restoreEquipIds)
+		SwapDiff slotRestore = CompoundSwap.fromMap(restoreEquipIds, icon)
 			.stream()
-			.map(c -> this.swap(c, swapModeProvider))
+			.map(c -> this.swap(c, false, swapModeProvider, iconSwapMode))
 			.reduce(SwapDiff::mergeOver)
 			.orElse(SwapDiff.blank());
 		SwapDiff colorRestore = swapDiff.getColorChanges().entrySet()

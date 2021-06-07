@@ -49,7 +49,6 @@ public class FashionscapePlugin extends Plugin
 	public static final Pattern PROFILE_PATTERN = Pattern.compile("^(\\w+):(-?\\d+).*");
 	private static final Pattern PAREN_REPLACE = Pattern.compile("\\(.*\\)");
 
-	private static final String CONFIG_GROUP = "fashionscape";
 	private static final String COPY_PLAYER = "Copy-outfit";
 	private static final Set<Integer> ITEM_ID_DUPES = new HashSet<>();
 
@@ -164,14 +163,16 @@ public class FashionscapePlugin extends Plugin
 	@Subscribe
 	public void onConfigChanged(ConfigChanged event)
 	{
-		if (event.getGroup().equals(CONFIG_GROUP))
+		if (event.getGroup().equals(FashionscapeConfig.GROUP))
 		{
-			if (event.getKey().equals(FashionscapeConfig.KEY_EXCLUDE_NON_STANDARD))
+			if (event.getKey().equals(FashionscapeConfig.KEY_EXCLUDE_NON_STANDARD) ||
+				event.getKey().equals(FashionscapeConfig.KEY_EXCLUDE_MEMBERS))
 			{
 				// reload displayed results
 				clientThread.invokeLater(() -> {
 					populateDupes();
 					panel.reloadResults();
+					panel.refreshKitsPanel();
 				});
 			}
 			else if (event.getKey().equals(FashionscapeConfig.KEY_IMPORT_MENU_ENTRY))
@@ -239,6 +240,14 @@ public class FashionscapePlugin extends Plugin
 				continue;
 			}
 			ItemComposition itemComposition = itemManager.getItemComposition(canonical);
+			String itemName = itemComposition.getName().toLowerCase();
+			boolean badItemName = ItemInteractions.BAD_ITEM_NAMES.contains(itemName);
+			boolean membersObject = config.excludeMembersItems() && itemComposition.isMembers();
+			if (badItemName || membersObject)
+			{
+				ITEM_ID_DUPES.add(canonical);
+				continue;
+			}
 			ItemStats itemStats = itemManager.getItemStats(canonical, false);
 			if (!ids.contains(itemComposition.getId()) && itemStats != null && itemStats.isEquipable())
 			{
@@ -246,7 +255,7 @@ public class FashionscapePlugin extends Plugin
 					itemComposition.getInventoryModel(),
 					itemComposition.getColorToReplaceWith(),
 					itemComposition.getTextureToReplaceWith(),
-					stripName(itemComposition.getName())
+					stripName(itemName)
 				);
 				if (itemUniques.contains(itemDupeData))
 				{
