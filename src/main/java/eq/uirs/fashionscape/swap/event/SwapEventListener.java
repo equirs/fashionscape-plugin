@@ -1,4 +1,4 @@
-package eq.uirs.fashionscape.swap;
+package eq.uirs.fashionscape.swap.event;
 
 import java.util.function.Consumer;
 import lombok.RequiredArgsConstructor;
@@ -10,14 +10,14 @@ public abstract class SwapEventListener<T extends SwapEvent>
 
 	abstract Class<T> getEventClass();
 
-	String getKey()
+	public String getKey()
 	{
 		return getEventClass().getName();
 	}
 
 	// onEvent is only ever called for events of type T
 	@SuppressWarnings("unchecked")
-	void onEvent(SwapEvent event)
+	public void onEvent(SwapEvent event)
 	{
 		consumer.accept((T) event);
 	}

@@ -1,10 +1,29 @@
 package eq.uirs.fashionscape.swap;
 
+import com.google.common.base.Objects;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 import eq.uirs.fashionscape.FashionscapeConfig;
 import eq.uirs.fashionscape.data.ColorType;
-import eq.uirs.fashionscape.data.Kit;
+import eq.uirs.fashionscape.data.kit.ArmsKit;
+import eq.uirs.fashionscape.data.kit.BootsKit;
+import eq.uirs.fashionscape.data.kit.HairKit;
+import eq.uirs.fashionscape.data.kit.HandsKit;
+import eq.uirs.fashionscape.data.kit.JawIcon;
+import eq.uirs.fashionscape.data.kit.JawKit;
+import eq.uirs.fashionscape.data.kit.LegsKit;
+import eq.uirs.fashionscape.data.kit.TorsoKit;
+import eq.uirs.fashionscape.swap.event.ColorChanged;
+import eq.uirs.fashionscape.swap.event.ColorLockChanged;
+import eq.uirs.fashionscape.swap.event.IconChanged;
+import eq.uirs.fashionscape.swap.event.IconLockChanged;
+import eq.uirs.fashionscape.swap.event.ItemChanged;
+import eq.uirs.fashionscape.swap.event.KitChanged;
+import eq.uirs.fashionscape.swap.event.KnownKitChanged;
+import eq.uirs.fashionscape.swap.event.LockChanged;
+import eq.uirs.fashionscape.swap.event.SwapEvent;
+import eq.uirs.fashionscape.swap.event.SwapEventListener;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -37,21 +56,21 @@ class SavedSwaps
 
 	static
 	{
-		FALLBACK_MALE_KITS.put(KitType.HAIR, Kit.BALD.getKitId());
-		FALLBACK_MALE_KITS.put(KitType.JAW, Kit.GOATEE.getKitId());
-		FALLBACK_MALE_KITS.put(KitType.TORSO, Kit.PLAIN.getKitId());
-		FALLBACK_MALE_KITS.put(KitType.ARMS, Kit.REGULAR.getKitId());
-		FALLBACK_MALE_KITS.put(KitType.LEGS, Kit.PLAIN_L.getKitId());
-		FALLBACK_MALE_KITS.put(KitType.HANDS, Kit.PLAIN_H.getKitId());
-		FALLBACK_MALE_KITS.put(KitType.BOOTS, Kit.SMALL.getKitId());
+		FALLBACK_MALE_KITS.put(KitType.HAIR, HairKit.BALD.getKitId());
+		FALLBACK_MALE_KITS.put(KitType.JAW, JawKit.GOATEE.getKitId());
+		FALLBACK_MALE_KITS.put(KitType.TORSO, TorsoKit.PLAIN.getKitId());
+		FALLBACK_MALE_KITS.put(KitType.ARMS, ArmsKit.REGULAR.getKitId());
+		FALLBACK_MALE_KITS.put(KitType.LEGS, LegsKit.PLAIN_L.getKitId());
+		FALLBACK_MALE_KITS.put(KitType.HANDS, HandsKit.PLAIN_H.getKitId());
+		FALLBACK_MALE_KITS.put(KitType.BOOTS, BootsKit.SMALL.getKitId());
 
-		FALLBACK_FEMALE_KITS.put(KitType.HAIR, Kit.PIGTAILS.getKitId());
+		FALLBACK_FEMALE_KITS.put(KitType.HAIR, HairKit.PIGTAILS.getKitId());
 		FALLBACK_FEMALE_KITS.put(KitType.JAW, -256);
-		FALLBACK_FEMALE_KITS.put(KitType.TORSO, Kit.SIMPLE.getKitId());
-		FALLBACK_FEMALE_KITS.put(KitType.ARMS, Kit.SHORT_SLEEVES.getKitId());
-		FALLBACK_FEMALE_KITS.put(KitType.LEGS, Kit.PLAIN_LF.getKitId());
-		FALLBACK_FEMALE_KITS.put(KitType.HANDS, Kit.PLAIN_HF.getKitId());
-		FALLBACK_FEMALE_KITS.put(KitType.BOOTS, Kit.SMALL_F.getKitId());
+		FALLBACK_FEMALE_KITS.put(KitType.TORSO, TorsoKit.SIMPLE.getKitId());
+		FALLBACK_FEMALE_KITS.put(KitType.ARMS, ArmsKit.SHORT_SLEEVES.getKitId());
+		FALLBACK_FEMALE_KITS.put(KitType.LEGS, LegsKit.PLAIN_LF.getKitId());
+		FALLBACK_FEMALE_KITS.put(KitType.HANDS, HandsKit.PLAIN_HF.getKitId());
+		FALLBACK_FEMALE_KITS.put(KitType.BOOTS, BootsKit.SMALL_F.getKitId());
 	}
 
 	@Inject
@@ -67,10 +86,16 @@ class SavedSwaps
 	private final HashMap<KitType, Integer> realKitIds = new HashMap<>();
 	// player's real base colors
 	private final Map<ColorType, Integer> realColorIds = new HashMap<>();
+	// player's real jaw icon (derived from real jaw item)
+	@Getter
+	private JawIcon realIcon = JawIcon.NOTHING;
 
 	private final HashMap<KitType, Integer> swappedItemIds = new HashMap<>();
 	private final HashMap<KitType, Integer> swappedKitIds = new HashMap<>();
 	private final HashMap<ColorType, Integer> swappedColorIds = new HashMap<>();
+	// swapped icon is stored as item id
+	@Getter
+	private JawIcon swappedIcon = null;
 	// currently only applicable for slots that exclusively hold items
 	@Getter
 	private final HashSet<KitType> hiddenSlots = new HashSet<>();
@@ -80,6 +105,7 @@ class SavedSwaps
 	// Only valid state where locks differ is item locked, kit unlocked
 	private final Set<KitType> lockedItems = new HashSet<>();
 	private final Set<ColorType> lockedColors = new HashSet<>();
+	private boolean lockedIcon = false;
 
 	private final Map<String, List<SwapEventListener<? extends SwapEvent>>> listeners = new HashMap<>();
 
@@ -104,6 +130,7 @@ class SavedSwaps
 		}
 		byte[] equipment = config.currentEquipment();
 		byte[] colors = config.currentColors();
+		Integer iconId = config.currentIcon();
 		try
 		{
 			Map<KitType, Integer> equipIds = SerializationUtils.deserialize(equipment);
@@ -119,6 +146,11 @@ class SavedSwaps
 			});
 			Map<ColorType, Integer> colorIds = SerializationUtils.deserialize(colors);
 			colorIds.forEach(this::putColor);
+			JawIcon icon = JawIcon.fromId(iconId);
+			if (icon != null)
+			{
+				putIcon(icon);
+			}
 		}
 		catch (Exception ignored)
 		{
@@ -234,12 +266,21 @@ class SavedSwaps
 
 	boolean containsSlot(KitType slot)
 	{
-		return swappedKitIds.containsKey(slot) || swappedItemIds.containsKey(slot);
+		if (swappedKitIds.containsKey(slot))
+		{
+			return true;
+		}
+		return containsItem(slot);
 	}
 
 	boolean containsItem(KitType slot)
 	{
 		return swappedItemIds.containsKey(slot);
+	}
+
+	boolean containsIcon()
+	{
+		return swappedIcon != null;
 	}
 
 	boolean isHidden(KitType slot)
@@ -258,6 +299,10 @@ class SavedSwaps
 		{
 			return;
 		}
+		if (slot == KitType.JAW)
+		{
+			log.warn("putting jaw {} - this should not happen", itemId);
+		}
 		Integer oldId = swappedItemIds.put(slot, itemId);
 		hiddenSlots.remove(slot);
 		if (swappedKitIds.containsKey(slot))
@@ -267,6 +312,18 @@ class SavedSwaps
 		if (!itemId.equals(oldId))
 		{
 			fireEvent(new ItemChanged(slot, itemId));
+			saveEquipmentConfigDebounced();
+		}
+	}
+
+	void putIcon(JawIcon icon)
+	{
+		Integer previousId = swappedIcon != null ? swappedIcon.getId() : null;
+		Integer newId = icon != null ? icon.getId() : null;
+		swappedIcon = icon;
+		if (!Objects.equal(previousId, newId))
+		{
+			fireEvent(new IconChanged(icon));
 			saveEquipmentConfigDebounced();
 		}
 	}
@@ -330,6 +387,11 @@ class SavedSwaps
 		realColorIds.put(type, colorId);
 	}
 
+	void putRealIcon(JawIcon icon)
+	{
+		realIcon = icon;
+	}
+
 	void removeSlot(KitType slot)
 	{
 		removeItem(slot);
@@ -375,6 +437,16 @@ class SavedSwaps
 		}
 	}
 
+	void removeIcon()
+	{
+		if (swappedIcon != null)
+		{
+			swappedIcon = null;
+			fireEvent(new IconChanged(null));
+			saveEquipmentConfigDebounced();
+		}
+	}
+
 	void clearSwapped()
 	{
 		Set<KitType> swappedItems = Sets.union(new HashSet<>(swappedItemIds.keySet()), new HashSet<>(hiddenSlots));
@@ -384,6 +456,7 @@ class SavedSwaps
 		kitSlots.forEach(this::removeKit);
 		Set<ColorType> colorTypes = Sets.difference(new HashSet<>(swappedColorIds.keySet()), lockedColors);
 		colorTypes.forEach(this::removeColor);
+		removeIcon();
 	}
 
 	void clearRealKits()
@@ -396,9 +469,62 @@ class SavedSwaps
 		}
 	}
 
+	Set<KitType> getAllLockedKits()
+	{
+		return Arrays.stream(KitType.values())
+			.filter(lockedKits::contains)
+			.collect(Collectors.toSet());
+	}
+
+	void setLockedKits(Set<KitType> kits)
+	{
+		for (KitType slot : KitType.values())
+		{
+			if (lockedKits.contains(slot) && !kits.contains(slot))
+			{
+				lockedKits.remove(slot);
+				fireEvent(new LockChanged(slot, false, LockChanged.Type.KIT));
+			}
+			else if (!lockedKits.contains(slot) && kits.contains(slot))
+			{
+				lockedKits.add(slot);
+				fireEvent(new LockChanged(slot, true, LockChanged.Type.KIT));
+			}
+		}
+	}
+
+	Set<KitType> getAllLockedItems()
+	{
+		return Arrays.stream(KitType.values())
+			.filter(lockedItems::contains)
+			.collect(Collectors.toSet());
+	}
+
+	void setLockedItems(Set<KitType> items)
+	{
+		for (KitType slot : KitType.values())
+		{
+			if (lockedItems.contains(slot) && !items.contains(slot))
+			{
+				lockedItems.remove(slot);
+				fireEvent(new LockChanged(slot, false, LockChanged.Type.ITEM));
+			}
+			else if (!lockedItems.contains(slot) && items.contains(slot))
+			{
+				lockedItems.add(slot);
+				fireEvent(new LockChanged(slot, true, LockChanged.Type.ITEM));
+			}
+		}
+	}
+
+	void setIconLocked(boolean locked)
+	{
+		lockedIcon = locked;
+	}
+
 	boolean isSlotLocked(KitType slot)
 	{
-		return lockedKits.contains(slot) || lockedItems.contains(slot);
+		return isKitLocked(slot) || isItemLocked(slot);
 	}
 
 	boolean isKitLocked(KitType slot)
@@ -414,6 +540,11 @@ class SavedSwaps
 	boolean isColorLocked(ColorType type)
 	{
 		return lockedColors.contains(type);
+	}
+
+	boolean isIconLocked()
+	{
+		return lockedIcon;
 	}
 
 	void toggleItemLocked(KitType slot)
@@ -461,6 +592,12 @@ class SavedSwaps
 		fireEvent(new ColorLockChanged(type, isColorLocked(type)));
 	}
 
+	void toggleIconLocked()
+	{
+		lockedIcon = !lockedIcon;
+		fireEvent(new IconLockChanged(isIconLocked()));
+	}
+
 	void removeAllLocks()
 	{
 		Set<KitType> slotClears = new HashSet<>(lockedKits);
@@ -469,8 +606,10 @@ class SavedSwaps
 		lockedKits.clear();
 		lockedItems.clear();
 		lockedColors.clear();
+		lockedIcon = false;
 		slotClears.forEach(slot -> fireEvent(new LockChanged(slot, false, LockChanged.Type.BOTH)));
 		colorClears.forEach(type -> fireEvent(new ColorLockChanged(type, false)));
+		fireEvent(new IconLockChanged(false));
 	}
 
 	void removeSlotLock(KitType slot)
@@ -484,6 +623,12 @@ class SavedSwaps
 	{
 		lockedColors.remove(type);
 		fireEvent(new ColorLockChanged(type, false));
+	}
+
+	void removeIconLock()
+	{
+		lockedIcon = false;
+		fireEvent(new IconLockChanged(false));
 	}
 
 	private void fireEvent(SwapEvent event)
@@ -518,6 +663,8 @@ class SavedSwaps
 			equips.putAll(hides);
 			byte[] bytes = SerializationUtils.serialize(equips);
 			config.setCurrentEquipment(bytes);
+			Integer iconId = swappedIcon != null ? swappedIcon.getId() : null;
+			config.setCurrentIcon(iconId);
 		}, DEBOUNCE_DELAY_MS, TimeUnit.MILLISECONDS);
 	}
 

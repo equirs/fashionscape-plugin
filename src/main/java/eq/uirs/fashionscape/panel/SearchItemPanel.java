@@ -15,11 +15,13 @@ import javax.annotation.Nullable;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.border.EmptyBorder;
+import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.kit.KitType;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.ui.ColorScheme;
 
+@Slf4j
 class SearchItemPanel extends AbsItemPanel
 {
 	private final SwapManager swapManager;

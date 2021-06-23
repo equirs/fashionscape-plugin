@@ -2,12 +2,13 @@ package eq.uirs.fashionscape.panel;
 
 import eq.uirs.fashionscape.FashionscapePlugin;
 import eq.uirs.fashionscape.data.ColorType;
-import eq.uirs.fashionscape.swap.ColorChangedListener;
-import eq.uirs.fashionscape.swap.ColorLockChangedListener;
-import eq.uirs.fashionscape.swap.ItemChangedListener;
-import eq.uirs.fashionscape.swap.KitChangedListener;
-import eq.uirs.fashionscape.swap.LockChangedListener;
 import eq.uirs.fashionscape.swap.SwapManager;
+import eq.uirs.fashionscape.swap.event.ColorChangedListener;
+import eq.uirs.fashionscape.swap.event.ColorLockChangedListener;
+import eq.uirs.fashionscape.swap.event.IconChangedListener;
+import eq.uirs.fashionscape.swap.event.ItemChangedListener;
+import eq.uirs.fashionscape.swap.event.KitChangedListener;
+import eq.uirs.fashionscape.swap.event.LockChangedListener;
 import java.awt.BorderLayout;
 import java.awt.Cursor;
 import java.awt.GridBagConstraints;
@@ -170,6 +171,7 @@ public class FashionscapePanel extends PluginPanel
 		swapManager.addEventListener(new ItemChangedListener(e -> saveClearListener.run()));
 		swapManager.addEventListener(new KitChangedListener(e -> saveClearListener.run()));
 		swapManager.addEventListener(new ColorChangedListener(e -> saveClearListener.run()));
+		swapManager.addEventListener(new IconChangedListener(e -> saveClearListener.run()));
 	}
 
 	public void onGameStateChanged(GameStateChanged event)
@@ -198,6 +200,14 @@ public class FashionscapePanel extends PluginPanel
 		if (searchPanel != null)
 		{
 			searchPanel.reloadResults();
+		}
+	}
+
+	public void refreshKitsPanel()
+	{
+		if (kitsPanel != null)
+		{
+			kitsPanel.populateKitSlots();
 		}
 	}
 
@@ -422,7 +432,8 @@ public class FashionscapePanel extends PluginPanel
 			.map(swapManager::swappedColorIdIn)
 			.filter(Objects::nonNull)
 			.count();
-		return numSlotSwaps + numColorSwaps > 0;
+		boolean hasIcon = swapManager.swappedIcon() != null;
+		return numSlotSwaps + numColorSwaps > 0 || hasIcon;
 	}
 
 	private boolean hasUnlocked()
@@ -437,7 +448,8 @@ public class FashionscapePanel extends PluginPanel
 			.map(swapManager::isColorLocked)
 			.filter(b -> !b)
 			.count();
-		return numUnlockedSlots + numUnlockedColors > 0;
+		long unlockedIcon = swapManager.isIconLocked() ? 0 : 1;
+		return numUnlockedSlots + numUnlockedColors + unlockedIcon > 0;
 	}
 
 	private void checkButtonEnabled(JButton button, Boolean isLoggedIn, Boolean hasUnlocked, Boolean hasNonEmpty)

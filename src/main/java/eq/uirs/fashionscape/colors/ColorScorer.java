@@ -6,6 +6,8 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
 import eq.uirs.fashionscape.data.ColorType;
 import eq.uirs.fashionscape.data.Colorable;
+import eq.uirs.fashionscape.data.kit.JawIcon;
+import eq.uirs.fashionscape.data.kit.JawKit;
 import eq.uirs.fashionscape.swap.SwapManager;
 import java.awt.Color;
 import java.io.BufferedReader;
@@ -23,11 +25,13 @@ import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import lombok.Value;
+import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.Player;
 import net.runelite.api.PlayerComposition;
 import net.runelite.api.kit.KitType;
 
+@Slf4j
 @Singleton
 public class ColorScorer
 {
@@ -95,6 +99,15 @@ public class ColorScorer
 			if (itemId != null)
 			{
 				kitColors.put(slot, colorsFor(itemId));
+			}
+		}
+		JawIcon icon = swapManager.swappedIcon();
+		if (icon != null)
+		{
+			Integer iconItemId = JawKit.NO_JAW.getIconItemId(icon);
+			if (iconItemId != null)
+			{
+				kitColors.put(KitType.JAW, colorsFor(iconItemId));
 			}
 		}
 	}

@@ -1,10 +1,12 @@
 package eq.uirs.fashionscape.swap;
 
+import eq.uirs.fashionscape.data.kit.JawIcon;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import lombok.Getter;
 import lombok.NonNull;
 import net.runelite.api.kit.KitType;
@@ -23,17 +25,21 @@ class CompoundSwap
 	@NonNull
 	private final Map<KitType, Integer> equipmentIds;
 
-	public static List<CompoundSwap> fromMap(Map<KitType, Integer> equipmentIds)
+	@Getter
+	@Nullable
+	private final JawIcon icon;
+
+	public static List<CompoundSwap> fromMap(Map<KitType, Integer> equipmentIds, @Nullable JawIcon icon)
 	{
 		List<CompoundSwap> result = new ArrayList<>();
 		Map<Type, Map<KitType, Integer>> grouping = equipmentIds.entrySet().stream()
 			.collect(Collectors.groupingBy(
 				e -> Type.fromSlot(e.getKey()),
 				Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)));
-		Map<KitType, Integer> heads = grouping.get(Type.HEAD);
-		if (heads != null && !heads.isEmpty())
+		Map<KitType, Integer> heads = grouping.get(Type.HEAD) != null ? grouping.get(Type.HEAD) : new HashMap<>();
+		if (!heads.isEmpty() || icon != null)
 		{
-			result.add(head(heads.get(KitType.HEAD), heads.get(KitType.HAIR), heads.get(KitType.JAW)));
+			result.add(head(heads.get(KitType.HEAD), heads.get(KitType.HAIR), heads.get(KitType.JAW), icon));
 		}
 		Map<KitType, Integer> torsos = grouping.get(Type.TORSO);
 		if (torsos != null && !torsos.isEmpty())
@@ -55,7 +61,7 @@ class CompoundSwap
 
 	enum Type
 	{
-		// hair jaw head
+		// hair jaw head icon
 		HEAD,
 		// torso arms
 		TORSO,
@@ -89,11 +95,11 @@ class CompoundSwap
 		switch (slot)
 		{
 			case HEAD:
-				return head(equipmentId, null, null);
+				return head(equipmentId, null, null, null);
 			case HAIR:
-				return head(null, equipmentId, null);
+				return head(null, equipmentId, null, null);
 			case JAW:
-				return head(null, null, equipmentId);
+				return head(null, null, equipmentId, null);
 			case TORSO:
 				return torso(equipmentId, null);
 			case ARMS:
@@ -105,16 +111,21 @@ class CompoundSwap
 		}
 		Map<KitType, Integer> map = new HashMap<>();
 		map.put(slot, equipmentId);
-		return new CompoundSwap(Type.SINGLE, map);
+		return new CompoundSwap(Type.SINGLE, map, null);
 	}
 
-	static CompoundSwap head(Integer headEquipId, Integer hairEquipId, Integer jawEquipId)
+	static CompoundSwap fromIcon(JawIcon icon)
+	{
+		return new CompoundSwap(Type.HEAD, new HashMap<>(), icon);
+	}
+
+	static CompoundSwap head(Integer headEquipId, Integer hairEquipId, Integer jawEquipId, JawIcon icon)
 	{
 		Map<KitType, Integer> map = new HashMap<>();
 		map.put(KitType.HEAD, headEquipId);
 		map.put(KitType.HAIR, hairEquipId);
 		map.put(KitType.JAW, jawEquipId);
-		return new CompoundSwap(Type.HEAD, map);
+		return new CompoundSwap(Type.HEAD, map, icon);
 	}
 
 	static CompoundSwap torso(Integer torsoEquipId, Integer armsEquipId)
@@ -122,7 +133,7 @@ class CompoundSwap
 		Map<KitType, Integer> map = new HashMap<>();
 		map.put(KitType.TORSO, torsoEquipId);
 		map.put(KitType.ARMS, armsEquipId);
-		return new CompoundSwap(Type.TORSO, map);
+		return new CompoundSwap(Type.TORSO, map, null);
 	}
 
 	static CompoundSwap weapons(Integer weaponEquipId, Integer shieldEquipId)
@@ -130,13 +141,14 @@ class CompoundSwap
 		Map<KitType, Integer> map = new HashMap<>();
 		map.put(KitType.WEAPON, weaponEquipId);
 		map.put(KitType.SHIELD, shieldEquipId);
-		return new CompoundSwap(Type.WEAPONS, map);
+		return new CompoundSwap(Type.WEAPONS, map, null);
 	}
 
-	private CompoundSwap(Type type, Map<KitType, Integer> equipmentIds)
+	private CompoundSwap(Type type, Map<KitType, Integer> equipmentIds, JawIcon icon)
 	{
 		this.type = type;
 		this.equipmentIds = equipmentIds;
+		this.icon = icon;
 	}
 
 	/**
