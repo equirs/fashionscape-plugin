@@ -120,7 +120,20 @@ public enum Pet
 	ZIGGY(ItemID.ZIGGY, NpcID.ZIGGY_9853, 7315, 7316, "Ziggy"),
 	LIL_CREATOR(ItemID.LIL_CREATOR, NpcID.LIL_CREATOR_3566, 8842, 8846, "Lil' creator"),
 	LIL_DESTRUCTOR(ItemID.LIL_DESTRUCTOR, NpcID.LIL_DESTRUCTOR_5008, 3079, 8847, "Lil' destructor"),
-	JALREK_JAD(ItemID.JALREKJAD, NpcID.JALREKJAD_10625, 7589, 8857, "Jalrek-jad");
+	JALREK_JAD(ItemID.JALREKJAD, NpcID.JALREKJAD_10625, 7589, 8857, "Jalrek-jad"),
+
+
+	// TODO need anim ids other than mole
+	TINY_TEMPOR(ItemID.TINY_TEMPOR, NpcID.TINY_TEMPOR_10637, -1, -1, "Tiny tempor"),
+	BABY_MOLE_RAT(ItemID.BABY_MOLERAT, NpcID.BABY_MOLERAT_10651, 3309, 3313, "Baby mole-rat"),
+	LIL_MAIDEN(ItemID.LIL_MAIDEN, NpcID.LIL_MAIDEN_10870, -1, -1, "Lil' maiden"),
+	LIL_BLOAT(ItemID.LIL_BLOAT, NpcID.LIL_BLOAT_10871, -1, -1, "Lil' bloat"),
+	LIL_NYLO(ItemID.LIL_NYLO, NpcID.LIL_NYLO_10872, -1, -1, "Lil' nylo"),
+	LIL_SOT(ItemID.LIL_SOT, NpcID.LIL_SOT_10873, -1, -1, "Lil' sot"),
+	LIL_XARP(ItemID.LIL_XARP, NpcID.LIL_XARP_10874, -1, -1, "Lil' xarp"),
+
+	;
+
 
 	@Getter
 	private final int itemId;

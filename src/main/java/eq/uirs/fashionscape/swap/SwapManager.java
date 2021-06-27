@@ -318,13 +318,13 @@ public class SwapManager
 		}
 	}
 
-	private SwapDiff refreshPetSwap()
+	private void refreshPetSwap()
 	{
 		if (follower == null)
 		{
-			return SwapDiff.blank();
+			return;
 		}
-		return swapPet(savedSwaps.getSwappedPetId(), SwapMode.PREVIEW);
+		swapPet(savedSwaps.getSwappedPetId(), SwapMode.PREVIEW);
 	}
 
 	public void refreshPetAnimations()
