@@ -339,6 +339,10 @@ public class SwapManager
 			JawIcon icon = JawKit.iconFromItemId(jawEquipId - 512);
 			savedSwaps.putRealIcon(icon);
 		}
+		else
+		{
+			savedSwaps.putRealIcon(JawIcon.NOTHING);
+		}
 		int bootKitId = playerComposition.getKitId(KitType.BOOTS);
 		int weaponItemId = playerComposition.getEquipmentIds()[KitType.WEAPON.getIndex()] - 512;
 		if (ItemInteractions.DISABLE_BOOT_KITS.contains(bootKitId))
