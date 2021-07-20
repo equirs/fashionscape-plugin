@@ -20,7 +20,9 @@ public interface Kit
 			case LEGS:
 				return LegsKit.values();
 			case HANDS:
-				return HandsKit.values();
+				return Arrays.stream(HandsKit.values())
+					.filter(kit -> includeHidden || !kit.isHidden())
+					.toArray(HandsKit[]::new);
 			case BOOTS:
 				return Arrays.stream(BootsKit.values())
 					.filter(kit -> includeHidden || !kit.isHidden())

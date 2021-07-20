@@ -83,6 +83,7 @@ class SavedSwaps
 	private ScheduledExecutorService executor;
 
 	// player's real kit ids, e.g., hairstyles, base clothing
+	@Getter
 	private final HashMap<KitType, Integer> realKitIds = new HashMap<>();
 	// player's real base colors
 	private final Map<ColorType, Integer> realColorIds = new HashMap<>();

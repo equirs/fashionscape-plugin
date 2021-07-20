@@ -298,10 +298,7 @@ public class SwapManager
 			return;
 		}
 		boolean female = playerComposition.isFemale();
-		if (isFemale != null && female != isFemale)
-		{
-			savedSwaps.clearRealKits();
-		}
+		checkRealKits(female);
 		isFemale = female;
 		if (isFemale)
 		{
@@ -363,6 +360,18 @@ public class SwapManager
 			disabledSlots.clear();
 		}
 		refreshDisabledSlots();
+	}
+
+	private void checkRealKits(boolean female) {
+		boolean containsOppositeGenderKits = savedSwaps.getRealKitIds().entrySet().stream()
+			.anyMatch(e -> {
+				Kit kit = KIT_ID_TO_KIT.get(e.getValue());
+				return kit != null && kit.isFemale() != female;
+			});
+		if (containsOppositeGenderKits)
+		{
+			savedSwaps.clearRealKits();
+		}
 	}
 
 	private void refreshDisabledSlots()
@@ -967,41 +976,77 @@ public class SwapManager
 		{
 			return new HashMap<>();
 		}
-		Map<KitType, Integer> newKitEquipIds = new HashMap<>();
+		Map<KitType, Integer> newEquipIds = new HashMap<>();
 		equipmentIds.forEach((slot, equipId) -> {
-			if (equipId >= 256 && equipId < 512)
+			if (equipId >= 256 && equipId < 512 || equipId >= 512 && slot == KitType.JAW)
 			{
-				Kit kit = KIT_ID_TO_KIT.get(equipId - 256);
-				if (kit != null)
+				Integer newEquipId = getAnalogousEquipmentId(equipId);
+				if (newEquipId != null)
 				{
-					if (isFemale == kit.isFemale())
-					{
-						newKitEquipIds.put(slot, equipId);
-					}
-					else
-					{
-						BiMap<Kit, Kit> lookup = isFemale ?
-							ItemInteractions.MALE_TO_FEMALE_KITS :
-							ItemInteractions.MALE_TO_FEMALE_KITS.inverse();
-						if (lookup.containsKey(kit))
-						{
-							newKitEquipIds.put(slot, lookup.get(kit).getKitId() + 256);
-						}
-					}
+					newEquipIds.put(slot, newEquipId);
 				}
-				else
-				{
-					// can't determine kit but put it there anyway
-					newKitEquipIds.put(slot, equipId);
-				}
+			}
+			else if (equipId >= 512)
+			{
+				newEquipIds.put(slot, equipId);
 			}
 		});
 		Map<KitType, Integer> removals = equipmentIds.entrySet().stream()
 			.filter(e -> e.getValue() == 0 && !getNonZeroSlots().contains(e.getKey()))
 			.collect(Collectors.toMap(Map.Entry::getKey, entry -> 0));
-		equipmentIds.putAll(newKitEquipIds);
-		equipmentIds.putAll(removals);
-		return equipmentIds;
+		newEquipIds.putAll(removals);
+		return newEquipIds;
+	}
+
+	/**
+	 * Attempts to match the given (kit/icon) equipment id with one that matches
+	 * the current player's gender. Returns null if no analogue is found.
+	 */
+	@Nullable
+	private Integer getAnalogousEquipmentId(int equipId)
+	{
+		Integer result = null;
+		JawIcon icon = JawIcon.NOTHING;
+		if (equipId >= 512)
+		{
+			JawKit kit = JawKit.fromEquipmentId(equipId);
+			if (kit != null)
+			{
+				icon = JawKit.iconFromItemId(equipId - 512);
+				equipId = kit.getKitId() + 256;
+			}
+		}
+		Kit kit = KIT_ID_TO_KIT.get(equipId - 256);
+		if (kit != null)
+		{
+			if (isFemale == kit.isFemale())
+			{
+				result = equipId;
+			}
+			else
+			{
+				BiMap<Kit, Kit> lookup = isFemale ?
+					ItemInteractions.MALE_TO_FEMALE_KITS :
+					ItemInteractions.MALE_TO_FEMALE_KITS.inverse();
+				if (lookup.containsKey(kit))
+				{
+					result = lookup.get(kit).getKitId() + 256;
+				}
+			}
+			if (icon != JawIcon.NOTHING)
+			{
+				if (result != null)
+				{
+					Integer itemId = JawKit.fromEquipmentId(result).getIconItemId(icon);
+					result = itemId != null ? itemId + 512 : result;
+				}
+				else
+				{
+					result = combineJawIcon(null, icon);
+				}
+			}
+		}
+		return result;
 	}
 
 	/**
@@ -1018,7 +1063,7 @@ public class SwapManager
 			return NEVER_ZERO_SLOTS_MALE;
 		}
 	}
-
+	
 	/**
 	 * Randomizes items/kits/colors in unlocked slots.
 	 * Can only be called from the client thread.

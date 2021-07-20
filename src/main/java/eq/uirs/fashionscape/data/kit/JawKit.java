@@ -28,7 +28,7 @@ public enum JawKit implements Kit
 	GOATEE("Goatee", false, 10,
 		new ImmutableMap.Builder<JawIcon, Integer>()
 			.put(JawIcon.BA_ATTACKER, 23460)
-			.put(JawIcon.BA_DEFENDER, 23460)
+			.put(JawIcon.BA_DEFENDER, 23466)
 			.put(JawIcon.BA_COLLECTOR, 22339)
 			.put(JawIcon.BA_HEALER, 23478)
 			.put(JawIcon.SW_BLUE, 25213)

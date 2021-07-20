@@ -164,6 +164,7 @@ public class ItemInteractions
 		mToF.put(LegsKit.PATCHED, LegsKit.PATCHED_SKIRT);
 		mToF.put(HandsKit.PLAIN_H, HandsKit.PLAIN_HF);
 		mToF.put(HandsKit.BRACERS, HandsKit.BRACERS_F);
+		mToF.put(HandsKit.BRACERS2, HandsKit.BRACERS_F2);
 		mToF.put(BootsKit.SMALL, BootsKit.SMALL_F);
 		mToF.put(BootsKit.LARGE, BootsKit.LARGE_F);
 		mToF.put(BootsKit.LARGE_2, BootsKit.LARGE_F2);
