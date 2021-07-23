@@ -1,6 +1,6 @@
 # Fashionscape
 
-Docs for version: ***1.1.11***
+Docs for version: ***1.1.12***
 
 RuneLite plugin that enables cosmetic changes to your character's equipped items, base models, colours, and more.
 Other players can't see the changes this plugin makes; the intention is to provide a tool for players to preview
