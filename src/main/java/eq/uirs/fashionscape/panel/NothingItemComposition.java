@@ -1,5 +1,6 @@
 package eq.uirs.fashionscape.panel;
 
+import javax.annotation.Nullable;
 import net.runelite.api.ItemComposition;
 import net.runelite.api.IterableHashTable;
 import net.runelite.api.Node;
@@ -16,6 +17,12 @@ class NothingItemComposition implements ItemComposition
 	public String getName()
 	{
 		return NAME;
+	}
+
+	@Override
+	public void setName(String name)
+	{
+
 	}
 
 	@Override
@@ -96,14 +103,28 @@ class NothingItemComposition implements ItemComposition
 	}
 
 	@Override
-	public void resetShiftClickActionIndex()
-	{
-	}
-
-	@Override
 	public int getInventoryModel()
 	{
 		return 0;
+	}
+
+	@Override
+	public void setInventoryModel(int model)
+	{
+
+	}
+
+	@Nullable
+	@Override
+	public short[] getColorToReplace()
+	{
+		return new short[0];
+	}
+
+	@Override
+	public void setColorToReplace(short[] colorsToReplace)
+	{
+
 	}
 
 	@Override
@@ -113,9 +134,70 @@ class NothingItemComposition implements ItemComposition
 	}
 
 	@Override
+	public void setColorToReplaceWith(short[] colorToReplaceWith)
+	{
+
+	}
+
+	@Nullable
+	@Override
+	public short[] getTextureToReplace()
+	{
+		return new short[0];
+	}
+
+	@Override
+	public void setTextureToReplace(short[] textureToFind)
+	{
+
+	}
+
+	@Override
 	public short[] getTextureToReplaceWith()
 	{
 		return new short[0];
+	}
+
+	@Override
+	public void setTextureToReplaceWith(short[] textureToReplaceWith)
+	{
+
+	}
+
+	@Override
+	public int getXan2d()
+	{
+		return 0;
+	}
+
+	@Override
+	public int getYan2d()
+	{
+		return 0;
+	}
+
+	@Override
+	public int getZan2d()
+	{
+		return 0;
+	}
+
+	@Override
+	public void setXan2d(int angle)
+	{
+
+	}
+
+	@Override
+	public void setYan2d(int angle)
+	{
+
+	}
+
+	@Override
+	public void setZan2d(int angle)
+	{
+
 	}
 
 	@Override

@@ -51,4 +51,5 @@ public class IdleAnimationID
 	public static final int GOLDEN_TENCH = 8208;
 	public static final int SPOOKY_LANTERN = 8521;
 	public static final int CLAN_VEXILLUM = 9018;
+	public static final int SKIS = 9341;
 }
