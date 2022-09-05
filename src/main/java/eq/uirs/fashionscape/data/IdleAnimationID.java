@@ -52,4 +52,6 @@ public class IdleAnimationID
 	public static final int SPOOKY_LANTERN = 8521;
 	public static final int CLAN_VEXILLUM = 9018;
 	public static final int SKIS = 9341;
+	public static final int COLOSSAL_BLADE = 9460;
+	public static final int TUMEKENS_SHADOW = 9494;
 }

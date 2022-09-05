@@ -20,6 +20,12 @@ class NothingItemComposition implements ItemComposition
 	}
 
 	@Override
+	public String getMembersName()
+	{
+		return NAME;
+	}
+
+	@Override
 	public void setName(String name)
 	{
 
