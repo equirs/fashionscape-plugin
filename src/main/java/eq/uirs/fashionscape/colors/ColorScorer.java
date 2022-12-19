@@ -54,11 +54,11 @@ public class ColorScorer
 	}
 
 	@Inject
-	ColorScorer(Client client, SwapManager swapManager)
+	ColorScorer(Client client, SwapManager swapManager, Gson baseGson)
 	{
 		this.client = client;
 		this.swapManager = swapManager;
-		GsonBuilder builder = new GsonBuilder()
+		GsonBuilder builder = baseGson.newBuilder()
 			.registerTypeAdapter(ItemColors.class, new ItemColors.Deserializer());
 		Gson gson = builder.create();
 		InputStream stream = this.getClass().getResourceAsStream("colors.json");
