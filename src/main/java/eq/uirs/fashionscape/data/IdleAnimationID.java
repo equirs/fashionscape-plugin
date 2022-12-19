@@ -54,4 +54,5 @@ public class IdleAnimationID
 	public static final int SKIS = 9341;
 	public static final int COLOSSAL_BLADE = 9460;
 	public static final int TUMEKENS_SHADOW = 9494;
+	public static final int GIANT_STOPWATCH = 9814;
 }
