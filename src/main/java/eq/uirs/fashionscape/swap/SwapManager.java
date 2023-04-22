@@ -95,7 +95,16 @@ public class SwapManager
 		{
 			for (Kit value : Kit.allInSlot(slot, true))
 			{
-				KIT_ID_TO_KIT.put(value.getKitId(), value);
+				Integer maleId = value.getKitId(false);
+				if (maleId != null)
+				{
+					KIT_ID_TO_KIT.put(maleId, value);
+				}
+				Integer femaleId = value.getKitId(true);
+				if (femaleId != null)
+				{
+					KIT_ID_TO_KIT.put(femaleId, value);
+				}
 			}
 		}
 	}
@@ -297,7 +306,7 @@ public class SwapManager
 		{
 			return;
 		}
-		boolean female = playerComposition.isFemale();
+		boolean female = playerComposition.getGender() == 1;
 		checkRealKits(female);
 		isFemale = female;
 		if (isFemale)
@@ -362,11 +371,12 @@ public class SwapManager
 		refreshDisabledSlots();
 	}
 
-	private void checkRealKits(boolean female) {
+	private void checkRealKits(boolean female)
+	{
 		boolean containsOppositeGenderKits = savedSwaps.getRealKitIds().entrySet().stream()
 			.anyMatch(e -> {
 				Kit kit = KIT_ID_TO_KIT.get(e.getValue());
-				return kit != null && kit.isFemale() != female;
+				return kit != null && kit.getKitId(female) == null;
 			});
 		if (containsOppositeGenderKits)
 		{
@@ -1013,15 +1023,20 @@ public class SwapManager
 			if (kit != null)
 			{
 				icon = JawKit.iconFromItemId(equipId - 512);
-				equipId = kit.getKitId() + 256;
+				Integer jawKitId = kit.getKitId(isFemale);
+				if (jawKitId != null)
+				{
+					equipId = jawKitId + 256;
+				}
 			}
 		}
 		Kit kit = KIT_ID_TO_KIT.get(equipId - 256);
 		if (kit != null)
 		{
-			if (isFemale == kit.isFemale())
+			Integer kitId = kit.getKitId(isFemale);
+			if (kitId != null)
 			{
-				result = equipId;
+				result = kitId + 256;
 			}
 			else
 			{
@@ -1030,7 +1045,11 @@ public class SwapManager
 					ItemInteractions.MALE_TO_FEMALE_KITS.inverse();
 				if (lookup.containsKey(kit))
 				{
-					result = lookup.get(kit).getKitId() + 256;
+					Integer analogKitId = lookup.get(kit).getKitId(isFemale);
+					if (analogKitId != null)
+					{
+						result = analogKitId + 256;
+					}
 				}
 			}
 			if (icon != JawIcon.NOTHING)
@@ -1063,7 +1082,7 @@ public class SwapManager
 			return NEVER_ZERO_SLOTS_MALE;
 		}
 	}
-	
+
 	/**
 	 * Randomizes items/kits/colors in unlocked slots.
 	 * Can only be called from the client thread.
@@ -1247,12 +1266,12 @@ public class SwapManager
 				.filter(slot -> !newSwaps.containsKey(slot) && isOpen(slot))
 				.map(slot -> {
 					List<Kit> kits = KIT_TYPE_TO_KITS.getOrDefault(slot, new ArrayList<>()).stream()
-						.filter(k -> k.isFemale() == isFemale)
+						.filter(k -> k.getKitId(isFemale) != null)
 						.collect(Collectors.toList());
 					return kits.isEmpty() ? null : kits.get(r.nextInt(kits.size()));
 				})
 				.filter(Objects::nonNull)
-				.collect(Collectors.toMap(Kit::getKitType, Kit::getKitId));
+				.collect(Collectors.toMap(Kit::getKitType, k -> k.getKitId(isFemale)));
 
 			Map<KitType, Integer> kitEquipSwaps = kitSwaps.entrySet().stream()
 				.collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue() + 256));
@@ -1578,16 +1597,11 @@ public class SwapManager
 					if (jawEquipId == null)
 					{
 						finalJawId = combineJawIcon(0, adjustedIcon);
-						finalHeadId = null;
 					}
 					else
 					{
 						finalHeadId = 0;
 					}
-				}
-				else
-				{
-					finalHeadId = null;
 				}
 			}
 		}
@@ -1919,12 +1933,13 @@ public class SwapManager
 			JawKit kit = JawKit.fromEquipmentId(equipId);
 			if (kit != null)
 			{
-				return kit.getKitId() + 256;
+				Integer kitId = kit.getKitId(isFemale);
+				if (kitId != null)
+				{
+					return kitId + 256;
+				}
 			}
-			else
-			{
-				return equipId;
-			}
+			return equipId;
 		};
 		// adjust equipment ids for jaw swaps since diff could be icon-only
 		int saveId = equipmentId;
@@ -2123,10 +2138,14 @@ public class SwapManager
 		JawKit kit = JawKit.fromEquipmentId(jawEquipId);
 		if (kit != null)
 		{
-			Map<SwapDiff.Change.Type, SwapDiff.Change> changes = swap(KitType.JAW, kit.getKitId() + 256,
-				SwapMode.PREVIEW, SwapMode.REVERT, false);
-			SwapDiff.Change iconChange = changes.get(SwapDiff.Change.Type.ICON);
-			return new SwapDiff(new HashMap<>(), new HashMap<>(), iconChange, null);
+			Integer kitId = kit.getKitId(isFemale);
+			if (kitId != null)
+			{
+				Map<SwapDiff.Change.Type, SwapDiff.Change> changes = swap(KitType.JAW, kitId + 256,
+					SwapMode.PREVIEW, SwapMode.REVERT, false);
+				SwapDiff.Change iconChange = changes.get(SwapDiff.Change.Type.ICON);
+				return new SwapDiff(new HashMap<>(), new HashMap<>(), iconChange, null);
+			}
 		}
 		return SwapDiff.blank();
 	}

@@ -6,36 +6,30 @@ import net.runelite.api.kit.KitType;
 @RequiredArgsConstructor
 public enum ArmsKit implements Kit
 {
-	REGULAR("Regular", false, 26),
-	MUSCLEBOUND("Musclebound", false, 27),
-	LOOSE_SLEEVED("Loose sleeved", false, 28),
-	LARGE_CUFFED("Large cuffed", false, 29),
-	THIN("Thin", false, 30),
-	SHOULDER_PADS("Shoulder pads", false, 31),
-	THIN_STRIPE("Thin stripe", false, 32),
-	THICK_STRIPE("Thick stripe", false, 84),
-	WHITE_CUFFS("White cuffs", false, 85),
-	PRINCELY_A("Princely", false, 86),
-	TATTY("Tatty", false, 87),
-	RIPPED("Ripped", false, 88),
+	REGULAR(26, null),
+	MUSCLEBOUND(27, null),
+	LOOSE_SLEEVED(28, null),
+	LARGE_CUFFED(29, null),
+	THIN(30, null),
+	SHOULDER_PADS(31, null),
+	THIN_STRIPE(32, 97),
+	THICK_STRIPE(84, null),
+	WHITE_CUFFS(85, 96),
+	PRINCELY_A(86, null),
+	TATTY(87, 98),
+	RIPPED(88, null),
+	SHORT_SLEEVES(null, 61),
+	BARE_ARMS(null, 62),
+	MUSCLEY(null, 63),
+	LONG_SLEEVED(null, 64),
+	LARGE_CUFFS(null, 65),
+	FRILLY_A(null, 66),
+	SWEATER_A(null, 95),
+	BARE_SHOULDERS(null, 99);
 
-	SHORT_SLEEVES("Short sleeves", true, 61),
-	BARE_ARMS("Bare arms", true, 62),
-	MUSCLEY("Muscley", true, 63),
-	LONG_SLEEVED("Long sleeved", true, 64),
-	LARGE_CUFFS("Large cuffs", true, 65),
-	FRILLY_A("Frilly", true, 66),
-	SWEATER_A("Sweater", true, 95),
-	WHITE_CUFFS_F("White cuffs", true, 96),
-	THIN_STRIPE_F("Thin stripe", true, 97),
-	TATTY_F("Tatty", true, 98),
-	BARE_SHOULDERS("Bare shoulders", true, 99);
+	private final Integer maleKitId;
 
-	private final String displayName;
-
-	private final boolean isFemale;
-
-	private final int kitId;
+	private final Integer femaleKitId;
 
 	@Override
 	public KitType getKitType()
@@ -46,18 +40,27 @@ public enum ArmsKit implements Kit
 	@Override
 	public String getDisplayName()
 	{
-		return displayName;
+		switch (this)
+		{
+			case PRINCELY_A:
+				return "Princely";
+			case FRILLY_A:
+				return "Frilly";
+			case SWEATER_A:
+				return "Sweater";
+		}
+		return Kit.sentenceCaseName(this);
 	}
 
 	@Override
-	public boolean isFemale()
+	public boolean isHidden()
 	{
-		return isFemale;
+		return false;
 	}
 
 	@Override
-	public int getKitId()
+	public Integer getKitId(boolean isFemale)
 	{
-		return kitId;
+		return isFemale ? femaleKitId : maleKitId;
 	}
 }

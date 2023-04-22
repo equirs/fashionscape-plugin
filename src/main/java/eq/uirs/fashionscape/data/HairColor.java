@@ -34,7 +34,12 @@ public enum HairColor implements Colorable
 	LIGHT_GREEN(21, new Color(145, 202, 146)),
 	DARK_GREEN(22, new Color(59, 88, 79)),
 	PURPLE(23, new Color(136, 65, 178)),
-	LIGHT_PURPLE(24, new Color(185, 141, 200));
+	LIGHT_PURPLE(24, new Color(185, 141, 200)),
+	NAVY_BLUE(25, new Color(36, 37, 67)),
+	BRIGHT_RED(26, new Color(155, 13, 5)),
+	YELLOW(27, new Color(248, 203, 18)),
+	DARK_PURPLE(28, new Color(56, 2, 74)),
+	AQUA(29, new Color(31, 155, 127));
 
 	private static final HairColor[] sorted = Arrays.stream(values())
 		.sorted(Comparator.comparing(HairColor::getColorId))

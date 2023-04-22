@@ -12,7 +12,7 @@ public enum SkinColor implements Colorable
 {
 	VERY_PALE(7, new Color(213, 169, 133)),
 	PALE(0, new Color(187, 143, 106)),
-	NORMAL(1, new Color(164, 127, 93)),
+	DEFAULT(1, new Color(164, 127, 93)),
 	SLIGHTLY_TAN(2, new Color(158, 122, 73)),
 	TAN(3, new Color(131, 110, 66)),
 	VERY_TAN(4, new Color(121, 88, 42)),

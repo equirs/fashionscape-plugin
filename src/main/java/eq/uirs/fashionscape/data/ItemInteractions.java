@@ -5,11 +5,8 @@ import com.google.common.collect.ImmutableBiMap;
 import com.google.common.collect.ImmutableSet;
 import eq.uirs.fashionscape.data.kit.ArmsKit;
 import eq.uirs.fashionscape.data.kit.BootsKit;
-import eq.uirs.fashionscape.data.kit.HairKit;
-import eq.uirs.fashionscape.data.kit.HandsKit;
 import eq.uirs.fashionscape.data.kit.Kit;
 import eq.uirs.fashionscape.data.kit.LegsKit;
-import eq.uirs.fashionscape.data.kit.TorsoKit;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -84,7 +81,7 @@ public class ItemInteractions
 		25226, 25227, 25228, 25229, 25230, 25231, 25232, 25233, 25234, 25235, 25236, 25237, 25238, 25239, 25240,
 		25241, 25242, 25243, 25398, 25413, 25438, 25549, 25592, 25840, 26254, 26312, 26531, 26788, 26801, 26804,
 		26937, 26963, 26967, 27035, 27123, 27141, 27143, 27145, 27147, 27149, 27151, 27153, 27155, 27576, 27584,
-		27588
+		27588, 27804, 27828
 	);
 
 	/**
@@ -112,7 +109,7 @@ public class ItemInteractions
 		25219, 25220, 25221, 25222, 25223, 25224, 25225, 25226, 25227, 25228, 25229, 25230, 25231, 25232, 25233, 25234,
 		25235, 25236, 25237, 25238, 25239, 25240, 25241, 25242, 25243, 25336, 25898, 25900, 25902, 25904, 25906, 25908,
 		25910, 25912, 25914, 26225, 26382, 26427, 26439, 26451, 26731, 26733, 26735, 26741, 26745, 26747, 27119, 27226,
-		27235
+		27235, 27705, 27707, 27717, 27719, 27729, 27731, 27741, 27743, 27753, 27755, 27765, 27767, 27777, 27779
 	);
 
 	/**
@@ -127,8 +124,8 @@ public class ItemInteractions
 	/**
 	 * kit ids of boot-slot items that, when detected in-game, will disable the boots, weapon and shield slots
 	 */
-	public static final Set<Integer> DISABLE_BOOT_KITS = ImmutableSet.of(BootsKit.MINECART.getKitId(),
-		BootsKit.MINECART_F.getKitId());
+	public static final Set<Integer> DISABLE_BOOT_KITS = ImmutableSet.of(BootsKit.MINECART.getKitId(true),
+		BootsKit.MINECART.getKitId(false));
 
 	/**
 	 * item ids of weapon-slot items that, when detected in-game, will disable the weapon and shield slots
@@ -137,52 +134,23 @@ public class ItemInteractions
 
 	// region Gender Swap Kits
 
+	// roughly corresponding kits that don't share the same name
 	public static final BiMap<Kit, Kit> MALE_TO_FEMALE_KITS;
 
 	static
 	{
 		Map<Kit, Kit> mToF = new HashMap<>();
-		mToF.put(HairKit.BALD, HairKit.BALD_F);
-		mToF.put(HairKit.DREADLOCKS, HairKit.DREADLOCKS_F);
-		mToF.put(HairKit.LONG, HairKit.LONG_F);
-		mToF.put(HairKit.MEDIUM, HairKit.MEDIUM_F);
-		mToF.put(HairKit.SHORT, HairKit.SHORT_F);
-		mToF.put(HairKit.CROPPED, HairKit.CROPPED_F);
-		mToF.put(HairKit.WILD_SPIKES, HairKit.WILD_SPIKES_F);
-		mToF.put(HairKit.SPIKES, HairKit.SPIKY);
-		mToF.put(HairKit.WIND_BRAIDS, HairKit.WIND_BRAIDS_F);
-		mToF.put(HairKit.CURTAINS, HairKit.CURTAINS_F);
-		mToF.put(HairKit.FRONT_SPLIT, HairKit.FRONT_SPLIT_F);
-		mToF.put(TorsoKit.PLAIN, TorsoKit.PLAIN_F);
-		mToF.put(TorsoKit.SHIRT, TorsoKit.SHIRT_F);
-		mToF.put(TorsoKit.TORN, TorsoKit.TORN_F);
-		mToF.put(TorsoKit.SWEATER, TorsoKit.SWEATER_F);
-		mToF.put(TorsoKit.VEST, TorsoKit.VEST_F);
 		mToF.put(ArmsKit.REGULAR, ArmsKit.SHORT_SLEEVES);
 		mToF.put(ArmsKit.MUSCLEBOUND, ArmsKit.MUSCLEY);
 		mToF.put(ArmsKit.LOOSE_SLEEVED, ArmsKit.FRILLY_A);
 		mToF.put(ArmsKit.LARGE_CUFFED, ArmsKit.LARGE_CUFFS);
 		mToF.put(ArmsKit.THIN, ArmsKit.LONG_SLEEVED);
 		mToF.put(ArmsKit.SHOULDER_PADS, ArmsKit.BARE_ARMS);
-		mToF.put(ArmsKit.THIN_STRIPE, ArmsKit.THIN_STRIPE_F);
 		mToF.put(ArmsKit.THICK_STRIPE, ArmsKit.SWEATER_A);
-		mToF.put(ArmsKit.WHITE_CUFFS, ArmsKit.WHITE_CUFFS_F);
-		mToF.put(ArmsKit.TATTY, ArmsKit.TATTY_F);
 		mToF.put(ArmsKit.RIPPED, ArmsKit.BARE_SHOULDERS);
-		mToF.put(LegsKit.PLAIN_L, LegsKit.PLAIN_LF);
 		mToF.put(LegsKit.SHORTS, LegsKit.SHORT_SKIRT);
-		mToF.put(LegsKit.FLARES, LegsKit.FLARES_F);
-		mToF.put(LegsKit.TURN_UPS, LegsKit.TURN_UPS_F);
-		mToF.put(LegsKit.TATTY_L, LegsKit.TATTY_LF);
 		mToF.put(LegsKit.RIPPED_L, LegsKit.TORN_SKIRT);
 		mToF.put(LegsKit.PATCHED, LegsKit.PATCHED_SKIRT);
-		mToF.put(HandsKit.PLAIN_H, HandsKit.PLAIN_HF);
-		mToF.put(HandsKit.BRACERS, HandsKit.BRACERS_F);
-		mToF.put(HandsKit.BRACERS2, HandsKit.BRACERS_F2);
-		mToF.put(BootsKit.SMALL, BootsKit.SMALL_F);
-		mToF.put(BootsKit.LARGE, BootsKit.LARGE_F);
-		mToF.put(BootsKit.LARGE_2, BootsKit.LARGE_F2);
-		mToF.put(BootsKit.MINECART, BootsKit.MINECART_F);
 		MALE_TO_FEMALE_KITS = new ImmutableBiMap.Builder<Kit, Kit>()
 			.putAll(mToF)
 			.build();
@@ -687,12 +655,22 @@ public class ItemInteractions
 		WEAPON_TO_IDLE.put(ItemID.GIANT_STOPWATCH, IdleAnimationID.GIANT_STOPWATCH);
 		WEAPON_TO_IDLE.put(ItemID.GOLD_SPEEDRUN_TROPHY, IdleAnimationID.HEAVY_ITEM);
 		WEAPON_TO_IDLE.put(ItemID.PLATINUM_SPEEDRUN_TROPHY, IdleAnimationID.HEAVY_ITEM);
-		// ItemID.FESTIVE_NUTCRACKER_STAFF (need updated ItemID)
-		WEAPON_TO_IDLE.put(27580, IdleAnimationID.BANNER);
-		// ItemID.SWEET_NUTCRACKER_STAFF (need updated ItemID)
-		WEAPON_TO_IDLE.put(27586, IdleAnimationID.BANNER);
+		WEAPON_TO_IDLE.put(ItemID.FESTIVE_NUTCRACKER_STAFF, IdleAnimationID.BANNER);
+		WEAPON_TO_IDLE.put(ItemID.SWEET_NUTCRACKER_STAFF, IdleAnimationID.BANNER);
+		WEAPON_TO_IDLE.put(ItemID.VENATOR_BOW, IdleAnimationID.VENATOR_BOW);
+		WEAPON_TO_IDLE.put(ItemID.VENATOR_BOW_UNCHARGED, IdleAnimationID.VENATOR_BOW);
+		WEAPON_TO_IDLE.put(ItemID.ANCIENT_SCEPTRE, IdleAnimationID.UPRIGHT_WEAPON);
+		WEAPON_TO_IDLE.put(ItemID.URSINE_CHAINMACE, IdleAnimationID.VIGGORAS_CHAINMACE);
+		WEAPON_TO_IDLE.put(ItemID.URSINE_CHAINMACE_U, IdleAnimationID.VIGGORAS_CHAINMACE);
+		WEAPON_TO_IDLE.put(ItemID.ACCURSED_SCEPTRE, IdleAnimationID.UPRIGHT_WEAPON);
+		WEAPON_TO_IDLE.put(ItemID.ACCURSED_SCEPTRE_U, IdleAnimationID.UPRIGHT_WEAPON);
+		WEAPON_TO_IDLE.put(ItemID.ACCURSED_SCEPTRE_AU, IdleAnimationID.UPRIGHT_WEAPON);
+		WEAPON_TO_IDLE.put(ItemID.ACCURSED_SCEPTRE_A, IdleAnimationID.UPRIGHT_WEAPON);
+		WEAPON_TO_IDLE.put(ItemID.DIAMOND_SPEEDRUN_TROPHY, IdleAnimationID.HEAVY_ITEM);
+		WEAPON_TO_IDLE.put(ItemID.THAMMARONS_SCEPTRE_AU, IdleAnimationID.UPRIGHT_WEAPON);
+		WEAPON_TO_IDLE.put(ItemID.THAMMARONS_SCEPTRE_A, IdleAnimationID.UPRIGHT_WEAPON);
+		WEAPON_TO_IDLE.put(ItemID._10TH_BIRTHDAY_BALLOONS, IdleAnimationID.TENTH_ANNI_BALLOONS);
 	}
 
 	// endregion
-
 }

@@ -6,39 +6,32 @@ import net.runelite.api.kit.KitType;
 @RequiredArgsConstructor
 public enum LegsKit implements Kit
 {
-	PLAIN_L("Plain", false, 36),
-	SHORTS("Shorts", false, 37),
-	FLARES("Flares", false, 38),
-	TURN_UPS("Turn-ups", false, 39),
-	TATTY_L("Tatty", false, 40),
-	BEACH("Beach", false, 41),
-	PRINCELY_L("Princely", false, 100),
-	LEGGINGS("Leggings", false, 101),
-	SIDE_STRIPES("Side-stripes", false, 102),
-	RIPPED_L("Ripped", false, 103),
-	PATCHED("Patched", false, 104),
+	PLAIN_L(36, 70),
+	SHORTS(37, null),
+	FLARES(38, 72),
+	TURN_UPS(39, 76),
+	TATTY_L(40, 75),
+	BEACH(41, null),
+	PRINCELY_L(100, null),
+	LEGGINGS(101, null),
+	SIDE_STRIPES(102, null),
+	RIPPED_L(103, null),
+	PATCHED(104, null),
+	SKIRT(null, 71),
+	LONG_SKIRT(null, 73),
+	LONG_NARROW_SKIRT(null, 74),
+	SHORT_SKIRT(null, 77),
+	LAYERED_L(null, 78),
+	SASH_AND_DOTS(null, 135),
+	BIG_HEM(null, 136),
+	SASH_AND_TROUSERS(null, 137),
+	PATTERNED(null, 138),
+	TORN_SKIRT(null, 139),
+	PATCHED_SKIRT(null, 140);
 
-	PLAIN_LF("Plain", true, 70),
-	SKIRT("Skirt", true, 71),
-	FLARES_F("Flares", true, 72),
-	LONG_SKIRT("Long skirt", true, 73),
-	LONG_NARROW_SKIRT("Long narrow skirt", true, 74),
-	TATTY_LF("Tatty", true, 75),
-	TURN_UPS_F("Turn-ups", true, 76),
-	SHORT_SKIRT("Short skirt", true, 77),
-	LAYERED_L("Layered", true, 78),
-	SASH_AND_DOTS("Sash & dots", true, 135),
-	BIG_HEM("Big hem", true, 136),
-	SASH_AND_TROUSERS("Sash & trousers", true, 137),
-	PATTERNED("Patterned", true, 138),
-	TORN_SKIRT("Torn skirt", true, 139),
-	PATCHED_SKIRT("Patched skirt", true, 140);
+	private final Integer maleKitId;
 
-	private final String displayName;
-
-	private final boolean isFemale;
-
-	private final int kitId;
+	private final Integer femaleKitId;
 
 	@Override
 	public KitType getKitType()
@@ -49,18 +42,39 @@ public enum LegsKit implements Kit
 	@Override
 	public String getDisplayName()
 	{
-		return displayName;
+		switch (this)
+		{
+			case PLAIN_L:
+				return "Plain";
+			case TURN_UPS:
+				return "Turn-ups";
+			case TATTY_L:
+				return "Tatty";
+			case PRINCELY_L:
+				return "Princely";
+			case SIDE_STRIPES:
+				return "Side-stripes";
+			case RIPPED_L:
+				return "Ripped";
+			case LAYERED_L:
+				return "Layered";
+			case SASH_AND_DOTS:
+				return "Sash & dots";
+			case SASH_AND_TROUSERS:
+				return "Sash & trousers";
+		}
+		return Kit.sentenceCaseName(this);
 	}
 
 	@Override
-	public boolean isFemale()
+	public boolean isHidden()
 	{
-		return isFemale;
+		return false;
 	}
 
 	@Override
-	public int getKitId()
+	public Integer getKitId(boolean isFemale)
 	{
-		return kitId;
+		return isFemale ? femaleKitId : maleKitId;
 	}
 }

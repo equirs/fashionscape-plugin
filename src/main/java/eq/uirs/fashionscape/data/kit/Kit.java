@@ -1,41 +1,64 @@
 package eq.uirs.fashionscape.data.kit;
 
 import java.util.Arrays;
+import java.util.function.IntFunction;
 import net.runelite.api.kit.KitType;
+import org.apache.commons.text.WordUtils;
 
 public interface Kit
 {
 	static Kit[] allInSlot(KitType slot, boolean includeHidden)
 	{
+		Kit[] values;
+		IntFunction<Kit[]> creator;
 		switch (slot)
 		{
 			case HAIR:
-				return HairKit.values();
+				values = HairKit.values();
+				creator = HairKit[]::new;
+				break;
 			case JAW:
-				return JawKit.values();
+				values = JawKit.values();
+				creator = JawKit[]::new;
+				break;
 			case TORSO:
-				return TorsoKit.values();
+				values = TorsoKit.values();
+				creator = TorsoKit[]::new;
+				break;
 			case ARMS:
-				return ArmsKit.values();
+				values = ArmsKit.values();
+				creator = ArmsKit[]::new;
+				break;
 			case LEGS:
-				return LegsKit.values();
+				values = LegsKit.values();
+				creator = LegsKit[]::new;
+				break;
 			case HANDS:
-				return Arrays.stream(HandsKit.values())
-					.filter(kit -> includeHidden || !kit.isHidden())
-					.toArray(HandsKit[]::new);
+				values = HandsKit.values();
+				creator = HandsKit[]::new;
+				break;
 			case BOOTS:
-				return Arrays.stream(BootsKit.values())
-					.filter(kit -> includeHidden || !kit.isHidden())
-					.toArray(BootsKit[]::new);
+				values = BootsKit.values();
+				creator = BootsKit[]::new;
+				break;
+			default:
+				return new Kit[0];
 		}
-		return new Kit[0];
+		return Arrays.stream(values)
+			.filter(kit -> includeHidden || !kit.isHidden())
+			.toArray(creator);
 	}
 
 	KitType getKitType();
 
 	String getDisplayName();
 
-	boolean isFemale();
+	boolean isHidden();
 
-	int getKitId();
+	Integer getKitId(boolean isFemale);
+
+	static String sentenceCaseName(Enum e)
+	{
+		return WordUtils.capitalize(e.toString().toLowerCase()).replace("_", " ");
+	}
 }

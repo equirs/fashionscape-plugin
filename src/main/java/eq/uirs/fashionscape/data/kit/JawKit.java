@@ -15,7 +15,7 @@ import net.runelite.api.kit.KitType;
 @RequiredArgsConstructor
 public enum JawKit implements Kit
 {
-	NO_JAW("(no jaw)", true, -256,
+	NO_JAW(-256,
 		new ImmutableMap.Builder<JawIcon, Integer>()
 			.put(JawIcon.BA_ATTACKER, 10556)
 			.put(JawIcon.BA_DEFENDER, 10558)
@@ -25,7 +25,7 @@ public enum JawKit implements Kit
 			.put(JawIcon.SW_RED, 25228)
 			.build()),
 
-	GOATEE("Goatee", false, 10,
+	GOATEE(10,
 		new ImmutableMap.Builder<JawIcon, Integer>()
 			.put(JawIcon.BA_ATTACKER, 23460)
 			.put(JawIcon.BA_DEFENDER, 23466)
@@ -35,7 +35,7 @@ public enum JawKit implements Kit
 			.put(JawIcon.SW_RED, 25229)
 			.build()),
 
-	LONG_J("Long", false, 11,
+	LONG_J(11,
 		new ImmutableMap.Builder<JawIcon, Integer>()
 			.put(JawIcon.BA_ATTACKER, 22723)
 			.put(JawIcon.BA_DEFENDER, 22345)
@@ -45,7 +45,7 @@ public enum JawKit implements Kit
 			.put(JawIcon.SW_RED, 25230)
 			.build()),
 
-	MEDIUM_J("Medium", false, 12,
+	MEDIUM_J(12,
 		new ImmutableMap.Builder<JawIcon, Integer>()
 			.put(JawIcon.BA_ATTACKER, 23461)
 			.put(JawIcon.BA_DEFENDER, 22728)
@@ -55,7 +55,7 @@ public enum JawKit implements Kit
 			.put(JawIcon.SW_RED, 25231)
 			.build()),
 
-	SMALL_MOUSTACHE("Small moustache", false, 13,
+	SMALL_MOUSTACHE(13,
 		new ImmutableMap.Builder<JawIcon, Integer>()
 			.put(JawIcon.BA_ATTACKER, 22722)
 			.put(JawIcon.BA_DEFENDER, 22344)
@@ -65,7 +65,7 @@ public enum JawKit implements Kit
 			.put(JawIcon.SW_RED, 25232)
 			.build()),
 
-	CLEAN_SHAVEN("Clean-shaven", false, 14,
+	CLEAN_SHAVEN(14,
 		new ImmutableMap.Builder<JawIcon, Integer>()
 			.put(JawIcon.BA_ATTACKER, 23462)
 			.put(JawIcon.BA_DEFENDER, 23467)
@@ -75,7 +75,7 @@ public enum JawKit implements Kit
 			.put(JawIcon.SW_RED, 25233)
 			.build()),
 
-	SHORT_J("Short", false, 15,
+	SHORT_J(15,
 		new ImmutableMap.Builder<JawIcon, Integer>()
 			.put(JawIcon.BA_ATTACKER, 23463)
 			.put(JawIcon.BA_DEFENDER, 23468)
@@ -85,7 +85,7 @@ public enum JawKit implements Kit
 			.put(JawIcon.SW_RED, 25234)
 			.build()),
 
-	POINTY("Pointy", false, 16,
+	POINTY(16,
 		new ImmutableMap.Builder<JawIcon, Integer>()
 			.put(JawIcon.BA_ATTACKER, 22721)
 			.put(JawIcon.BA_DEFENDER, 22343)
@@ -95,7 +95,7 @@ public enum JawKit implements Kit
 			.put(JawIcon.SW_RED, 25235)
 			.build()),
 
-	SPLIT("Split", false, 17,
+	SPLIT(17,
 		new ImmutableMap.Builder<JawIcon, Integer>()
 			.put(JawIcon.BA_ATTACKER, 23464)
 			.put(JawIcon.BA_DEFENDER, 23469)
@@ -105,7 +105,7 @@ public enum JawKit implements Kit
 			.put(JawIcon.SW_RED, 25236)
 			.build()),
 
-	HANDLEBAR("Handlebar", false, 111,
+	HANDLEBAR(111,
 		new ImmutableMap.Builder<JawIcon, Integer>()
 			.put(JawIcon.BA_ATTACKER, 22349)
 			.put(JawIcon.BA_DEFENDER, 22342)
@@ -115,7 +115,7 @@ public enum JawKit implements Kit
 			.put(JawIcon.SW_RED, 25237)
 			.build()),
 
-	MUTTON("Mutton", false, 112,
+	MUTTON(112,
 		new ImmutableMap.Builder<JawIcon, Integer>()
 			.put(JawIcon.BA_ATTACKER, 22730)
 			.put(JawIcon.BA_DEFENDER, 23470)
@@ -125,7 +125,7 @@ public enum JawKit implements Kit
 			.put(JawIcon.SW_RED, 25238)
 			.build()),
 
-	FULL_MUTTON("Full mutton", false, 113,
+	FULL_MUTTON(113,
 		new ImmutableMap.Builder<JawIcon, Integer>()
 			.put(JawIcon.BA_ATTACKER, 22348)
 			.put(JawIcon.BA_DEFENDER, 22341)
@@ -135,7 +135,7 @@ public enum JawKit implements Kit
 			.put(JawIcon.SW_RED, 25239)
 			.build()),
 
-	BIG_MOUSTACHE("Big moustache", false, 114,
+	BIG_MOUSTACHE(114,
 		new ImmutableMap.Builder<JawIcon, Integer>()
 			.put(JawIcon.BA_ATTACKER, 22729)
 			.put(JawIcon.BA_DEFENDER, 22727)
@@ -145,7 +145,7 @@ public enum JawKit implements Kit
 			.put(JawIcon.SW_RED, 25240)
 			.build()),
 
-	WAXED_MOUSTACHE("Waxed moustache", false, 115,
+	WAXED_MOUSTACHE(115,
 		new ImmutableMap.Builder<JawIcon, Integer>()
 			.put(JawIcon.BA_ATTACKER, 22347)
 			.put(JawIcon.BA_DEFENDER, 22340)
@@ -155,7 +155,7 @@ public enum JawKit implements Kit
 			.put(JawIcon.SW_RED, 25241)
 			.build()),
 
-	DALI("Dali", false, 116,
+	DALI(116,
 		new ImmutableMap.Builder<JawIcon, Integer>()
 			.put(JawIcon.BA_ATTACKER, 23465)
 			.put(JawIcon.BA_DEFENDER, 22726)
@@ -165,7 +165,7 @@ public enum JawKit implements Kit
 			.put(JawIcon.SW_RED, 25242)
 			.build()),
 
-	VIZIER("Vizier", false, 117,
+	VIZIER(117,
 		new ImmutableMap.Builder<JawIcon, Integer>()
 			.put(JawIcon.BA_ATTACKER, 22346)
 			.put(JawIcon.BA_DEFENDER, 22725)
@@ -209,10 +209,6 @@ public enum JawKit implements Kit
 		}
 	}
 
-	private final String displayName;
-
-	private final boolean isFemale;
-
 	private final int kitId;
 
 	// note: since they're items, these are all item ids
@@ -227,24 +223,42 @@ public enum JawKit implements Kit
 	@Override
 	public String getDisplayName()
 	{
-		return displayName;
-	}
-
-	@Override
-	public boolean isFemale()
-	{
-		return isFemale;
-	}
-
-	@Override
-	public int getKitId()
-	{
-		return kitId;
+		switch (this)
+		{
+			case NO_JAW:
+				return "";
+			case CLEAN_SHAVEN:
+				return "Clean-shaven";
+			case LONG_J:
+				return "Long";
+			case MEDIUM_J:
+				return "Medium";
+			case SHORT_J:
+				return "Short";
+		}
+		return Kit.sentenceCaseName(this);
 	}
 
 	@Nullable
 	public Integer getIconItemId(JawIcon icon)
 	{
 		return icons.get(icon);
+	}
+
+	@Override
+	public boolean isHidden()
+	{
+		return false;
+	}
+
+	@Override
+	public Integer getKitId(boolean isFemale)
+	{
+		// no jaw is female-only; other jaws are male-only
+		if (isFemale != (this == NO_JAW))
+		{
+			return null;
+		}
+		return kitId;
 	}
 }

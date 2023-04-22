@@ -222,7 +222,7 @@ public class KitsPanel extends JPanel
 			PlayerComposition composition = player.getPlayerComposition();
 			if (composition != null)
 			{
-				boolean female = composition.isFemale();
+				boolean female = composition.getGender() == 1;
 				if (isFemale == null || female != isFemale)
 				{
 					isFemale = female;
@@ -242,7 +242,7 @@ public class KitsPanel extends JPanel
 			PlayerComposition composition = player.getPlayerComposition();
 			if (composition != null)
 			{
-				return composition.isFemale();
+				return composition.getGender() == 1;
 			}
 		}
 		return null;

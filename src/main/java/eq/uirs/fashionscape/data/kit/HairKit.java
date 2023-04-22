@@ -6,61 +6,81 @@ import net.runelite.api.kit.KitType;
 @RequiredArgsConstructor
 public enum HairKit implements Kit
 {
-	BALD("Bald", false, 0),
-	DREADLOCKS("Dreadlocks", false, 1),
-	LONG("Long", false, 2),
-	MEDIUM("Medium", false, 3),
-	TONSURE("Tonsure", false, 4),
-	SHORT("Short", false, 5),
-	CROPPED("Cropped", false, 6),
-	WILD_SPIKES("Wild spikes", false, 7),
-	SPIKES("Spikes", false, 8),
-	MOHAWK("Mohawk", false, 9),
-	WIND_BRAIDS("Wind braids", false, 129),
-	QUIFF("Quiff", false, 130),
-	SAMURAI("Samurai", false, 131),
-	PRINCELY("Princely", false, 132),
-	CURTAINS("Curtains", false, 133),
-	LONG_CURTAINS("Long curtains", false, 134),
-	TOUSLED("Tousled", false, 144),
-	SIDE_WEDGE("Side wedge", false, 145),
-	FRONT_WEDGE("Front wedge", false, 146),
-	FRONT_SPIKES("Front spikes", false, 147),
-	FROHAWK("Frohawk", false, 148),
-	REAR_SKIRT("Rear skirt", false, 149),
-	QUEUE("Queue", false, 150),
-	FRONT_SPLIT("Front split", false, 151),
+	BALD(0, 45),
+	DREADLOCKS(1, 47),
+	LONG(2, 48),
+	MEDIUM(3, 49),
+	TONSURE(4, 174),
+	SHORT(5, 51),
+	CROPPED(6, 52),
+	WILD_SPIKES(7, 53),
+	SPIKES(8, 54),
+	MOHAWK(9, 175),
+	WIND_BRAIDS(129, 120),
+	QUIFF(130, 176),
+	SAMURAI(131, 177),
+	PRINCELY(132, 178),
+	CURTAINS(133, 128),
+	LONG_CURTAINS(134, 179),
+	TOUSLED(144, 180),
+	SIDE_WEDGE(145, 181),
+	FRONT_WEDGE(146, 182),
+	FRONT_SPIKES(147, 183),
+	FROHAWK(148, 184),
+	REAR_SKIRT(149, 185),
+	QUEUE(150, 186),
+	FRONT_SPLIT(151, 141),
+	MULLET(201, 154),
+	UNDERCUT(202, 155),
+	POMPADOUR(203, 156),
+	AFRO(204, 157),
+	SHORT_LOCS(205, 158),
+	SPIKY_MOHAWK(206, 159),
+	SLICKED_MOHAWK(207, 160),
+	LONG_QUIFF(208, 161),
+	SHORT_CHOPPY(209, 162),
+	SIDE_AFRO(210, 163),
+	PUNK(211, 164),
+	HALF_SHAVED(212, 165),
+	FREMENNIK(213, 166),
+	ELVEN(214, 167),
+	MEDIUM_COILS(215, 168),
+	LOW_BUN(216, 169),
+	MESSY_BUN(217, 170),
+	HIGH_PONYTAIL(218, 171),
+	PLAITS(219, 172),
+	HIGH_BUNCHES(220, 173),
+	BUN(221, 46),
+	PIGTAILS(222, 50),
+	EARMUFFS(223, 55),
+	SIDE_PONY(224, 118),
+	CURLS(225, 119),
+	PONYTAIL(226, 121),
+	BRAIDS(227, 122),
+	BUNCHES(228, 123),
+	BOB(229, 124),
+	LAYERED(230, 125),
+	STRAIGHT(231, 126),
+	STRAIGHT_BRAIDS(232, 127),
+	TWO_BACK(233, 143),
+	SHORT_AFRO(234, 187),
+	SHORT_COILS(235, 188),
+	DOUBLE_PONY(236, 189),
+	LOW_PONY(237, 190),
+	SHORT_MOHAWK(238, 191),
+	SHORT_POMP(239, 192),
+	BACK_BUN(240, 193),
+	SAD_CURTAINS(241, 194),
+	LOW_PIGTAILS(242, 195),
+	LOW_SIDE_PONY(243, 196),
+	LOW_BUNCHES(244, 197),
+	LOWER_BUN(245, 198),
+	LOW_MESSY_BUN(246, 199),
+	DROOPY_MOHAWK(247, 200);
 
-	BALD_F("Bald", true, 45),
-	BUN("Bun", true, 46),
-	DREADLOCKS_F("Dreadlocks", true, 47),
-	LONG_F("Long", true, 48),
-	MEDIUM_F("Medium", true, 49),
-	PIGTAILS("Pigtails", true, 50),
-	SHORT_F("Short", true, 51),
-	CROPPED_F("Cropped", true, 52),
-	WILD_SPIKES_F("Wild spikes", true, 53),
-	SPIKY("Spiky", true, 54),
-	EARMUFFS("Earmuffs", true, 55),
-	SIDE_PONY("Side pony", true, 118),
-	CURLS("Curls", true, 119),
-	WIND_BRAIDS_F("Wind braids", true, 120),
-	PONYTAIL("Ponytail", true, 121),
-	BRAIDS("Braids", true, 122),
-	BUNCHES("Bunches", true, 123),
-	BOB("Bob", true, 124),
-	LAYERED("Layered", true, 125),
-	STRAIGHT("Straight", true, 126),
-	STRAIGHT_BRAIDS("Straight braids", true, 127),
-	CURTAINS_F("Curtains", true, 128),
-	FRONT_SPLIT_F("Front split", true, 141),
-	TWO_BACK("Two-back", true, 143);
+	private final int maleKitId;
 
-	private final String displayName;
-
-	private final boolean isFemale;
-
-	private final int kitId;
+	private final int femaleKitId;
 
 	@Override
 	public KitType getKitType()
@@ -71,18 +91,25 @@ public enum HairKit implements Kit
 	@Override
 	public String getDisplayName()
 	{
-		return displayName;
+		switch (this)
+		{
+			case HALF_SHAVED:
+				return "Half-shaved";
+			case TWO_BACK:
+				return "Two-back";
+		}
+		return Kit.sentenceCaseName(this);
 	}
 
 	@Override
-	public boolean isFemale()
+	public boolean isHidden()
 	{
-		return isFemale;
+		return false;
 	}
 
 	@Override
-	public int getKitId()
+	public Integer getKitId(boolean isFemale)
 	{
-		return kitId;
+		return isFemale ? femaleKitId : maleKitId;
 	}
 }

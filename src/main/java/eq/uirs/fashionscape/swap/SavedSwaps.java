@@ -56,21 +56,21 @@ class SavedSwaps
 
 	static
 	{
-		FALLBACK_MALE_KITS.put(KitType.HAIR, HairKit.BALD.getKitId());
-		FALLBACK_MALE_KITS.put(KitType.JAW, JawKit.GOATEE.getKitId());
-		FALLBACK_MALE_KITS.put(KitType.TORSO, TorsoKit.PLAIN.getKitId());
-		FALLBACK_MALE_KITS.put(KitType.ARMS, ArmsKit.REGULAR.getKitId());
-		FALLBACK_MALE_KITS.put(KitType.LEGS, LegsKit.PLAIN_L.getKitId());
-		FALLBACK_MALE_KITS.put(KitType.HANDS, HandsKit.PLAIN_H.getKitId());
-		FALLBACK_MALE_KITS.put(KitType.BOOTS, BootsKit.SMALL.getKitId());
+		FALLBACK_MALE_KITS.put(KitType.HAIR, HairKit.BALD.getKitId(false));
+		FALLBACK_MALE_KITS.put(KitType.JAW, JawKit.GOATEE.getKitId(false));
+		FALLBACK_MALE_KITS.put(KitType.TORSO, TorsoKit.PLAIN.getKitId(false));
+		FALLBACK_MALE_KITS.put(KitType.ARMS, ArmsKit.REGULAR.getKitId(false));
+		FALLBACK_MALE_KITS.put(KitType.LEGS, LegsKit.PLAIN_L.getKitId(false));
+		FALLBACK_MALE_KITS.put(KitType.HANDS, HandsKit.PLAIN_H.getKitId(false));
+		FALLBACK_MALE_KITS.put(KitType.BOOTS, BootsKit.SMALL.getKitId(false));
 
-		FALLBACK_FEMALE_KITS.put(KitType.HAIR, HairKit.PIGTAILS.getKitId());
+		FALLBACK_FEMALE_KITS.put(KitType.HAIR, HairKit.PIGTAILS.getKitId(true));
 		FALLBACK_FEMALE_KITS.put(KitType.JAW, -256);
-		FALLBACK_FEMALE_KITS.put(KitType.TORSO, TorsoKit.SIMPLE.getKitId());
-		FALLBACK_FEMALE_KITS.put(KitType.ARMS, ArmsKit.SHORT_SLEEVES.getKitId());
-		FALLBACK_FEMALE_KITS.put(KitType.LEGS, LegsKit.PLAIN_LF.getKitId());
-		FALLBACK_FEMALE_KITS.put(KitType.HANDS, HandsKit.PLAIN_HF.getKitId());
-		FALLBACK_FEMALE_KITS.put(KitType.BOOTS, BootsKit.SMALL_F.getKitId());
+		FALLBACK_FEMALE_KITS.put(KitType.TORSO, TorsoKit.SIMPLE.getKitId(true));
+		FALLBACK_FEMALE_KITS.put(KitType.ARMS, ArmsKit.SHORT_SLEEVES.getKitId(true));
+		FALLBACK_FEMALE_KITS.put(KitType.LEGS, LegsKit.PLAIN_L.getKitId(true));
+		FALLBACK_FEMALE_KITS.put(KitType.HANDS, HandsKit.PLAIN_H.getKitId(true));
+		FALLBACK_FEMALE_KITS.put(KitType.BOOTS, BootsKit.SMALL.getKitId(true));
 	}
 
 	@Inject

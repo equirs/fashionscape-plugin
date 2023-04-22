@@ -6,38 +6,30 @@ import net.runelite.api.kit.KitType;
 @RequiredArgsConstructor
 public enum TorsoKit implements Kit
 {
-	PLAIN("Plain", false, 18),
-	LIGHT_BUTTONS("Light buttons", false, 19),
-	DARK_BUTTONS("Dark buttons", false, 20),
-	JACKET("Jacket", false, 21),
-	SHIRT("Shirt", false, 22),
-	STITCHING("Stitching", false, 23),
-	TORN("Torn", false, 24),
-	TWO_TONED("Two-toned", false, 25),
-	SWEATER("Sweater", false, 105),
-	BUTTONED_SHIRT("Buttoned shirt", false, 106),
-	VEST("Vest", false, 107),
-	PRINCELY_T("Princely", false, 108),
-	RIPPED_WESKIT("Ripped weskit", false, 109),
-	TORN_WESKIT("Torn weskit", false, 110),
+	PLAIN(18, 56),
+	LIGHT_BUTTONS(19, null),
+	DARK_BUTTONS(20, null),
+	JACKET(21, null),
+	SHIRT(22, 90),
+	STITCHING(23, null),
+	TORN(24, 60),
+	TWO_TONED(25, null),
+	SWEATER(105, 89),
+	BUTTONED_SHIRT(106, null),
+	VEST(107, 91),
+	PRINCELY_T(108, null),
+	RIPPED_WESKIT(109, null),
+	TORN_WESKIT(110, null),
+	CROP_TOP(null, 57),
+	POLO_NECK(null, 58),
+	SIMPLE(null, 59),
+	FRILLY(null, 92),
+	CORSETRY(null, 93),
+	BODICE(null, 94);
 
-	PLAIN_F("Plain", true, 56),
-	CROP_TOP("Crop-top", true, 57),
-	POLO_NECK("Polo-neck", true, 58),
-	SIMPLE("Simple", true, 59),
-	TORN_F("Torn", true, 60),
-	SWEATER_F("Sweater", true, 89),
-	SHIRT_F("Shirt", true, 90),
-	VEST_F("Vest", true, 91),
-	FRILLY("Frilly", true, 92),
-	CORSETRY("Corsetry", true, 93),
-	BODICE("Bodice", true, 94);
+	private final Integer maleKitId;
 
-	private final String displayName;
-
-	private final boolean isFemale;
-
-	private final int kitId;
+	private final Integer femaleKitId;
 
 	@Override
 	public KitType getKitType()
@@ -48,18 +40,27 @@ public enum TorsoKit implements Kit
 	@Override
 	public String getDisplayName()
 	{
-		return displayName;
+		switch (this)
+		{
+			case TWO_TONED:
+				return "Two-toned";
+			case PRINCELY_T:
+				return "Princely";
+			case CROP_TOP:
+				return "Crop-top";
+		}
+		return Kit.sentenceCaseName(this);
 	}
 
 	@Override
-	public boolean isFemale()
+	public boolean isHidden()
 	{
-		return isFemale;
+		return false;
 	}
 
 	@Override
-	public int getKitId()
+	public Integer getKitId(boolean isFemale)
 	{
-		return kitId;
+		return isFemale ? femaleKitId : maleKitId;
 	}
 }

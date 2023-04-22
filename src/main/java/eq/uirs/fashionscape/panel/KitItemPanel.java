@@ -292,7 +292,8 @@ public class KitItemPanel extends DropdownIconPanel
 
 			for (Kit kit : allKits)
 			{
-				if (kit.isFemale() != isFemale)
+				final Integer kitId = kit.getKitId(isFemale);
+				if (kitId == null)
 				{
 					continue;
 				}
@@ -308,7 +309,7 @@ public class KitItemPanel extends DropdownIconPanel
 						{
 							setCursor(new Cursor(Cursor.HAND_CURSOR));
 						}
-						swapManager.hoverOverKit(slot, kit.getKitId());
+						swapManager.hoverOverKit(slot, kitId);
 					}
 
 					@Override
@@ -321,7 +322,7 @@ public class KitItemPanel extends DropdownIconPanel
 					@Override
 					public void mouseReleased(MouseEvent e)
 					{
-						swapManager.hoverSelectKit(slot, kit.getKitId());
+						swapManager.hoverSelectKit(slot, kitId);
 					}
 				});
 				kitsList.add(kitLabel, c);
