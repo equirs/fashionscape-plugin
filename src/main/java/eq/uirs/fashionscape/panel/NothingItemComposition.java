@@ -207,6 +207,18 @@ class NothingItemComposition implements ItemComposition
 	}
 
 	@Override
+	public int getAmbient()
+	{
+		return 0;
+	}
+
+	@Override
+	public int getContrast()
+	{
+		return 0;
+	}
+
+	@Override
 	public IterableHashTable<Node> getParams()
 	{
 		return null;
