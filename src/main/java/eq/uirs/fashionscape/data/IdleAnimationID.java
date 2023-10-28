@@ -55,6 +55,9 @@ public class IdleAnimationID
 	public static final int COLOSSAL_BLADE = 9460;
 	public static final int TUMEKENS_SHADOW = 9494;
 	public static final int GIANT_STOPWATCH = 9814;
+	public static final int MYSTIC_CARDS = 9847;
 	public static final int VENATOR_BOW = 9857;
 	public static final int TENTH_ANNI_BALLOONS = 10032;
+	public static final int TWO_HANDED_AXE = 10075;
+	public static final int SOULREAPER_AXE = 10169;
 }
