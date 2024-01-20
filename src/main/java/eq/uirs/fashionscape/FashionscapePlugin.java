@@ -205,17 +205,6 @@ public class FashionscapePlugin extends Plugin
 	{
 		if (event.getMenuAction() == MenuAction.RUNELITE_PLAYER && event.getMenuOption().equals(COPY_PLAYER))
 		{
-			SwingUtilities.invokeLater(() ->
-			{
-				if (!navButton.isSelected())
-				{
-					Runnable onSelect = navButton.getOnSelect();
-					if (onSelect != null)
-					{
-						onSelect.run();
-					}
-				}
-			});
 			Player p = client.getCachedPlayers()[event.getId()];
 			if (p == null)
 			{
