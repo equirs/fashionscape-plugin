@@ -105,7 +105,7 @@ class SearchPanel extends JPanel
 			for (SearchItemPanel item : searchPanels)
 			{
 				if (Objects.equals(item.itemId, swapManager.swappedItemIdIn(slot)) ||
-					(item.itemId < 0 && swapManager.isHidden(slot)))
+					(item.itemId != null && item.itemId < 0 && swapManager.isHidden(slot)))
 				{
 					item.resetBackground();
 				}
@@ -121,7 +121,7 @@ class SearchPanel extends JPanel
 	private boolean hasSearched = false;
 	private final Map<Integer, Double> scores = new HashMap<>();
 
-	private final Comparator<Result> itemAlphaComparator = Comparator.comparing(o -> o.getItemComposition().getName());
+	private final Comparator<Result> itemAlphaComparator = Comparator.comparing(o -> o.getItemComposition().getMembersName());
 
 	@Value
 	private static class Result
@@ -203,20 +203,7 @@ class SearchPanel extends JPanel
 		sortLabel.setPreferredSize(new Dimension(0, 0));
 		sortBar.add(sortLabel);
 
-		JComboBox<SortBy> sortBox = new JComboBox<>(SortBy.values());
-		sortBox.setSelectedItem(this.sort);
-		sortBox.setPreferredSize(new Dimension(sortBox.getPreferredSize().width, 25));
-		sortBox.setForeground(Color.WHITE);
-		sortBox.setFocusable(false);
-		sortBox.addItemListener(e -> {
-			if (e.getStateChange() == ItemEvent.SELECTED)
-			{
-				SortBy selectedSort = (SortBy) sortBox.getSelectedItem();
-				config.setPreferredSort(selectedSort);
-				sort = selectedSort;
-				updateSearchDebounced();
-			}
-		});
+		JComboBox<SortBy> sortBox = createSortBox(config);
 		sortBar.add(sortBox);
 
 		container.add(slotFilter, groupConstraints);
@@ -237,6 +224,25 @@ class SearchPanel extends JPanel
 				updateTabIcon(e);
 			}
 		}));
+	}
+
+	private JComboBox<SortBy> createSortBox(FashionscapeConfig config)
+	{
+		JComboBox<SortBy> sortBox = new JComboBox<>(SortBy.values());
+		sortBox.setSelectedItem(this.sort);
+		sortBox.setPreferredSize(new Dimension(sortBox.getPreferredSize().width, 25));
+		sortBox.setForeground(Color.WHITE);
+		sortBox.setFocusable(false);
+		sortBox.addItemListener(e -> {
+			if (e.getStateChange() == ItemEvent.SELECTED)
+			{
+				SortBy selectedSort = (SortBy) sortBox.getSelectedItem();
+				config.setPreferredSort(selectedSort);
+				sort = selectedSort;
+				updateSearchDebounced();
+			}
+		});
+		return sortBox;
 	}
 
 	public void clearResults()
@@ -559,7 +565,7 @@ class SearchPanel extends JPanel
 
 	private boolean isValidSearch(ItemComposition itemComposition, String query)
 	{
-		String name = itemComposition.getName().toLowerCase();
+		String name = itemComposition.getMembersName().toLowerCase();
 		// The client assigns "null" to item names of items it doesn't know about
 		if (name.equals("null") || !name.contains(query))
 		{
@@ -573,7 +579,7 @@ class SearchPanel extends JPanel
 		KitType slot = event.getSlot();
 		boolean isLocked = event.isLocked();
 		Arrays.stream(PanelEquipSlot.values())
-			.filter(p -> Objects.equals(p.getKitType(), slot))
+			.filter(p -> p.getKitType() == slot)
 			.findFirst()
 			.ifPresent(panelEquipSlot -> updateTabIcon(panelEquipSlot, isLocked));
 	}

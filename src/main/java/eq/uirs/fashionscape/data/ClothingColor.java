@@ -7,6 +7,7 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import net.runelite.client.util.Text;
 
+@Getter
 @RequiredArgsConstructor
 public enum ClothingColor implements Colorable
 {
@@ -66,13 +67,10 @@ public enum ClothingColor implements Colorable
 		return values()[id];
 	}
 
-	@Getter
 	private final int torsoColorId;
 
-	@Getter
 	private final int legsColorId;
 
-	@Getter
 	private final Color color;
 
 	public String getDisplayName()

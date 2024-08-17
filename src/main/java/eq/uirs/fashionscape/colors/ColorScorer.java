@@ -1,6 +1,5 @@
 package eq.uirs.fashionscape.colors;
 
-import com.google.common.base.Objects;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
@@ -42,7 +41,7 @@ public class ColorScorer
 	private final Map<KitType, List<ItemColorInfo>> kitColors = new ConcurrentHashMap<>();
 	private final Map<ColorType, Colorable> playerColors = new ConcurrentHashMap<>();
 
-	private boolean isFemale;
+	private Integer gender;
 
 	@Value
 	private static class Score
@@ -92,7 +91,7 @@ public class ColorScorer
 		}
 		playerColors.clear();
 		playerColors.putAll(swapManager.swappedColorsMap());
-		isFemale = composition.isFemale();
+		gender = composition.getGender();
 		for (KitType slot : KitType.values())
 		{
 			Integer itemId = swapManager.swappedItemIdIn(slot);
@@ -123,7 +122,7 @@ public class ColorScorer
 		playerColors.clear();
 		playerColors.putAll(colors);
 		PlayerComposition composition = player.getPlayerComposition();
-		isFemale = composition.isFemale();
+		gender = composition.getGender();
 		for (Map.Entry<KitType, Integer> entry : itemIds.entrySet())
 		{
 			kitColors.put(entry.getKey(), colorsFor(entry.getValue()));
@@ -226,13 +225,15 @@ public class ColorScorer
 			{
 				return genderColors.any.itemColorInfo;
 			}
-			else if (isFemale)
-			{
-				return genderColors.female.itemColorInfo;
-			}
 			else
 			{
-				return genderColors.male.itemColorInfo;
+				switch (gender)
+				{
+					case 0:
+						return genderColors.masc.itemColorInfo;
+					case 1:
+						return genderColors.fem.itemColorInfo;
+				}
 			}
 		}
 		return new ArrayList<>();
@@ -242,12 +243,12 @@ public class ColorScorer
 	private Map<Integer, Double> getPlayerRgbInfo(KitType excludeKit, ColorType excludeColor)
 	{
 		Map<Integer, Double> unscaled = kitColors.entrySet().stream()
-			.filter(e -> !Objects.equal(e.getKey(), excludeKit))
+			.filter(e -> e.getKey() != excludeKit)
 			.map(Map.Entry::getValue)
 			.flatMap(List::stream)
 			.collect(Collectors.toMap(ItemColorInfo::getRgb, ItemColorInfo::getPct, Double::sum));
 		Map<Integer, Double> unscaledColors = playerColors.entrySet().stream()
-			.filter(e -> !Objects.equal(e.getKey(), excludeColor))
+			.filter(e -> e.getKey() != excludeColor)
 			.map(Map.Entry::getValue)
 			.collect(Collectors.toMap(c -> c.getColor().getRGB(), c -> 1.0, Double::sum));
 		unscaledColors.forEach((rgb, score) -> unscaled.merge(rgb, score, Double::sum));

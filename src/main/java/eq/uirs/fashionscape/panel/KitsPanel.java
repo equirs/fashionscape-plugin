@@ -1,6 +1,5 @@
 package eq.uirs.fashionscape.panel;
 
-import com.google.common.base.Objects;
 import eq.uirs.fashionscape.FashionscapeConfig;
 import eq.uirs.fashionscape.data.ColorType;
 import eq.uirs.fashionscape.data.kit.JawIcon;
@@ -47,15 +46,15 @@ public class KitsPanel extends JPanel
 	private final List<KitItemPanel> kitPanels = new ArrayList<>();
 	private JawIconPanel jawIconPanel = null;
 
-	private Boolean isFemale = null;
+	private Integer gender;
 	private final KitColorOpener kitColorOpener = (slot, type) -> {
 		kitPanels.forEach(panel -> {
-			if (Objects.equal(slot, panel.getSlot()) && Objects.equal(type, panel.getType()))
+			if (slot == panel.getSlot() && type == panel.getType())
 			{
-				Boolean female = isFemale();
-				if (female != null)
+				Integer gender = getGender();
+				if (gender != null)
 				{
-					panel.openOptions(female);
+					panel.openOptions(gender);
 				}
 			}
 			else
@@ -138,10 +137,6 @@ public class KitsPanel extends JPanel
 				Integer kitId = null;
 				Integer colorId = null;
 
-				if (KitType.JAW.equals(kitType) && Objects.equal(isFemale(), true))
-				{
-					continue;
-				}
 				if (kitType == null && colorType == null)
 				{
 					if (config.excludeNonStandardItems() || config.excludeMembersItems())
@@ -222,10 +217,10 @@ public class KitsPanel extends JPanel
 			PlayerComposition composition = player.getPlayerComposition();
 			if (composition != null)
 			{
-				boolean female = composition.getGender() == 1;
-				if (isFemale == null || female != isFemale)
+				int gender = composition.getGender();
+				if (this.gender == null || this.gender != gender)
 				{
-					isFemale = female;
+					this.gender = gender;
 					populateKitSlots();
 				}
 			}
@@ -234,7 +229,7 @@ public class KitsPanel extends JPanel
 
 	// returns null if gender cannot be determined
 	@Nullable
-	private Boolean isFemale()
+	private Integer getGender()
 	{
 		Player player = client.getLocalPlayer();
 		if (player != null)
@@ -242,7 +237,7 @@ public class KitsPanel extends JPanel
 			PlayerComposition composition = player.getPlayerComposition();
 			if (composition != null)
 			{
-				return composition.getGender() == 1;
+				return composition.getGender();
 			}
 		}
 		return null;

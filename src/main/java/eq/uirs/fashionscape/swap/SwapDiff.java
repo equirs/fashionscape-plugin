@@ -13,6 +13,7 @@ import net.runelite.api.kit.KitType;
 /**
  * Holds onto information about equipment and animations before a swap occurred
  */
+@Getter
 @RequiredArgsConstructor
 @ToString
 @EqualsAndHashCode
@@ -45,13 +46,9 @@ class SwapDiff
 		return new SwapDiff(new HashMap<>(), new HashMap<>(), null, null);
 	}
 
-	@Getter
 	private final Map<KitType, Change> slotChanges;
-	@Getter
 	private final Map<ColorType, Change> colorChanges;
-	@Getter
 	private final Change iconChange;
-	@Getter
 	private final Integer changedIdleAnimationId;
 
 	boolean isBlank()

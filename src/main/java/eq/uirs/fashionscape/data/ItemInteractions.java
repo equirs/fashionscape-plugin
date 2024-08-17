@@ -23,7 +23,8 @@ public class ItemInteractions
 		25960, 25961, 25969, 25971, 25983, 25987, 25989, 25973, 26217, 26237, 26239, 26376, 26378, 26380, 26526, 26567,
 		26686, 26687, 26688, 26689, 26690, 26691, 26692, 26693, 26694, 26695, 26698, 26699, 26700, 26701, 26702, 26703,
 		// inactive corrupted bh armor sets (vesta, statius, zuriel, morrigan)
-		27965, 27968, 27971, 27974, 27977, 27980, 27983, 27986, 27989, 27992, 27995
+		27965, 27968, 27971, 27974, 27977, 27980, 27983, 27986, 27989, 27992, 27995,
+		28813, 29055, 29064, 29073, 29277
 	);
 
 	/**
@@ -82,7 +83,8 @@ public class ItemInteractions
 		25221, 25222, 25223, 25224, 25225, 25226, 25227, 25228, 25229, 25230, 25231, 25232, 25233, 25234, 25235, 25236,
 		25237, 25238, 25239, 25240, 25241, 25242, 25243, 25398, 25413, 25438, 25549, 25592, 25840, 26254, 26312, 26531,
 		26788, 26801, 26804, 26937, 26963, 26967, 27035, 27123, 27141, 27143, 27145, 27147, 27149, 27151, 27153, 27155,
-		27576, 27584, 27588, 27804, 27828, 27875, 27877, 28603, 28605, 28607, 28609, 28611, 28620, 28655
+		27576, 27584, 27588, 27804, 27828, 27875, 27877, 28603, 28605, 28607, 28609, 28611, 28620, 28655, 28712, 28724,
+		28736, 29010, 29019, 29028, 29263, 29443
 	);
 
 	/**
@@ -112,7 +114,7 @@ public class ItemInteractions
 		25235, 25236, 25237, 25238, 25239, 25240, 25241, 25242, 25243, 25336, 25898, 25900, 25902, 25904, 25906, 25908,
 		25910, 25912, 25914, 26225, 26241, 26382, 26427, 26439, 26451, 26731, 26733, 26735, 26741, 26745, 26747, 27119,
 		27226, 27235, 27705, 27707, 27717, 27719, 27729, 27731, 27741, 27743, 27753, 27755, 27765, 27767, 27777, 27779,
-		28254
+		28254, 28788, 29560, 29566
 	);
 
 	/**
@@ -128,8 +130,8 @@ public class ItemInteractions
 	/**
 	 * kit ids of boot-slot items that, when detected in-game, will disable the boots, weapon and shield slots
 	 */
-	public static final Set<Integer> DISABLE_BOOT_KITS = ImmutableSet.of(BootsKit.MINECART.getKitId(true),
-		BootsKit.MINECART.getKitId(false));
+	public static final Set<Integer> DISABLE_BOOT_KITS = ImmutableSet.of(BootsKit.MINECART.getKitId(0),
+		BootsKit.MINECART.getKitId(1));
 
 	/**
 	 * item ids of weapon-slot items that, when detected in-game, will disable the weapon and shield slots
@@ -139,11 +141,12 @@ public class ItemInteractions
 	// region Gender Swap Kits
 
 	// roughly corresponding kits that don't share the same name
-	public static final BiMap<Kit, Kit> MALE_TO_FEMALE_KITS;
+	public static final BiMap<Kit, Kit> GENDER_MIRRORED_KITS;
 
 	static
 	{
 		Map<Kit, Kit> mToF = new HashMap<>();
+		// TODO review
 		mToF.put(ArmsKit.REGULAR, ArmsKit.SHORT_SLEEVES);
 		mToF.put(ArmsKit.MUSCLEBOUND, ArmsKit.MUSCLEY);
 		mToF.put(ArmsKit.LOOSE_SLEEVED, ArmsKit.FRILLY_A);
@@ -155,7 +158,7 @@ public class ItemInteractions
 		mToF.put(LegsKit.SHORTS, LegsKit.SHORT_SKIRT);
 		mToF.put(LegsKit.RIPPED_L, LegsKit.TORN_SKIRT);
 		mToF.put(LegsKit.PATCHED, LegsKit.PATCHED_SKIRT);
-		MALE_TO_FEMALE_KITS = new ImmutableBiMap.Builder<Kit, Kit>()
+		GENDER_MIRRORED_KITS = new ImmutableBiMap.Builder<Kit, Kit>()
 			.putAll(mToF)
 			.build();
 	}
@@ -711,6 +714,22 @@ public class ItemInteractions
 		WEAPON_TO_IDLE.put(ItemID.CORRUPTED_TUMEKENS_SHADOW, IdleAnimationID.TUMEKENS_SHADOW);
 		WEAPON_TO_IDLE.put(ItemID.WARPED_SCEPTRE_UNCHARGED, IdleAnimationID.UPRIGHT_WEAPON);
 		WEAPON_TO_IDLE.put(ItemID.WARPED_SCEPTRE, IdleAnimationID.UPRIGHT_WEAPON);
+		WEAPON_TO_IDLE.put(ItemID.DINHS_BLAZING_BULWARK , IdleAnimationID.DINHS_BULWARK);
+		WEAPON_TO_IDLE.put(ItemID.BLAZING_BLOWPIPE , IdleAnimationID.UPRIGHT_WEAPON);
+		WEAPON_TO_IDLE.put(ItemID.BLAZING_BLOWPIPE_EMPTY , IdleAnimationID.UPRIGHT_WEAPON);
+		WEAPON_TO_IDLE.put(ItemID.TRAILBLAZER_RELOADED_BANNER , IdleAnimationID.BANNER);
+		WEAPON_TO_IDLE.put(ItemID.TRAILBLAZER_RELOADED_TORCH , IdleAnimationID.TRAILBLAZER_TORCH);
+		WEAPON_TO_IDLE.put(ItemID.TRAILBLAZER_RELOADED_DRAGON_TROPHY , IdleAnimationID.HEAVY_ITEM);
+		WEAPON_TO_IDLE.put(ItemID.TRAILBLAZER_RELOADED_RUNE_TROPHY , IdleAnimationID.HEAVY_ITEM);
+		WEAPON_TO_IDLE.put(ItemID.TRAILBLAZER_RELOADED_ADAMANT_TROPHY , IdleAnimationID.HEAVY_ITEM);
+		WEAPON_TO_IDLE.put(ItemID.BONE_MACE , IdleAnimationID.VERACS_FLAIL);
+		WEAPON_TO_IDLE.put(ItemID.BONE_STAFF , IdleAnimationID.UPRIGHT_WEAPON);
+		WEAPON_TO_IDLE.put(ItemID.TECU_SALAMANDER , IdleAnimationID.SALAMANDER);
+		WEAPON_TO_IDLE.put(ItemID.BLUE_MOON_SPEAR , IdleAnimationID.ZAMORAKIAN_SPEAR);
+		WEAPON_TO_IDLE.put(ItemID.PURGING_STAFF , IdleAnimationID.UPRIGHT_WEAPON);
+		WEAPON_TO_IDLE.put(ItemID.CORRUPTED_VOLATILE_NIGHTMARE_STAFF , IdleAnimationID.NIGHTMARE_STAFF);
+		WEAPON_TO_IDLE.put(ItemID.ARMADYL_GODSWORD_DEADMAN , IdleAnimationID.GODSWORD);
+		WEAPON_TO_IDLE.put(ItemID.VOLATILE_NIGHTMARE_STAFF_DEADMAN , IdleAnimationID.NIGHTMARE_STAFF);
 	}
 
 	// endregion

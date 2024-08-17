@@ -1,8 +1,10 @@
 package eq.uirs.fashionscape.data.kit;
 
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import net.runelite.api.kit.KitType;
 
+@Getter
 @RequiredArgsConstructor
 public enum BootsKit implements Kit
 {
@@ -11,9 +13,8 @@ public enum BootsKit implements Kit
 	LARGE_2(44, 81, true),
 	MINECART(82, 83, true);
 
-	private final Integer maleKitId;
-
-	private final Integer femaleKitId;
+	private final Integer mascKitId;
+	private final Integer femKitId;
 
 	private final boolean hidden;
 
@@ -31,17 +32,5 @@ public enum BootsKit implements Kit
 			return "Large";
 		}
 		return Kit.sentenceCaseName(this);
-	}
-
-	@Override
-	public boolean isHidden()
-	{
-		return hidden;
-	}
-
-	@Override
-	public Integer getKitId(boolean isFemale)
-	{
-		return isFemale ? femaleKitId : maleKitId;
 	}
 }

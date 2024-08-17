@@ -7,6 +7,7 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import net.runelite.client.util.Text;
 
+@Getter
 @RequiredArgsConstructor
 public enum SkinColor implements Colorable
 {
@@ -37,10 +38,8 @@ public enum SkinColor implements Colorable
 		return values()[id];
 	}
 
-	@Getter
 	private final int colorId;
 
-	@Getter
 	private final Color color;
 
 	@Override

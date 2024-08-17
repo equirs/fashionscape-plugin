@@ -4,7 +4,6 @@ import java.awt.Color;
 import java.awt.Component;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
-import java.awt.Insets;
 import java.awt.geom.RoundRectangle2D;
 import javax.swing.border.AbstractBorder;
 
@@ -27,24 +26,5 @@ public class RoundedBorder extends AbstractBorder
 		g2d.setColor(color);
 		g2d.draw(new RoundRectangle2D.Double(x, y, width - 1, height - 1, radius, radius));
 		g2d.dispose();
-	}
-
-	@Override
-	public Insets getBorderInsets(Component c)
-	{
-		return (getBorderInsets(c, new Insets(0, 0, 0, 0)));
-	}
-
-	@Override
-	public Insets getBorderInsets(Component c, Insets insets)
-	{
-		insets.left = insets.top = insets.right = insets.bottom = 0;
-		return insets;
-	}
-
-	@Override
-	public boolean isBorderOpaque()
-	{
-		return false;
 	}
 }

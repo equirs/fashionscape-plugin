@@ -11,7 +11,6 @@ import java.util.Set;
 import java.util.regex.Pattern;
 import javax.inject.Inject;
 import javax.inject.Provider;
-import javax.swing.SwingUtilities;
 import lombok.Value;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
@@ -192,7 +191,7 @@ public class FashionscapePlugin extends Plugin
 		}
 		else if (event.getGameState() == GameState.LOGIN_SCREEN)
 		{
-			swapManager.setIsFemale(null);
+			swapManager.setGender(null);
 		}
 		if (panel != null)
 		{
@@ -229,7 +228,7 @@ public class FashionscapePlugin extends Plugin
 				continue;
 			}
 			ItemComposition itemComposition = itemManager.getItemComposition(canonical);
-			String itemName = itemComposition.getName().toLowerCase();
+			String itemName = itemComposition.getMembersName().toLowerCase();
 			boolean badItemName = ItemInteractions.BAD_ITEM_NAMES.contains(itemName);
 			boolean membersObject = config.excludeMembersItems() && itemComposition.isMembers();
 			if (badItemName || membersObject)

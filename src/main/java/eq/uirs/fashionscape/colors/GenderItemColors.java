@@ -9,7 +9,7 @@ public class GenderItemColors
 	@SerializedName("a")
 	public ItemColors any;
 	@SerializedName("m")
-	public ItemColors male;
+	public ItemColors masc;
 	@SerializedName("f")
-	public ItemColors female;
+	public ItemColors fem;
 }

@@ -30,7 +30,7 @@ abstract class AbsItemPanel extends AbsIconLabelPanel
 				if (itemId >= 0)
 				{
 					ItemComposition itemComposition = itemManager.getItemComposition(itemId);
-					itemName = itemComposition.getName();
+					itemName = itemComposition.getMembersName();
 				}
 				else
 				{

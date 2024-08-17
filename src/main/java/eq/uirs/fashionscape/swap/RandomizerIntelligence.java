@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 /**
  * Determines the size of the queue for scoring the "best" matched item via randomizer request
  */
+@Getter
 @RequiredArgsConstructor
 public enum RandomizerIntelligence
 {
@@ -14,6 +15,5 @@ public enum RandomizerIntelligence
 	MODERATE(30),
 	HIGH(50);
 
-	@Getter
 	private final int depth;
 }

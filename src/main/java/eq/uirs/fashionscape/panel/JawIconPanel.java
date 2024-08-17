@@ -14,6 +14,7 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
 import java.util.Arrays;
+import javax.annotation.Nullable;
 import javax.swing.ImageIcon;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
@@ -39,7 +40,7 @@ public class JawIconPanel extends DropdownIconPanel
 	private JawIcon jawIcon = null;
 
 	JawIconPanel(BufferedImage image, ClientThread clientThread, SwapManager swapManager, ItemManager itemManager,
-				 KitColorOpener kitColorOpener, Integer iconId)
+				 KitColorOpener kitColorOpener, @Nullable Integer iconId)
 	{
 		super(image, clientThread);
 		this.swapManager = swapManager;
@@ -65,7 +66,7 @@ public class JawIconPanel extends DropdownIconPanel
 		icon.setBorder(new RoundedBorder(ColorScheme.LIGHT_GRAY_COLOR, ICON_CORNER_RADIUS));
 
 		swapManager.addEventListener(new IconChangedListener(e -> {
-			if (!Objects.equal(jawIcon, e.getIcon()))
+			if (jawIcon != e.getIcon())
 			{
 				this.jawIcon = e.getIcon();
 				setIconName();
@@ -145,39 +146,45 @@ public class JawIconPanel extends DropdownIconPanel
 			{
 				continue;
 			}
-			JLabel iconLabel = new JLabel();
-			iconLabel.setBorder(new EmptyBorder(5, 5, 0, 5));
-			iconLabel.setText(jawIcon.getDisplayName());
-			iconLabel.addMouseListener(new MouseAdapter()
-			{
-				@Override
-				public void mouseEntered(MouseEvent e)
-				{
-					if (!swapManager.isIconLocked())
-					{
-						setCursor(new Cursor(Cursor.HAND_CURSOR));
-					}
-					swapManager.hoverOverIcon(jawIcon);
-				}
-
-				@Override
-				public void mouseExited(MouseEvent e)
-				{
-					setCursor(new Cursor(Cursor.DEFAULT_CURSOR));
-					swapManager.hoverAway();
-				}
-
-				@Override
-				public void mouseReleased(MouseEvent e)
-				{
-					swapManager.hoverSelectIcon(jawIcon);
-				}
-			});
+			JLabel iconLabel = createIconLabel(jawIcon);
 			iconsList.add(iconLabel, c);
 			c.gridy++;
 		}
 		optionsContainer.add(iconsList, BorderLayout.CENTER);
 		optionsContainer.updateUI();
+	}
+
+	private JLabel createIconLabel(JawIcon jawIcon)
+	{
+		JLabel iconLabel = new JLabel();
+		iconLabel.setBorder(new EmptyBorder(5, 5, 0, 5));
+		iconLabel.setText(jawIcon.getDisplayName());
+		iconLabel.addMouseListener(new MouseAdapter()
+		{
+			@Override
+			public void mouseEntered(MouseEvent e)
+			{
+				if (!swapManager.isIconLocked())
+				{
+					setCursor(new Cursor(Cursor.HAND_CURSOR));
+				}
+				swapManager.hoverOverIcon(jawIcon);
+			}
+
+			@Override
+			public void mouseExited(MouseEvent e)
+			{
+				setCursor(new Cursor(Cursor.DEFAULT_CURSOR));
+				swapManager.hoverAway();
+			}
+
+			@Override
+			public void mouseReleased(MouseEvent e)
+			{
+				swapManager.hoverSelectIcon(jawIcon);
+			}
+		});
+		return iconLabel;
 	}
 
 	public void closeOptions()

@@ -140,7 +140,7 @@ class SearchItemPanel extends AbsItemPanel
 		}
 		else
 		{
-			return Objects.equals(swapManager.swappedItemIdIn(slot), itemId);
+			return Objects.equals(itemId, swapManager.swappedItemIdIn(slot));
 		}
 	}
 

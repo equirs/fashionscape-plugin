@@ -103,7 +103,7 @@ public class KitItemPanel extends DropdownIconPanel
 			setKitName();
 			setIcon(icon, image);
 			swapManager.addEventListener(new KitChangedListener(e -> {
-				if (Objects.equal(slot, e.getSlot()))
+				if (slot == e.getSlot())
 				{
 					this.kitId = e.getKitId();
 					setKitName();
@@ -129,7 +129,7 @@ public class KitItemPanel extends DropdownIconPanel
 		{
 			setIconColor();
 			swapManager.addEventListener(new ColorChangedListener(e -> {
-				if (Objects.equal(type, e.getType()))
+				if (type == e.getType())
 				{
 					this.colorId = e.getColorId();
 					setIconColor();
@@ -178,13 +178,13 @@ public class KitItemPanel extends DropdownIconPanel
 		add(rightPanel, BorderLayout.CENTER);
 
 		swapManager.addEventListener(new LockChangedListener(e -> {
-			if (Objects.equal(e.getSlot(), slot) && e.getType() != LockChanged.Type.ITEM)
+			if (e.getSlot() == slot && e.getType() != LockChanged.Type.ITEM)
 			{
 				updateLockButton();
 			}
 		}));
 		swapManager.addEventListener(new ColorLockChangedListener(e -> {
-			if (Objects.equal(e.getType(), type))
+			if (e.getType() == type)
 			{
 				updateColorLockButton();
 			}
@@ -197,7 +197,7 @@ public class KitItemPanel extends DropdownIconPanel
 		kitColorOpener.openOptions(slot, type);
 	}
 
-	public void openOptions(boolean isFemale)
+	public void openOptions(Integer gender)
 	{
 		optionsContainer.removeAll();
 		if (optionsContainer.isVisible())
@@ -226,37 +226,7 @@ public class KitItemPanel extends DropdownIconPanel
 
 			for (Colorable colorable : type.getColorables())
 			{
-				JLabel colorLabel = new JLabel();
-				colorLabel.setOpaque(true);
-				colorLabel.setBackground(colorable.getColor());
-				colorLabel.setPreferredSize(COLOR_CHOOSER_SIZE);
-				colorLabel.setToolTipText(colorable.getDisplayName());
-				colorLabel.setBorder(BorderFactory.createLineBorder(ColorScheme.LIGHT_GRAY_COLOR));
-				colorLabel.addMouseListener(new MouseAdapter()
-				{
-					@Override
-					public void mouseEntered(MouseEvent e)
-					{
-						if (!swapManager.isColorLocked(type))
-						{
-							setCursor(new Cursor(Cursor.HAND_CURSOR));
-						}
-						swapManager.hoverOverColor(type, colorable.getColorId(type));
-					}
-
-					@Override
-					public void mouseExited(MouseEvent e)
-					{
-						setCursor(new Cursor(Cursor.DEFAULT_CURSOR));
-						swapManager.hoverAway();
-					}
-
-					@Override
-					public void mouseReleased(MouseEvent e)
-					{
-						swapManager.hoverSelectColor(type, colorable.getColorId(type));
-					}
-				});
+				JLabel colorLabel = createColorLabel(colorable);
 
 				JPanel colorWrapper = new JPanel(new BorderLayout());
 				colorWrapper.setBorder(new EmptyBorder(1, 1, 1, 1));
@@ -292,39 +262,12 @@ public class KitItemPanel extends DropdownIconPanel
 
 			for (Kit kit : allKits)
 			{
-				final Integer kitId = kit.getKitId(isFemale);
+				final Integer kitId = kit.getKitId(gender);
 				if (kitId == null)
 				{
 					continue;
 				}
-				JLabel kitLabel = new JLabel();
-				kitLabel.setBorder(new EmptyBorder(5, 5, 0, 5));
-				kitLabel.setText(kit.getDisplayName());
-				kitLabel.addMouseListener(new MouseAdapter()
-				{
-					@Override
-					public void mouseEntered(MouseEvent e)
-					{
-						if (!swapManager.isKitLocked(slot))
-						{
-							setCursor(new Cursor(Cursor.HAND_CURSOR));
-						}
-						swapManager.hoverOverKit(slot, kitId);
-					}
-
-					@Override
-					public void mouseExited(MouseEvent e)
-					{
-						setCursor(new Cursor(Cursor.DEFAULT_CURSOR));
-						swapManager.hoverAway();
-					}
-
-					@Override
-					public void mouseReleased(MouseEvent e)
-					{
-						swapManager.hoverSelectKit(slot, kitId);
-					}
-				});
+				JLabel kitLabel = createKitLabel(kit, kitId);
 				kitsList.add(kitLabel, c);
 				c.gridy++;
 			}
@@ -332,6 +275,75 @@ public class KitItemPanel extends DropdownIconPanel
 		optionsContainer.add(kitsList, BorderLayout.CENTER);
 
 		optionsContainer.updateUI();
+	}
+
+	private JLabel createColorLabel(Colorable colorable)
+	{
+		JLabel colorLabel = new JLabel();
+		colorLabel.setOpaque(true);
+		colorLabel.setBackground(colorable.getColor());
+		colorLabel.setPreferredSize(COLOR_CHOOSER_SIZE);
+		colorLabel.setToolTipText(colorable.getDisplayName());
+		colorLabel.setBorder(BorderFactory.createLineBorder(ColorScheme.LIGHT_GRAY_COLOR));
+		colorLabel.addMouseListener(new MouseAdapter()
+		{
+			@Override
+			public void mouseEntered(MouseEvent e)
+			{
+				if (!swapManager.isColorLocked(type))
+				{
+					setCursor(new Cursor(Cursor.HAND_CURSOR));
+				}
+				swapManager.hoverOverColor(type, colorable.getColorId(type));
+			}
+
+			@Override
+			public void mouseExited(MouseEvent e)
+			{
+				setCursor(new Cursor(Cursor.DEFAULT_CURSOR));
+				swapManager.hoverAway();
+			}
+
+			@Override
+			public void mouseReleased(MouseEvent e)
+			{
+				swapManager.hoverSelectColor(type, colorable.getColorId(type));
+			}
+		});
+		return colorLabel;
+	}
+
+	private JLabel createKitLabel(Kit kit, Integer kitId)
+	{
+		JLabel kitLabel = new JLabel();
+		kitLabel.setBorder(new EmptyBorder(5, 5, 0, 5));
+		kitLabel.setText(kit.getDisplayName());
+		kitLabel.addMouseListener(new MouseAdapter()
+		{
+			@Override
+			public void mouseEntered(MouseEvent e)
+			{
+				if (!swapManager.isKitLocked(slot))
+				{
+					setCursor(new Cursor(Cursor.HAND_CURSOR));
+				}
+				swapManager.hoverOverKit(slot, kitId);
+			}
+
+			@Override
+			public void mouseExited(MouseEvent e)
+			{
+				setCursor(new Cursor(Cursor.DEFAULT_CURSOR));
+				swapManager.hoverAway();
+			}
+
+			@Override
+			public void mouseReleased(MouseEvent e)
+			{
+				swapManager.hoverSelectKit(slot, kitId);
+			}
+		});
+		return kitLabel;
 	}
 
 	public void closeOptions()

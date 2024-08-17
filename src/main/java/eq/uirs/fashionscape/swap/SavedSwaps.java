@@ -51,26 +51,26 @@ class SavedSwaps
 {
 	private static final int DEBOUNCE_DELAY_MS = 500;
 	// when player's kit info is not known, fall back to showing some default values
-	private static final Map<KitType, Integer> FALLBACK_MALE_KITS = new HashMap<>();
-	private static final Map<KitType, Integer> FALLBACK_FEMALE_KITS = new HashMap<>();
+	private static final Map<KitType, Integer> FALLBACK_MASC_KITS = new HashMap<>();
+	private static final Map<KitType, Integer> FALLBACK_FEM_KITS = new HashMap<>();
 
 	static
 	{
-		FALLBACK_MALE_KITS.put(KitType.HAIR, HairKit.BALD.getKitId(false));
-		FALLBACK_MALE_KITS.put(KitType.JAW, JawKit.GOATEE.getKitId(false));
-		FALLBACK_MALE_KITS.put(KitType.TORSO, TorsoKit.PLAIN.getKitId(false));
-		FALLBACK_MALE_KITS.put(KitType.ARMS, ArmsKit.REGULAR.getKitId(false));
-		FALLBACK_MALE_KITS.put(KitType.LEGS, LegsKit.PLAIN_L.getKitId(false));
-		FALLBACK_MALE_KITS.put(KitType.HANDS, HandsKit.PLAIN_H.getKitId(false));
-		FALLBACK_MALE_KITS.put(KitType.BOOTS, BootsKit.SMALL.getKitId(false));
+		FALLBACK_MASC_KITS.put(KitType.HAIR, HairKit.BALD.getKitId(0));
+		FALLBACK_MASC_KITS.put(KitType.JAW, JawKit.GOATEE.getKitId(0));
+		FALLBACK_MASC_KITS.put(KitType.TORSO, TorsoKit.PLAIN.getKitId(0));
+		FALLBACK_MASC_KITS.put(KitType.ARMS, ArmsKit.REGULAR.getKitId(0));
+		FALLBACK_MASC_KITS.put(KitType.LEGS, LegsKit.PLAIN_L.getKitId(0));
+		FALLBACK_MASC_KITS.put(KitType.HANDS, HandsKit.PLAIN_H.getKitId(0));
+		FALLBACK_MASC_KITS.put(KitType.BOOTS, BootsKit.SMALL.getKitId(0));
 
-		FALLBACK_FEMALE_KITS.put(KitType.HAIR, HairKit.PIGTAILS.getKitId(true));
-		FALLBACK_FEMALE_KITS.put(KitType.JAW, -256);
-		FALLBACK_FEMALE_KITS.put(KitType.TORSO, TorsoKit.SIMPLE.getKitId(true));
-		FALLBACK_FEMALE_KITS.put(KitType.ARMS, ArmsKit.SHORT_SLEEVES.getKitId(true));
-		FALLBACK_FEMALE_KITS.put(KitType.LEGS, LegsKit.PLAIN_L.getKitId(true));
-		FALLBACK_FEMALE_KITS.put(KitType.HANDS, HandsKit.PLAIN_H.getKitId(true));
-		FALLBACK_FEMALE_KITS.put(KitType.BOOTS, BootsKit.SMALL.getKitId(true));
+		FALLBACK_FEM_KITS.put(KitType.HAIR, HairKit.PIGTAILS.getKitId(1));
+		FALLBACK_FEM_KITS.put(KitType.JAW, JawKit.CLEAN_SHAVEN.getKitId(1));
+		FALLBACK_FEM_KITS.put(KitType.TORSO, TorsoKit.SIMPLE.getKitId(1));
+		FALLBACK_FEM_KITS.put(KitType.ARMS, ArmsKit.SHORT_SLEEVES.getKitId(1));
+		FALLBACK_FEM_KITS.put(KitType.LEGS, LegsKit.PLAIN_L.getKitId(1));
+		FALLBACK_FEM_KITS.put(KitType.HANDS, HandsKit.PLAIN_H.getKitId(1));
+		FALLBACK_FEM_KITS.put(KitType.BOOTS, BootsKit.SMALL.getKitId(1));
 	}
 
 	@Inject
@@ -136,13 +136,13 @@ class SavedSwaps
 		{
 			Map<KitType, Integer> equipIds = SerializationUtils.deserialize(equipment);
 			equipIds.forEach((slot, equipId) -> {
-				if (equipId >= 256 && equipId < 512)
+				if (equipId >= SwapManager.KIT_OFFSET && equipId < SwapManager.ITEM_OFFSET)
 				{
-					putKit(slot, equipId - 256);
+					putKit(slot, equipId - SwapManager.KIT_OFFSET);
 				}
-				else if (equipId >= 512)
+				else if (equipId >= SwapManager.ITEM_OFFSET)
 				{
-					putItem(slot, equipId - 512);
+					putItem(slot, equipId - SwapManager.ITEM_OFFSET);
 				}
 			});
 			Map<ColorType, Integer> colorIds = SerializationUtils.deserialize(colors);
@@ -244,21 +244,21 @@ class SavedSwaps
 	/**
 	 * Returns the player's actual kit id in the given slot, or a fallback kit id if it's not known
 	 */
-	int getRealKit(KitType slot, Boolean isFemale)
+	int getRealKit(KitType slot, Integer gender)
 	{
 		Integer realKit = getRealKit(slot);
-		return realKit != null ? realKit : getFallbackKit(slot, isFemale);
+		return realKit != null ? realKit : getFallbackKit(slot, gender);
 	}
 
-	int getFallbackKit(KitType slot, Boolean isFemale)
+	int getFallbackKit(KitType slot, Integer gender)
 	{
-		if (isFemale == null || slot == null)
+		if (gender == null || slot == null)
 		{
-			return -256;
+			return -SwapManager.KIT_OFFSET;
 		}
-		Map<KitType, Integer> map = isFemale ? FALLBACK_FEMALE_KITS : FALLBACK_MALE_KITS;
-		int result = map.getOrDefault(slot, -256);
-		if (result != -256)
+		Map<KitType, Integer> map = gender == 1 ? FALLBACK_FEM_KITS : FALLBACK_MASC_KITS;
+		int result = map.getOrDefault(slot, -SwapManager.KIT_OFFSET);
+		if (result != -SwapManager.KIT_OFFSET)
 		{
 			fireEvent(new KnownKitChanged(true, slot));
 		}
@@ -654,9 +654,9 @@ class SavedSwaps
 		}
 		equipSaveFuture = executor.schedule(() -> {
 			Map<KitType, Integer> itemEquips = swappedItemIds.entrySet().stream()
-				.collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue() + 512));
+				.collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue() + SwapManager.ITEM_OFFSET));
 			Map<KitType, Integer> kitEquips = swappedKitIds.entrySet().stream()
-				.collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue() + 256));
+				.collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue() + SwapManager.KIT_OFFSET));
 			Map<KitType, Integer> hides = hiddenSlots.stream()
 				.collect(Collectors.toMap(v -> v, v -> 0));
 			HashMap<KitType, Integer> equips = new HashMap<>(itemEquips);

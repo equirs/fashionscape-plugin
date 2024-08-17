@@ -15,17 +15,15 @@ import net.runelite.api.kit.KitType;
  * Several slots are tightly coupled in their interactions. This groups them together so
  * that they're submitted for swapping at the same time.
  */
+@Getter
 class CompoundSwap
 {
-	@Getter
 	@NonNull
 	private final Type type;
 
-	@Getter
 	@NonNull
 	private final Map<KitType, Integer> equipmentIds;
 
-	@Getter
 	@Nullable
 	private final JawIcon icon;
 

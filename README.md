@@ -45,8 +45,7 @@ this is possible by selecting **"Nothing"** in the search results (note: this is
 ![Base tab](base_panel.png)
 
 "Base" is similar to "items", only this tab allows changing your character's base models and colours, essentially 
-combining every makeover NPC into one. There is a jaw (or beard) slot that is only available to male characters, while 
-every other slot is available to either gender. The icons in this tab have a rounded border indicating the colour you've 
+combining every makeover NPC into one. The icons in this tab have a rounded border indicating the colour you've 
 swapped to (if you haven't changed the colour, it will show up as light gray). Note that torso+arms and hair+jaw slot 
 colours are connected, so changing one always changes the other. There is no search feature for these slots since there 
 not as many options; instead, **clicking the icon** brings up a dropdown to browse the colour/model options available.

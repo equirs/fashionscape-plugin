@@ -59,5 +59,6 @@ public class IdleAnimationID
 	public static final int VENATOR_BOW = 9857;
 	public static final int TENTH_ANNI_BALLOONS = 10032;
 	public static final int TWO_HANDED_AXE = 10075;
+	public static final int TRAILBLAZER_TORCH = 10636;
 	public static final int SOULREAPER_AXE = 10169;
 }

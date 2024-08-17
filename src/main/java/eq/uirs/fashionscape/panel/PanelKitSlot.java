@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import net.runelite.api.kit.KitType;
 import net.runelite.client.util.Text;
 
+@Getter
 @RequiredArgsConstructor
 public enum PanelKitSlot
 {
@@ -19,10 +20,8 @@ public enum PanelKitSlot
 	BOOTS(KitType.BOOTS, ColorType.BOOTS),
 	ICON(null, null);
 
-	@Getter
 	private final KitType kitType;
 
-	@Getter
 	private final ColorType colorType;
 
 	public String getDisplayName()

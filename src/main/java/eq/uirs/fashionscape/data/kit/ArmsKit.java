@@ -1,8 +1,10 @@
 package eq.uirs.fashionscape.data.kit;
 
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import net.runelite.api.kit.KitType;
 
+@Getter
 @RequiredArgsConstructor
 public enum ArmsKit implements Kit
 {
@@ -27,9 +29,8 @@ public enum ArmsKit implements Kit
 	SWEATER_A(null, 95),
 	BARE_SHOULDERS(null, 99);
 
-	private final Integer maleKitId;
-
-	private final Integer femaleKitId;
+	private final Integer mascKitId;
+	private final Integer femKitId;
 
 	@Override
 	public KitType getKitType()
@@ -56,11 +57,5 @@ public enum ArmsKit implements Kit
 	public boolean isHidden()
 	{
 		return false;
-	}
-
-	@Override
-	public Integer getKitId(boolean isFemale)
-	{
-		return isFemale ? femaleKitId : maleKitId;
 	}
 }

@@ -5,6 +5,7 @@ import javax.annotation.Nullable;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
+@Getter
 @RequiredArgsConstructor
 public enum JawIcon
 {
@@ -25,10 +26,8 @@ public enum JawIcon
 			.orElse(null);
 	}
 
-	@Getter
 	private final String displayName;
 
 	// representative item id for displaying in panel icon and for color scoring
-	@Getter
 	private final int id;
 }

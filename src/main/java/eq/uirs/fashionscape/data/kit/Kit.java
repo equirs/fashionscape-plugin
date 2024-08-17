@@ -55,7 +55,21 @@ public interface Kit
 
 	boolean isHidden();
 
-	Integer getKitId(boolean isFemale);
+	Integer getMascKitId();
+	Integer getFemKitId();
+
+	default Integer getKitId(Integer gender)
+	{
+		switch (gender)
+		{
+			case 0:
+				return getMascKitId();
+			case 1:
+				return getFemKitId();
+			default:
+				return null;
+		}
+	}
 
 	static String sentenceCaseName(Enum e)
 	{

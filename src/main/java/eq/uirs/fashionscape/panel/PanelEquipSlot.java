@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import net.runelite.api.kit.KitType;
 import net.runelite.client.util.Text;
 
+@Getter
 @RequiredArgsConstructor
 public enum PanelEquipSlot
 {
@@ -19,7 +20,6 @@ public enum PanelEquipSlot
 	LEGS(KitType.LEGS),
 	BOOTS(KitType.BOOTS);
 
-	@Getter
 	private final KitType kitType;
 
 	public String getDisplayName()

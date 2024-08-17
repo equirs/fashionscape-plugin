@@ -1,9 +1,11 @@
 package eq.uirs.fashionscape.data.kit;
 
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import net.runelite.api.kit.KitType;
 
 @RequiredArgsConstructor
+@Getter
 public enum HairKit implements Kit
 {
 	BALD(0, 45),
@@ -64,9 +66,8 @@ public enum HairKit implements Kit
 	STRAIGHT_BRAIDS(232, 127),
 	TWO_BACK(233, 143);
 
-	private final int maleKitId;
-
-	private final int femaleKitId;
+	private final Integer mascKitId;
+	private final Integer femKitId;
 
 	@Override
 	public KitType getKitType()
@@ -91,11 +92,5 @@ public enum HairKit implements Kit
 	public boolean isHidden()
 	{
 		return false;
-	}
-
-	@Override
-	public Integer getKitId(boolean isFemale)
-	{
-		return isFemale ? femaleKitId : maleKitId;
 	}
 }
