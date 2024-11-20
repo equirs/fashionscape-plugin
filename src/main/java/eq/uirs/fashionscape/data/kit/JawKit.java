@@ -1,10 +1,9 @@
 package eq.uirs.fashionscape.data.kit;
 
 import com.google.common.collect.ImmutableMap;
-import eq.uirs.fashionscape.swap.SwapManager;
+import eq.uirs.fashionscape.core.FashionManager;
 import java.util.HashMap;
 import java.util.Map;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
@@ -18,7 +17,7 @@ import net.runelite.api.kit.KitType;
 public enum JawKit implements Kit
 {
 	// only valid when worn items obscure the player's jaw
-	NO_JAW(-256, -256,
+	NO_JAW(-FashionManager.KIT_OFFSET, -FashionManager.KIT_OFFSET,
 		new ImmutableMap.Builder<JawIcon, Integer>()
 			.put(JawIcon.BA_ATTACKER, 10556)
 			.put(JawIcon.BA_DEFENDER, 10558)
@@ -183,32 +182,51 @@ public enum JawKit implements Kit
 	// equipment id -> kit
 	private static final Map<Integer, JawKit> reverseLookupKit = new HashMap<>();
 
-	@Nonnull
+	@Nullable
 	public static JawIcon iconFromItemId(Integer itemId)
 	{
-		JawIcon icon = reverseLookupIcon.get(itemId);
-		return icon != null ? icon : JawIcon.NOTHING;
+		return reverseLookupIcon.get(itemId);
 	}
 
-	public static boolean isNoJawIcon(int itemId)
-	{
-		return JawKit.NO_JAW.icons.containsValue(itemId);
-	}
-
+	@Nullable
 	public static JawKit fromEquipmentId(int equipId)
 	{
 		return reverseLookupKit.get(equipId);
+	}
+
+	/**
+	 * Attempts to combine kit id and icon into an equipment id.
+	 * Falls back on returning the original kit id as an equipment id.
+	 */
+	public static int getEquipmentId(int kitId, @Nullable JawIcon icon)
+	{
+		int baseEquipId = kitId + FashionManager.KIT_OFFSET;
+		if (icon == null || icon == JawIcon.NOTHING)
+		{
+			return baseEquipId;
+		}
+		JawKit k = fromEquipmentId(baseEquipId);
+		if (k == null)
+		{
+			return baseEquipId;
+		}
+		Integer itemId = k.getIconItemId(icon);
+		if (itemId == null)
+		{
+			return baseEquipId;
+		}
+		return itemId + FashionManager.ITEM_OFFSET;
 	}
 
 	static
 	{
 		for (JawKit kit : JawKit.values())
 		{
-			reverseLookupKit.put(kit.mascKitId + SwapManager.KIT_OFFSET, kit);
-			reverseLookupKit.put(kit.femKitId + SwapManager.KIT_OFFSET, kit);
+			reverseLookupKit.put(kit.mascKitId + FashionManager.KIT_OFFSET, kit);
+			reverseLookupKit.put(kit.femKitId + FashionManager.KIT_OFFSET, kit);
 			kit.icons.forEach((icon, itemId) -> {
 				reverseLookupIcon.put(itemId, icon);
-				reverseLookupKit.put(itemId + SwapManager.ITEM_OFFSET, kit);
+				reverseLookupKit.put(itemId + FashionManager.ITEM_OFFSET, kit);
 			});
 		}
 	}
@@ -218,7 +236,7 @@ public enum JawKit implements Kit
 	@Getter
 	private final Integer femKitId;
 
-	// values are equipment ids
+	// values are item ids
 	private final Map<JawIcon, Integer> icons;
 
 	@Override

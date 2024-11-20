@@ -1,10 +1,9 @@
 package eq.uirs.fashionscape.panel;
 
-import eq.uirs.fashionscape.data.ColorType;
+import eq.uirs.fashionscape.data.color.ColorType;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import net.runelite.api.kit.KitType;
-import net.runelite.client.util.Text;
 
 @Getter
 @RequiredArgsConstructor
@@ -23,9 +22,4 @@ public enum PanelKitSlot
 	private final KitType kitType;
 
 	private final ColorType colorType;
-
-	public String getDisplayName()
-	{
-		return Text.titleCase(this);
-	}
 }

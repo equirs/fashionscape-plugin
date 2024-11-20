@@ -1,19 +1,13 @@
 package eq.uirs.fashionscape.colors;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.reflect.TypeToken;
-import eq.uirs.fashionscape.data.ColorType;
-import eq.uirs.fashionscape.data.Colorable;
+import eq.uirs.fashionscape.core.SlotInfo;
+import eq.uirs.fashionscape.core.layer.Layers;
+import eq.uirs.fashionscape.data.color.ColorType;
+import eq.uirs.fashionscape.data.color.Colorable;
 import eq.uirs.fashionscape.data.kit.JawIcon;
 import eq.uirs.fashionscape.data.kit.JawKit;
-import eq.uirs.fashionscape.swap.SwapManager;
+import eq.uirs.fashionscape.remote.RemoteData;
 import java.awt.Color;
-import java.io.BufferedReader;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.Reader;
-import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -23,6 +17,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.inject.Singleton;
+import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
@@ -32,12 +27,12 @@ import net.runelite.api.kit.KitType;
 
 @Slf4j
 @Singleton
+@RequiredArgsConstructor(onConstructor_ = {@Inject})
 public class ColorScorer
 {
 	private final Client client;
-	private final SwapManager swapManager;
+	private final Layers layers;
 
-	private final Map<Integer, GenderItemColors> allColors;
 	private final Map<KitType, List<ItemColorInfo>> kitColors = new ConcurrentHashMap<>();
 	private final Map<ColorType, Colorable> playerColors = new ConcurrentHashMap<>();
 
@@ -52,30 +47,7 @@ public class ColorScorer
 		double percentage;
 	}
 
-	@Inject
-	ColorScorer(Client client, SwapManager swapManager, Gson baseGson)
-	{
-		this.client = client;
-		this.swapManager = swapManager;
-		GsonBuilder builder = baseGson.newBuilder()
-			.registerTypeAdapter(ItemColors.class, new ItemColors.Deserializer());
-		Gson gson = builder.create();
-		InputStream stream = this.getClass().getResourceAsStream("colors.json");
-		if (stream != null)
-		{
-			Reader reader = new BufferedReader(new InputStreamReader(stream));
-			Type type = new TypeToken<Map<Integer, GenderItemColors>>()
-			{
-			}.getType();
-			allColors = new ConcurrentHashMap<>(gson.fromJson(reader, type));
-		}
-		else
-		{
-			allColors = new ConcurrentHashMap<>();
-		}
-	}
-
-	// this should be called before scoring if relying on current player swaps
+	// this should be called before scoring if relying on current player info
 	public void updatePlayerInfo()
 	{
 		kitColors.clear();
@@ -90,17 +62,17 @@ public class ColorScorer
 			return;
 		}
 		playerColors.clear();
-		playerColors.putAll(swapManager.swappedColorsMap());
+		playerColors.putAll(layers.getVirtualModels().getColors().getAllColorable());
 		gender = composition.getGender();
 		for (KitType slot : KitType.values())
 		{
-			Integer itemId = swapManager.swappedItemIdIn(slot);
-			if (itemId != null)
+			SlotInfo slotInfo = layers.getVirtualModels().getItems().get(slot);
+			if (slotInfo != null)
 			{
-				kitColors.put(slot, colorsFor(itemId));
+				kitColors.put(slot, colorsFor(slotInfo.getItemId()));
 			}
 		}
-		JawIcon icon = swapManager.swappedIcon();
+		JawIcon icon = layers.getVirtualModels().getIcon();
 		if (icon != null)
 		{
 			Integer iconItemId = JawKit.NO_JAW.getIconItemId(icon);
@@ -114,19 +86,23 @@ public class ColorScorer
 	public void setPlayerInfo(Map<KitType, Integer> itemIds, Map<ColorType, Colorable> colors)
 	{
 		kitColors.clear();
+		playerColors.clear();
+		playerColors.putAll(colors);
+		for (Map.Entry<KitType, Integer> entry : itemIds.entrySet())
+		{
+			kitColors.put(entry.getKey(), colorsFor(entry.getValue()));
+		}
 		Player player = client.getLocalPlayer();
 		if (player == null)
 		{
 			return;
 		}
-		playerColors.clear();
-		playerColors.putAll(colors);
 		PlayerComposition composition = player.getPlayerComposition();
-		gender = composition.getGender();
-		for (Map.Entry<KitType, Integer> entry : itemIds.entrySet())
+		if (composition == null)
 		{
-			kitColors.put(entry.getKey(), colorsFor(entry.getValue()));
+			return;
 		}
+		gender = composition.getGender();
 	}
 
 	public void addPlayerInfo(KitType slot, Integer itemId)
@@ -218,14 +194,14 @@ public class ColorScorer
 
 	private List<ItemColorInfo> colorsFor(int itemId)
 	{
-		GenderItemColors genderColors = allColors.get(itemId);
+		GenderItemColors genderColors = RemoteData.ITEM_ID_TO_COLORS.get(itemId);
 		if (genderColors != null)
 		{
 			if (genderColors.any != null)
 			{
 				return genderColors.any.itemColorInfo;
 			}
-			else
+			else if (gender != null)
 			{
 				switch (gender)
 				{

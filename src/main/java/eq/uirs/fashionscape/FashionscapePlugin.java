@@ -1,40 +1,36 @@
 package eq.uirs.fashionscape;
 
 import com.google.inject.Provides;
-import eq.uirs.fashionscape.data.ItemInteractions;
+import eq.uirs.fashionscape.core.Events;
+import eq.uirs.fashionscape.core.FashionManager;
+import eq.uirs.fashionscape.core.layer.Layers;
+import eq.uirs.fashionscape.core.randomizer.Randomizer;
+import eq.uirs.fashionscape.overlay.DebugOverlay;
 import eq.uirs.fashionscape.panel.FashionscapePanel;
-import eq.uirs.fashionscape.swap.SwapManager;
+import eq.uirs.fashionscape.remote.RemoteDataHandler;
 import java.awt.image.BufferedImage;
-import java.io.File;
-import java.util.HashSet;
-import java.util.Set;
-import java.util.regex.Pattern;
 import javax.inject.Inject;
+import javax.inject.Named;
 import javax.inject.Provider;
-import lombok.Value;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
-import net.runelite.api.InventoryID;
-import net.runelite.api.ItemComposition;
 import net.runelite.api.MenuAction;
 import net.runelite.api.Player;
 import net.runelite.api.events.GameStateChanged;
-import net.runelite.api.events.ItemContainerChanged;
 import net.runelite.api.events.MenuOptionClicked;
 import net.runelite.api.events.PlayerChanged;
-import net.runelite.client.RuneLite;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ConfigChanged;
-import net.runelite.client.game.ItemManager;
-import net.runelite.client.game.ItemStats;
+import net.runelite.client.events.RuneScapeProfileChanged;
 import net.runelite.client.menus.MenuManager;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.ClientToolbar;
 import net.runelite.client.ui.NavigationButton;
+import net.runelite.client.ui.overlay.OverlayManager;
 import net.runelite.client.util.ImageUtil;
 
 @PluginDescriptor(
@@ -44,39 +40,7 @@ import net.runelite.client.util.ImageUtil;
 @Slf4j
 public class FashionscapePlugin extends Plugin
 {
-	public static final File OUTFITS_DIR = new File(RuneLite.RUNELITE_DIR, "outfits");
-	public static final Pattern PROFILE_PATTERN = Pattern.compile("^(\\w+):(-?\\d+).*");
-	private static final Pattern PAREN_REPLACE = Pattern.compile("\\(.*\\)");
-
-	private static final String COPY_PLAYER = "Copy-outfit";
-	private static final Set<Integer> ITEM_ID_DUPES = new HashSet<>();
-
-	// combined set of all items to skip when searching (bad items, dupes, non-standard if applicable)
-	public static Set<Integer> getItemIdsToExclude(FashionscapeConfig config)
-	{
-		Set<Integer> result = ITEM_ID_DUPES;
-		result.addAll(ItemInteractions.BAD_ITEM_IDS);
-		if (config.excludeNonStandardItems())
-		{
-			result.addAll(ItemInteractions.NON_STANDARD_ITEMS);
-		}
-		return result;
-	}
-
-	private static String stripName(String name)
-	{
-		String noParens = PAREN_REPLACE.matcher(name).replaceAll("");
-		return noParens.replaceAll("[^A-Za-z]+", "");
-	}
-
-	@Value
-	private static class ItemDupeData
-	{
-		int modelId;
-		short[] colorsToReplace;
-		short[] texturesToReplace;
-		String strippedName;
-	}
+	private static final String COPY_PLAYER = "Copy-fashion";
 
 	@Inject
 	private ClientToolbar clientToolbar;
@@ -88,10 +52,16 @@ public class FashionscapePlugin extends Plugin
 	private ClientThread clientThread;
 
 	@Inject
-	private ItemManager itemManager;
+	private OverlayManager overlayManager;
 
 	@Inject
-	private SwapManager swapManager;
+	private FashionManager fashionManager;
+
+	@Inject
+	private Layers layers;
+
+	@Inject
+	private Randomizer randomizer;
 
 	@Inject
 	private FashionscapeConfig config;
@@ -99,8 +69,19 @@ public class FashionscapePlugin extends Plugin
 	@Inject
 	private Provider<MenuManager> menuManager;
 
+	@Inject
+	private RemoteDataHandler remote;
+
+	@Inject
+	private DebugOverlay debugOverlay;
+
+	@Inject
+	@Named("developerMode")
+	private boolean developerMode;
+
 	private FashionscapePanel panel;
 	private NavigationButton navButton;
+	private boolean hasLoggedIn;
 
 	@Provides
 	FashionscapeConfig getConfig(ConfigManager configManager)
@@ -111,6 +92,7 @@ public class FashionscapePlugin extends Plugin
 	@Override
 	protected void startUp()
 	{
+		remote.fetch();
 		final BufferedImage icon = ImageUtil.loadImageResource(getClass(), "panelicon.png");
 		panel = injector.getInstance(FashionscapePanel.class);
 		navButton = NavigationButton.builder()
@@ -121,19 +103,26 @@ public class FashionscapePlugin extends Plugin
 			.build();
 		clientToolbar.addNavigation(navButton);
 		refreshMenuEntries();
-		clientThread.invokeLater(() -> {
-			populateDupes();
-			swapManager.startUp();
-		});
+		fashionManager.startUp();
+		if (developerMode)
+		{
+			overlayManager.add(debugOverlay);
+		}
 	}
 
 	@Override
 	protected void shutDown()
 	{
+
+		remote.removeListeners();
+		Events.removeListeners();
 		menuManager.get().removePlayerMenuItem(COPY_PLAYER);
-		clientThread.invokeLater(() -> swapManager.shutDown());
+		clientThread.invokeLater(() -> fashionManager.shutDown());
 		clientToolbar.removeNavigation(navButton);
-		ITEM_ID_DUPES.clear();
+		if (developerMode)
+		{
+			overlayManager.remove(debugOverlay);
+		}
 	}
 
 	@Subscribe
@@ -142,7 +131,7 @@ public class FashionscapePlugin extends Plugin
 		Player player = event.getPlayer();
 		if (player != null && player == client.getLocalPlayer())
 		{
-			swapManager.onPlayerChanged();
+			fashionManager.onPlayerChanged();
 			if (panel != null)
 			{
 				panel.onPlayerChanged(player);
@@ -151,33 +140,30 @@ public class FashionscapePlugin extends Plugin
 	}
 
 	@Subscribe
-	public void onItemContainerChanged(ItemContainerChanged event)
+	public void onRuneScapeProfileChanged(RuneScapeProfileChanged event)
 	{
-		if (event.getContainerId() == InventoryID.EQUIPMENT.getId())
-		{
-			swapManager.onEquipmentChanged();
-		}
+		fashionManager.loadRSProfile();
 	}
 
 	@Subscribe
 	public void onConfigChanged(ConfigChanged event)
 	{
-		if (event.getGroup().equals(FashionscapeConfig.GROUP))
+		if (!event.getGroup().equals(FashionscapeConfig.GROUP))
 		{
-			if (event.getKey().equals(FashionscapeConfig.KEY_EXCLUDE_NON_STANDARD) ||
-				event.getKey().equals(FashionscapeConfig.KEY_EXCLUDE_MEMBERS))
-			{
-				// reload displayed results
-				clientThread.invokeLater(() -> {
-					populateDupes();
-					panel.reloadResults();
-					panel.refreshKitsPanel();
-				});
-			}
-			else if (event.getKey().equals(FashionscapeConfig.KEY_IMPORT_MENU_ENTRY))
-			{
-				refreshMenuEntries();
-			}
+			return;
+		}
+		if (event.getKey().equals(FashionscapeConfig.KEY_EXCLUDE_MEMBERS))
+		{
+			// reload displayed results
+			clientThread.invokeLater(() -> {
+				panel.reloadResults();
+				panel.refreshKitsPanel();
+				randomizer.repopulateMemo();
+			});
+		}
+		else if (event.getKey().equals(FashionscapeConfig.KEY_IMPORT_MENU_ENTRY))
+		{
+			refreshMenuEntries();
 		}
 	}
 
@@ -186,16 +172,12 @@ public class FashionscapePlugin extends Plugin
 	{
 		if (event.getGameState() == GameState.LOGGED_IN)
 		{
-			populateDupes();
-			swapManager.onEquipmentChanged();
+			hasLoggedIn = true;
 		}
-		else if (event.getGameState() == GameState.LOGIN_SCREEN)
+		else if (hasLoggedIn && event.getGameState() == GameState.LOGIN_SCREEN)
 		{
-			swapManager.setGender(null);
-		}
-		if (panel != null)
-		{
-			panel.onGameStateChanged(event);
+			layers.resetRealInfo();
+			hasLoggedIn = false;
 		}
 	}
 
@@ -209,50 +191,8 @@ public class FashionscapePlugin extends Plugin
 			{
 				return;
 			}
-			swapManager.copyOutfit(p.getPlayerComposition());
+			fashionManager.importPlayer(p);
 			panel.reloadResults();
-		}
-	}
-
-	private void populateDupes()
-	{
-		ITEM_ID_DUPES.clear();
-		Set<Integer> ids = new HashSet<>();
-		Set<ItemDupeData> itemUniques = new HashSet<>();
-		Set<Integer> skips = FashionscapePlugin.getItemIdsToExclude(config);
-		for (int i = 0; i < client.getItemCount(); i++)
-		{
-			int canonical = itemManager.canonicalize(i);
-			if (skips.contains(canonical))
-			{
-				continue;
-			}
-			ItemComposition itemComposition = itemManager.getItemComposition(canonical);
-			String itemName = itemComposition.getMembersName().toLowerCase();
-			boolean badItemName = ItemInteractions.BAD_ITEM_NAMES.contains(itemName);
-			boolean membersObject = config.excludeMembersItems() && itemComposition.isMembers();
-			if (badItemName || membersObject)
-			{
-				ITEM_ID_DUPES.add(canonical);
-				continue;
-			}
-			ItemStats itemStats = itemManager.getItemStats(canonical);
-			if (!ids.contains(itemComposition.getId()) && itemStats != null && itemStats.isEquipable())
-			{
-				ItemDupeData itemDupeData = new ItemDupeData(
-					itemComposition.getInventoryModel(),
-					itemComposition.getColorToReplaceWith(),
-					itemComposition.getTextureToReplaceWith(),
-					stripName(itemName)
-				);
-				if (itemUniques.contains(itemDupeData))
-				{
-					ITEM_ID_DUPES.add(canonical);
-					continue;
-				}
-				itemUniques.add(itemDupeData);
-				ids.add(itemComposition.getId());
-			}
 		}
 	}
 

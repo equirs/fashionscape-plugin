@@ -1,24 +1,23 @@
 package eq.uirs.fashionscape.panel;
 
 import java.awt.image.BufferedImage;
-import javax.annotation.Nullable;
+import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.ItemComposition;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.game.ItemManager;
 
+@Slf4j
 abstract class AbsItemPanel extends AbsIconLabelPanel
 {
-	public final Integer itemId;
-
 	protected final ItemManager itemManager;
+	private final boolean developerMode;
 
-	AbsItemPanel(@Nullable Integer itemId, BufferedImage icon, ItemManager itemManager,
-				 ClientThread clientThread)
+	AbsItemPanel(BufferedImage icon, ItemManager itemManager,
+				 ClientThread clientThread, boolean developerMode)
 	{
 		super(icon, clientThread);
-		this.itemId = itemId;
 		this.itemManager = itemManager;
-		setItemName(itemId);
+		this.developerMode = developerMode;
 	}
 
 	protected void setItemName(Integer itemId)
@@ -29,8 +28,16 @@ abstract class AbsItemPanel extends AbsIconLabelPanel
 			{
 				if (itemId >= 0)
 				{
-					ItemComposition itemComposition = itemManager.getItemComposition(itemId);
-					itemName = itemComposition.getMembersName();
+					// this can be called very early, before client is able to get item compositions
+					try
+					{
+						ItemComposition itemComposition = itemManager.getItemComposition(itemId);
+						itemName = itemComposition.getMembersName();
+					}
+					catch (Exception e)
+					{
+						return false;
+					}
 				}
 				else
 				{
@@ -38,6 +45,11 @@ abstract class AbsItemPanel extends AbsIconLabelPanel
 				}
 			}
 			label.setText(itemName);
+			if (itemId != null && developerMode)
+			{
+				label.setToolTipText("item id " + itemId);
+			}
+			return true;
 		});
 	}
 }

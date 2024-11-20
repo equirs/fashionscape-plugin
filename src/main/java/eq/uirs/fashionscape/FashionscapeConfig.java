@@ -1,8 +1,10 @@
 package eq.uirs.fashionscape;
 
-import eq.uirs.fashionscape.data.ColorType;
+import eq.uirs.fashionscape.core.LockStatus;
+import eq.uirs.fashionscape.core.SlotInfo;
+import eq.uirs.fashionscape.core.randomizer.RandomizerIntelligence;
+import eq.uirs.fashionscape.data.color.ColorType;
 import eq.uirs.fashionscape.panel.SortBy;
-import eq.uirs.fashionscape.swap.RandomizerIntelligence;
 import java.util.HashMap;
 import net.runelite.api.kit.KitType;
 import net.runelite.client.config.Config;
@@ -15,21 +17,9 @@ import org.apache.commons.lang3.SerializationUtils;
 public interface FashionscapeConfig extends Config
 {
 	String GROUP = "fashionscape";
-	String KEY_EXCLUDE_NON_STANDARD = "excludeNonStandardItems";
 	String KEY_EXCLUDE_MEMBERS = "excludeMembersItems";
 	String KEY_IMPORT_MENU_ENTRY = "copyMenuEntry";
 	String KEY_REAL_KITS = "realKitIds";
-
-	@ConfigItem(
-		position = 0,
-		keyName = KEY_EXCLUDE_NON_STANDARD,
-		name = "Exclude non-standard items",
-		description = "Filters out items that cannot be normally equipped anywhere"
-	)
-	default boolean excludeNonStandardItems()
-	{
-		return false;
-	}
 
 	@ConfigItem(
 		position = 1,
@@ -105,24 +95,44 @@ public interface FashionscapeConfig extends Config
 	)
 	void setPreferredSort(SortBy sort);
 
+	// replaces older currentEquipment key
 	@ConfigItem(
-		keyName = "currentEquipment",
-		name = "Current equipment",
-		description = "The player's equipment ids set by the plugin (hidden)",
+		keyName = "currentEquipmentInfo",
+		name = "Current equipment info",
+		description = "The player's virtual equipment info (hidden)",
 		hidden = true
 	)
-	default byte[] currentEquipment()
+	default byte[] equipmentInfo()
+	{
+		return SerializationUtils.serialize(new HashMap<KitType, SlotInfo>());
+	}
+
+	@ConfigItem(
+		keyName = "currentEquipmentInfo",
+		name = "Current equipment info",
+		description = "The player's virtual equipment info (hidden)",
+		hidden = true
+	)
+	void setEquipmentInfo(byte[] equipIdsMapBytes);
+
+	@ConfigItem(
+		keyName = "currentEquipment",
+		name = "Legacy equipment",
+		description = "Deprecated config, migrated to currentEquipmentInfo",
+		hidden = true
+	)
+	default byte[] legacyEquipment()
 	{
 		return SerializationUtils.serialize(new HashMap<KitType, Integer>());
 	}
 
 	@ConfigItem(
 		keyName = "currentEquipment",
-		name = "Current equipment",
-		description = "The player's equipment ids set by the plugin (hidden)",
+		name = "Legacy equipment",
+		description = "Deprecated config, migrated to currentEquipmentInfo",
 		hidden = true
 	)
-	void setCurrentEquipment(byte[] equipIdsMapBytes);
+	void setLegacyEquipment(byte[] equipmentIds);
 
 	@ConfigItem(
 		keyName = "currentIcon",
@@ -130,7 +140,7 @@ public interface FashionscapeConfig extends Config
 		description = "The player's jaw icon set by the plugin (hidden)",
 		hidden = true
 	)
-	default Integer currentIcon()
+	default Integer icon()
 	{
 		return null;
 	}
@@ -141,28 +151,83 @@ public interface FashionscapeConfig extends Config
 		description = "The player's jaw icon set by the plugin (hidden)",
 		hidden = true
 	)
-	void setCurrentIcon(Integer iconId);
+	void setIcon(Integer iconId);
 
 	@ConfigItem(
-		// key name is not very accurate, oops
-		keyName = "currentItems",
+		keyName = "currentColors",
 		name = "Current colors",
 		description = "The player's color ids set by the plugin (hidden)",
 		hidden = true
 	)
-	default byte[] currentColors()
+	default byte[] colors()
 	{
 		return SerializationUtils.serialize(new HashMap<ColorType, Integer>());
 	}
 
 	@ConfigItem(
-		// key name is not very accurate, oops
-		keyName = "currentItems",
+		keyName = "currentColors",
 		name = "Current colors",
 		description = "The player's color ids set by the plugin (hidden)",
 		hidden = true
 	)
-	void setCurrentColors(byte[] colorMapBytes);
+	void setColors(byte[] colorMapBytes);
+
+	@ConfigItem(
+		keyName = "currentLocks",
+		name = "Current locks",
+		description = "The player's lock statuses set by the plugin (hidden)",
+		hidden = true
+	)
+	default byte[] locks()
+	{
+		return SerializationUtils.serialize(new HashMap<KitType, LockStatus>());
+	}
+
+	@ConfigItem(
+		keyName = "currentLocks",
+		name = "Current locks",
+		description = "The player's lock statuses set by the plugin (hidden)",
+		hidden = true
+	)
+	void setLocks(byte[] locks);
+
+	@ConfigItem(
+		keyName = "currentColorLocks",
+		name = "Current color locks",
+		description = "The player's color lock statuses set by the plugin (hidden)",
+		hidden = true
+	)
+	default byte[] colorLocks()
+	{
+		return SerializationUtils.serialize(new HashMap<ColorType, Boolean>());
+	}
+
+	@ConfigItem(
+		keyName = "currentColorLocks",
+		name = "Current color locks",
+		description = "The player's color lock statuses set by the plugin (hidden)",
+		hidden = true
+	)
+	void setColorLocks(byte[] colorLocks);
+
+	@ConfigItem(
+		keyName = "currentIconLocked",
+		name = "Current icon locked",
+		description = "The player's icon lock status set by the plugin (hidden)",
+		hidden = true
+	)
+	default boolean iconLocked()
+	{
+		return false;
+	}
+
+	@ConfigItem(
+		keyName = "currentIconLocked",
+		name = "Current icon locked",
+		description = "The player's icon lock status set by the plugin (hidden)",
+		hidden = true
+	)
+	void setIconLocked(boolean value);
 
 	@ConfigItem(
 		keyName = KEY_REAL_KITS,

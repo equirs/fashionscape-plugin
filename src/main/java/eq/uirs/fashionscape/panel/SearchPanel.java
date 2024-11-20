@@ -3,11 +3,14 @@ package eq.uirs.fashionscape.panel;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableMap;
 import eq.uirs.fashionscape.FashionscapeConfig;
-import eq.uirs.fashionscape.FashionscapePlugin;
 import eq.uirs.fashionscape.colors.ColorScorer;
-import eq.uirs.fashionscape.swap.SwapManager;
-import eq.uirs.fashionscape.swap.event.LockChanged;
-import eq.uirs.fashionscape.swap.event.LockChangedListener;
+import eq.uirs.fashionscape.core.Events;
+import eq.uirs.fashionscape.core.Exclusions;
+import eq.uirs.fashionscape.core.FashionManager;
+import eq.uirs.fashionscape.core.event.LockChanged;
+import eq.uirs.fashionscape.core.event.LockChangedListener;
+import eq.uirs.fashionscape.core.utils.IntUtil;
+import eq.uirs.fashionscape.core.utils.ItemSlotUtil;
 import java.awt.BorderLayout;
 import java.awt.CardLayout;
 import java.awt.Color;
@@ -24,7 +27,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -37,6 +39,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
+import javax.inject.Named;
 import javax.swing.ImageIcon;
 import javax.swing.JComboBox;
 import javax.swing.JLabel;
@@ -47,12 +50,12 @@ import javax.swing.border.EmptyBorder;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import lombok.Value;
+import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.ItemComposition;
 import net.runelite.api.kit.KitType;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.game.ItemManager;
-import net.runelite.client.game.ItemStats;
 import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.ui.components.IconTextField;
 import net.runelite.client.ui.components.PluginErrorPanel;
@@ -65,24 +68,25 @@ import net.runelite.client.util.SwingUtil;
 /**
  * Tab panel that houses the search UI: bar, filters, sort, results, etc.
  */
-class SearchPanel extends JPanel
+@Slf4j
+public class SearchPanel extends JPanel
 {
 	private static final int DEBOUNCE_DELAY_MS = 200;
 	private static final String ERROR_PANEL = "ERROR_PANEL";
 	private static final String RESULTS_PANEL = "RESULTS_PANEL";
-	private static final Set<Integer> VALID_SLOT_IDS = Arrays.stream(PanelEquipSlot.values())
+	private static final Set<KitType> VALID_SLOTS = Arrays.stream(PanelEquipSlot.values())
 		.map(PanelEquipSlot::getKitType)
 		.filter(Objects::nonNull)
-		.map(KitType::getIndex)
 		.collect(Collectors.toSet());
 
 	private final Client client;
-	private final SwapManager swapManager;
+	private final FashionManager fashionManager;
 	private final ItemManager itemManager;
 	private final ClientThread clientThread;
-	private final FashionscapeConfig config;
 	private final ScheduledExecutorService executor;
 	private final ColorScorer colorScorer;
+	private final Exclusions exclusions;
+	private final boolean developerMode;
 
 	// constrain items in the list of results
 	private final GridBagConstraints itemConstraints = new GridBagConstraints();
@@ -105,8 +109,8 @@ class SearchPanel extends JPanel
 		{
 			for (SearchItemPanel item : searchPanels)
 			{
-				if (Objects.equals(item.itemId, swapManager.swappedItemIdIn(slot)) ||
-					(item.itemId != null && item.itemId < 0 && swapManager.isHidden(slot)))
+				if (Objects.equals(item.itemId, fashionManager.virtualItemIdFor(slot)) ||
+					(item.itemId < 0 && fashionManager.isNothing(slot)))
 				{
 					item.resetBackground();
 				}
@@ -124,6 +128,8 @@ class SearchPanel extends JPanel
 
 	private final Comparator<Result> itemAlphaComparator = Comparator.comparing(Result::getName);
 
+	private final LockChangedListener lockChangedListener;
+
 	@Value
 	private static class Result
 	{
@@ -132,28 +138,34 @@ class SearchPanel extends JPanel
 		BufferedImage icon;
 		KitType slot;
 
-		int getId() {
+		int getId()
+		{
 			return itemComposition != null ? itemComposition.getId() : NothingItemComposition.ID;
 		}
 
-		String getName() {
+		String getName()
+		{
 			return itemComposition != null ? itemComposition.getMembersName() : NothingItemComposition.NAME;
 		}
 	}
 
 	@Inject
-	public SearchPanel(Client client, SwapManager swapManager, ClientThread clientThread,
+	public SearchPanel(Client client, FashionManager fashionManager, ClientThread clientThread,
 					   ItemManager itemManager, ScheduledExecutorService executor,
-					   FashionscapeConfig config, ColorScorer colorScorer)
+					   FashionscapeConfig config, ColorScorer colorScorer, Exclusions exclusions,
+					   @Named("developerMode") boolean developerMode)
 	{
 		this.client = client;
-		this.swapManager = swapManager;
+		this.fashionManager = fashionManager;
 		this.itemManager = itemManager;
 		this.clientThread = clientThread;
 		this.executor = executor;
-		this.config = config;
 		this.colorScorer = colorScorer;
+		this.exclusions = exclusions;
+		this.developerMode = developerMode;
 		this.sort = config.preferredSort();
+
+		this.lockChangedListener = new LockChangedListener(this::updateTabIcon);
 
 		setLayout(new BorderLayout());
 		setBackground(ColorScheme.DARK_GRAY_COLOR);
@@ -227,13 +239,22 @@ class SearchPanel extends JPanel
 		add(centerPanel, BorderLayout.CENTER);
 
 		SwingUtilities.invokeLater(searchBar::requestFocusInWindow);
+	}
 
-		swapManager.addEventListener(new LockChangedListener((e) -> {
-			if (e.getType() != LockChanged.Type.KIT)
-			{
-				updateTabIcon(e);
-			}
-		}));
+	@Override
+	public void addNotify()
+	{
+		updateTabIcons();
+
+		Events.addListener(lockChangedListener);
+		super.addNotify();
+	}
+
+	@Override
+	public void removeNotify()
+	{
+		Events.removeListener(lockChangedListener);
+		super.removeNotify();
 	}
 
 	private JComboBox<SortBy> createSortBox(FashionscapeConfig config)
@@ -312,7 +333,7 @@ class SearchPanel extends JPanel
 			}
 			else
 			{
-				isLocked = swapManager.isItemLocked(filterSlot.getKitType());
+				isLocked = fashionManager.isItemLocked(filterSlot.getKitType());
 			}
 			ImageIcon icon = iconFor(filterSlot, isLocked);
 			tab.setIcon(icon);
@@ -335,15 +356,15 @@ class SearchPanel extends JPanel
 				filter = itemComposition -> {
 					KitType kitType = filterSlot.getKitType();
 					selectedSlot = kitType;
-					Integer slotId = swapManager.slotIdFor(itemComposition);
+					KitType slot = ItemSlotUtil.getSlot(itemComposition.getId(), itemManager);
 					if (kitType == null)
 					{
-						// allow any equipment slot that is also a KitType (so no ammo, etc)
-						return slotId != null && VALID_SLOT_IDS.contains(slotId);
+						// allow any equipment slot that is also a KitType (so no ammo, etc.)
+						return slot != null && VALID_SLOTS.contains(slot);
 					}
 					else
 					{
-						return slotId != null && kitType.getIndex() == slotId;
+						return Objects.equals(slot, kitType);
 					}
 				};
 				// individual slots will show all results all the time
@@ -441,43 +462,42 @@ class SearchPanel extends JPanel
 				});
 				return true;
 			}
-
-			Set<Integer> ids = new HashSet<>();
-			Set<Integer> skips = FashionscapePlugin.getItemIdsToExclude(config);
+			boolean isSearchForId = IntUtil.safeParse(search) != null;
+			Set<Integer> skips = exclusions.getAll();
 			for (int i = 0; i < client.getItemCount(); i++)
 			{
 				ItemComposition itemComposition = null;
-				ItemStats stats = null;
 				try
 				{
 					int canonical = itemManager.canonicalize(i);
-					if (skips.contains(canonical))
+					// only consider canonical ids
+					if (canonical != i || (!isSearchForId && skips.contains(canonical)))
 					{
 						continue;
 					}
 					itemComposition = itemManager.getItemComposition(canonical);
-					stats = itemManager.getItemStats(canonical);
 				}
 				catch (Exception ignored)
 				{
 				}
-				// id might already be in results due to canonicalize
-				if (itemComposition != null && stats != null && stats.isEquipable() &&
-					!ids.contains(itemComposition.getId()) && isValidSearch(itemComposition, search))
+				KitType slot = ItemSlotUtil.getSlot(i, itemManager);
+				if (itemComposition != null && slot != null && shouldDisplayResult(itemComposition, search))
 				{
-					ids.add(itemComposition.getId());
 					try
 					{
-						KitType slot = KitType.values()[stats.getEquipment().getSlot()];
 						AsyncBufferedImage image = itemManager.getImage(itemComposition.getId());
 						results.add(new Result(itemComposition, image, slot));
 					}
 					catch (Exception ignored)
 					{
+						if (log.isDebugEnabled())
+						{
+							log.debug("could not get image for item id {}", i);
+						}
 					}
 				}
 			}
-			if (selectedSlot != null && SwapManager.ALLOWS_NOTHING.contains(selectedSlot) &&
+			if (selectedSlot != null && FashionManager.ALLOWS_NOTHING_ITEMS.contains(selectedSlot) &&
 				NothingItemComposition.NAME.toLowerCase().contains(search))
 			{
 				BufferedImage image = ImageUtil.loadImageResource(getClass(), selectedSlot.name().toLowerCase() + ".png");
@@ -488,7 +508,7 @@ class SearchPanel extends JPanel
 			scores.clear();
 			switch (this.sort)
 			{
-				case RELEASE:
+				case ITEM_ID:
 					addPendingResults(postExec);
 					break;
 				case ALPHABETICAL:
@@ -542,7 +562,7 @@ class SearchPanel extends JPanel
 				boolean showScores = true;
 				for (Result result : results)
 				{
-					Integer itemId = result.getId();
+					int itemId = result.getId();
 					Double score = scores.get(itemId);
 					if (firstItem)
 					{
@@ -553,7 +573,7 @@ class SearchPanel extends JPanel
 						score = null;
 					}
 					SearchItemPanel panel = new SearchItemPanel(itemId, result.getIcon(),
-						result.getSlot(), itemManager, swapManager, clientThread, listener, score);
+						result.getSlot(), itemManager, fashionManager, clientThread, listener, score, developerMode);
 					searchPanels.add(panel);
 					int topPadding = firstItem ? 0 : 5;
 					firstItem = false;
@@ -572,21 +592,31 @@ class SearchPanel extends JPanel
 		});
 	}
 
-	private boolean isValidSearch(ItemComposition itemComposition, String query)
+	private boolean shouldDisplayResult(ItemComposition itemComposition, String query)
 	{
 		String name = itemComposition.getMembersName().toLowerCase();
-		// The client assigns "null" to item names of items it doesn't know about
-		if (name.equals("null") || !name.contains(query))
+		Integer itemId = IntUtil.safeParse(query);
+		// Check if query is exactly this itemId.
+		// If not, the name of the item (can't be "null") must match the input string
+		if (!Objects.equals(itemId, itemComposition.getId()) &&
+			(name.equals("null") || !name.contains(query)))
 		{
 			return false;
 		}
 		return filter == null || filter.apply(itemComposition);
 	}
 
+	private void updateTabIcons()
+	{
+		Arrays.stream(PanelEquipSlot.values())
+			.filter(p -> p.getKitType() != null)
+			.forEach(p -> updateTabIcon(p, fashionManager.isSlotLocked(p.getKitType())));
+	}
+
 	private void updateTabIcon(LockChanged event)
 	{
 		KitType slot = event.getSlot();
-		boolean isLocked = event.isLocked();
+		boolean isLocked = event.getStatus() != null;
 		Arrays.stream(PanelEquipSlot.values())
 			.filter(p -> p.getKitType() == slot)
 			.findFirst()
@@ -608,5 +638,4 @@ class SearchPanel extends JPanel
 		String iconName = panelSlot.getDisplayName().toLowerCase() + lockStr + ".png";
 		return new ImageIcon(ImageUtil.loadImageResource(getClass(), iconName));
 	}
-
 }

@@ -1,9 +1,8 @@
 package eq.uirs.fashionscape.panel;
 
 import eq.uirs.fashionscape.FashionscapeConfig;
-import eq.uirs.fashionscape.data.ColorType;
-import eq.uirs.fashionscape.data.kit.JawIcon;
-import eq.uirs.fashionscape.swap.SwapManager;
+import eq.uirs.fashionscape.core.FashionManager;
+import eq.uirs.fashionscape.data.color.ColorType;
 import java.awt.BorderLayout;
 import java.awt.Dimension;
 import java.awt.GridBagConstraints;
@@ -28,6 +27,7 @@ import net.runelite.client.callback.ClientThread;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.util.ImageUtil;
+import net.runelite.client.util.SwingUtil;
 
 /**
  * Tab panel that houses "base" player models and colors
@@ -35,7 +35,7 @@ import net.runelite.client.util.ImageUtil;
 @Slf4j
 public class KitsPanel extends JPanel
 {
-	private final SwapManager swapManager;
+	private final FashionManager fashionManager;
 	private final ClientThread clientThread;
 	private final ItemManager itemManager;
 	private final Client client;
@@ -43,7 +43,7 @@ public class KitsPanel extends JPanel
 
 	private final JPanel resultsPanel = new JPanel();
 	private final JScrollPane scrollPane = new JScrollPane();
-	private final List<KitItemPanel> kitPanels = new ArrayList<>();
+	private final List<KitPanel> kitPanels = new ArrayList<>();
 	private JawIconPanel jawIconPanel = null;
 
 	private Integer gender;
@@ -81,17 +81,14 @@ public class KitsPanel extends JPanel
 	private static class KitColorResult
 	{
 		KitType slot;
-		Integer id; // icon id if icon, kit id otherwise
-
 		ColorType colorType;
-		Integer colorId;
 	}
 
 	@Inject
-	public KitsPanel(SwapManager swapManager, ClientThread clientThread, Client client, FashionscapeConfig config,
+	public KitsPanel(FashionManager fashionManager, ClientThread clientThread, Client client, FashionscapeConfig config,
 					 ItemManager itemManager)
 	{
-		this.swapManager = swapManager;
+		this.fashionManager = fashionManager;
 		this.clientThread = clientThread;
 		this.client = client;
 		this.config = config;
@@ -118,7 +115,7 @@ public class KitsPanel extends JPanel
 
 	public void collapseOptions()
 	{
-		for (KitItemPanel kitPanel : kitPanels)
+		for (KitPanel kitPanel : kitPanels)
 		{
 			kitPanel.closeOptions();
 		}
@@ -134,30 +131,18 @@ public class KitsPanel extends JPanel
 			{
 				KitType kitType = slot.getKitType();
 				ColorType colorType = slot.getColorType();
-				Integer kitId = null;
-				Integer colorId = null;
 
 				if (kitType == null && colorType == null)
 				{
-					if (config.excludeNonStandardItems() || config.excludeMembersItems())
+					if (config.excludeMembersItems())
 					{
 						continue;
 					}
-					JawIcon jawIcon = swapManager.swappedIcon();
-					Integer iconId = jawIcon != null ? jawIcon.getId() : null;
-					results.add(new KitColorResult(null, iconId, null, null));
+					results.add(new KitColorResult(null, null));
 				}
 				else
 				{
-					if (kitType != null)
-					{
-						kitId = swapManager.swappedKitIdIn(kitType);
-					}
-					if (colorType != null)
-					{
-						colorId = swapManager.swappedColorIdIn(colorType);
-					}
-					results.add(new KitColorResult(kitType, kitId, colorType, colorId));
+					results.add(new KitColorResult(kitType, colorType));
 				}
 			}
 			SwingUtilities.invokeLater(() -> addKitSlotPanels(results));
@@ -166,8 +151,13 @@ public class KitsPanel extends JPanel
 
 	private void addKitSlotPanels(List<KitColorResult> results)
 	{
-		resultsPanel.removeAll();
+		SwingUtil.fastRemoveAll(resultsPanel);
+		kitPanels.forEach(KitPanel::removeListeners);
 		kitPanels.clear();
+		if (jawIconPanel != null)
+		{
+			jawIconPanel.removeListeners();
+		}
 		GridBagConstraints c = new GridBagConstraints();
 		c.fill = GridBagConstraints.HORIZONTAL;
 		c.anchor = GridBagConstraints.PAGE_START;
@@ -179,12 +169,12 @@ public class KitsPanel extends JPanel
 		for (KitColorResult result : results)
 		{
 			BufferedImage image = null;
-			JPanel panel;
+			DropdownIconPanel panel;
 			if (result.colorType == null && result.slot == null)
 			{
 				image = ImageUtil.loadImageResource(getClass(), "icon.png");
-				JawIconPanel jawPanel = new JawIconPanel(image, clientThread, swapManager, itemManager, kitColorOpener,
-					result.id);
+				JawIconPanel jawPanel = new JawIconPanel(image, clientThread, fashionManager, itemManager,
+					kitColorOpener);
 				jawIconPanel = jawPanel;
 				panel = jawPanel;
 			}
@@ -194,8 +184,8 @@ public class KitsPanel extends JPanel
 				{
 					image = ImageUtil.loadImageResource(getClass(), result.slot.name().toLowerCase() + ".png");
 				}
-				KitItemPanel kitPanel = new KitItemPanel(swapManager, result.colorType, result.colorId, result.slot,
-					result.id, kitColorOpener, image, clientThread);
+				KitPanel kitPanel = new KitPanel(fashionManager, result.colorType, result.slot,
+					kitColorOpener, image, clientThread);
 				kitPanels.add(kitPanel);
 				panel = kitPanel;
 			}

@@ -1,9 +1,9 @@
 package eq.uirs.fashionscape.data.kit;
 
 import java.util.Arrays;
-import javax.annotation.Nullable;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.NotNull;
 
 @Getter
 @RequiredArgsConstructor
@@ -17,17 +17,17 @@ public enum JawIcon
 	SW_BLUE("Blue icon", 25212),
 	SW_RED("Red icon", 25228);
 
-	@Nullable
+	@NotNull
 	public static JawIcon fromId(int id)
 	{
 		return Arrays.stream(JawIcon.values())
 			.filter(i -> i.id == id)
 			.findFirst()
-			.orElse(null);
+			.orElse(JawIcon.NOTHING);
 	}
 
 	private final String displayName;
 
-	// representative item id for displaying in panel icon and for color scoring
+	// representative item id for displaying in panel icon and for color scoring (no facial hair)
 	private final int id;
 }

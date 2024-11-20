@@ -1,10 +1,11 @@
 package eq.uirs.fashionscape.panel;
 
-import com.google.common.base.Objects;
+import eq.uirs.fashionscape.core.Events;
+import eq.uirs.fashionscape.core.FashionManager;
+import eq.uirs.fashionscape.core.event.IconChangedListener;
+import eq.uirs.fashionscape.core.event.IconLockChangedListener;
+import eq.uirs.fashionscape.core.layer.ModelType;
 import eq.uirs.fashionscape.data.kit.JawIcon;
-import eq.uirs.fashionscape.swap.SwapManager;
-import eq.uirs.fashionscape.swap.event.IconChangedListener;
-import eq.uirs.fashionscape.swap.event.IconLockChangedListener;
 import java.awt.BorderLayout;
 import java.awt.Cursor;
 import java.awt.GridBagConstraints;
@@ -13,12 +14,9 @@ import java.awt.GridLayout;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
-import java.util.Arrays;
-import javax.annotation.Nullable;
 import javax.swing.ImageIcon;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
-import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.ItemComposition;
@@ -34,22 +32,28 @@ import net.runelite.client.util.ImageUtil;
 @Slf4j
 public class JawIconPanel extends DropdownIconPanel
 {
-	private final SwapManager swapManager;
+	private final FashionManager fashionManager;
 	private final ItemManager itemManager;
 	private final KitColorOpener kitColorOpener;
-	private JawIcon jawIcon = null;
 
-	JawIconPanel(BufferedImage image, ClientThread clientThread, SwapManager swapManager, ItemManager itemManager,
-				 KitColorOpener kitColorOpener, @Nullable Integer iconId)
+	private final IconChangedListener iconChangedListener;
+	private final IconLockChangedListener iconLockChangedListener;
+
+	JawIconPanel(BufferedImage image, ClientThread clientThread, FashionManager fashionManager, ItemManager itemManager,
+				 KitColorOpener kitColorOpener)
 	{
 		super(image, clientThread);
-		this.swapManager = swapManager;
+		this.fashionManager = fashionManager;
 		this.itemManager = itemManager;
 		this.kitColorOpener = kitColorOpener;
-		Arrays.stream(JawIcon.values())
-			.filter(i -> Objects.equal(i.getId(), iconId))
-			.findFirst()
-			.ifPresent(i -> this.jawIcon = i);
+
+		this.iconChangedListener = new IconChangedListener(e -> {
+			if (e.getModelType() == ModelType.VIRTUAL)
+			{
+				refreshData();
+			}
+		});
+		this.iconLockChangedListener = new IconLockChangedListener(e -> updateLockButton());
 
 		JPanel rightPanel = new JPanel(new BorderLayout());
 		rightPanel.setBackground(nonHighlightColor);
@@ -57,45 +61,20 @@ public class JawIconPanel extends DropdownIconPanel
 		highlightPanels.add(rightPanel);
 		rightPanel.add(label, BorderLayout.CENTER);
 
-		setIconTooltip();
-
 		JPanel buttons = new JPanel(new GridLayout(1, 2, 2, 0));
 		buttons.setBackground(ColorScheme.DARKER_GRAY_COLOR);
 
 		setIcon(icon, image);
 		icon.setBorder(new RoundedBorder(ColorScheme.LIGHT_GRAY_COLOR, ICON_CORNER_RADIUS));
 
-		swapManager.addEventListener(new IconChangedListener(e -> {
-			if (jawIcon != e.getIcon())
-			{
-				this.jawIcon = e.getIcon();
-				setIconName();
-				updateIconImage();
-				updateXButton();
-			}
-		}));
-		swapManager.addEventListener(new IconLockChangedListener(e -> updateLockButton()));
 		configureButton(lockButton);
-		lockButton.addActionListener(e -> {
-			swapManager.toggleIconLocked();
-			updateLockButton();
-			updateXButton();
-		});
+		lockButton.addActionListener(e -> fashionManager.toggleIconLocked());
 		buttons.add(lockButton);
 
 		configureButton(xButton);
 		xButton.setIcon(new ImageIcon(ImageUtil.loadImageResource(this.getClass(), "x.png")));
-		xButton.addActionListener(e -> clientThread.invokeLater(() -> {
-			swapManager.revertIcon();
-			SwingUtilities.invokeLater(() -> {
-				updateLockButton();
-				updateXButton();
-			});
-		}));
+		xButton.addActionListener(e -> clientThread.invokeLater(fashionManager::revertIcon));
 		buttons.add(xButton);
-
-		updateLockButton();
-		updateXButton();
 
 		optionsContainer.setLayout(new BorderLayout());
 		optionsContainer.setBackground(ColorScheme.DARKER_GRAY_COLOR);
@@ -103,15 +82,44 @@ public class JawIconPanel extends DropdownIconPanel
 		add(optionsContainer, BorderLayout.SOUTH);
 		rightPanel.add(buttons, BorderLayout.EAST);
 		add(rightPanel, BorderLayout.CENTER);
-
-		setIconName();
-		updateIconImage();
 	}
 
 	@Override
-	void openDropdown()
+	void addListeners()
+	{
+		refreshData();
+
+		Events.addListener(iconChangedListener);
+		Events.addListener(iconLockChangedListener);
+	}
+
+	@Override
+	void removeListeners()
+	{
+		Events.removeListener(iconChangedListener);
+		Events.removeListener(iconLockChangedListener);
+	}
+
+	private void refreshData()
+	{
+		setIconName();
+		updateIconImage();
+		setIconTooltip();
+		updateLockButton();
+		updateXButton();
+	}
+
+	@Override
+	void openDropdown(MouseEvent e)
 	{
 		kitColorOpener.openOptions(null, null);
+	}
+
+	@Override
+	void tryClear()
+	{
+		// clear the icon just as pressing the "x" button would
+		clientThread.invokeLater(fashionManager::revertIcon);
 	}
 
 	public void openOptions()
@@ -142,10 +150,6 @@ public class JawIconPanel extends DropdownIconPanel
 
 		for (JawIcon jawIcon : JawIcon.values())
 		{
-			if (jawIcon == JawIcon.NOTHING)
-			{
-				continue;
-			}
 			JLabel iconLabel = createIconLabel(jawIcon);
 			iconsList.add(iconLabel, c);
 			c.gridy++;
@@ -164,24 +168,24 @@ public class JawIconPanel extends DropdownIconPanel
 			@Override
 			public void mouseEntered(MouseEvent e)
 			{
-				if (!swapManager.isIconLocked())
+				if (!fashionManager.isIconLocked())
 				{
 					setCursor(new Cursor(Cursor.HAND_CURSOR));
+					fashionManager.hoverOverIcon(jawIcon);
 				}
-				swapManager.hoverOverIcon(jawIcon);
 			}
 
 			@Override
 			public void mouseExited(MouseEvent e)
 			{
 				setCursor(new Cursor(Cursor.DEFAULT_CURSOR));
-				swapManager.hoverAway();
+				fashionManager.hoverAway();
 			}
 
 			@Override
 			public void mouseReleased(MouseEvent e)
 			{
-				swapManager.hoverSelectIcon(jawIcon);
+				fashionManager.hoverSelectIcon(jawIcon);
 			}
 		});
 		return iconLabel;
@@ -196,6 +200,7 @@ public class JawIconPanel extends DropdownIconPanel
 	private void setIconName()
 	{
 		String iconName = "Not set";
+		JawIcon jawIcon = fashionManager.virtualIcon();
 		if (jawIcon != null)
 		{
 			iconName = jawIcon.getDisplayName();
@@ -205,12 +210,21 @@ public class JawIconPanel extends DropdownIconPanel
 
 	private void updateIconImage()
 	{
+		JawIcon jawIcon = fashionManager.virtualIcon();
 		if (jawIcon != null && jawIcon != JawIcon.NOTHING)
 		{
 			clientThread.invokeLater(() -> {
-				ItemComposition itemComposition = itemManager.getItemComposition(jawIcon.getId());
-				AsyncBufferedImage image = itemManager.getImage(itemComposition.getId());
-				image.addTo(icon);
+				try
+				{
+					ItemComposition itemComposition = itemManager.getItemComposition(jawIcon.getId());
+					AsyncBufferedImage image = itemManager.getImage(itemComposition.getId());
+					image.addTo(icon);
+				}
+				catch (Exception e)
+				{
+					return false;
+				}
+				return true;
 			});
 		}
 		else
@@ -222,13 +236,14 @@ public class JawIconPanel extends DropdownIconPanel
 
 	private void updateXButton()
 	{
+		JawIcon jawIcon = fashionManager.virtualIcon();
 		xButton.setEnabled(jawIcon != null);
 		xButton.setToolTipText("Clear icon");
 	}
 
 	private void updateLockButton()
 	{
-		boolean locked = swapManager.isIconLocked();
+		boolean locked = fashionManager.isIconLocked();
 		String lockIcon = locked ? "lock" : "unlock";
 		lockButton.setIcon(
 			new ImageIcon(ImageUtil.loadImageResource(this.getClass(), lockIcon + ".png")));
@@ -240,6 +255,7 @@ public class JawIconPanel extends DropdownIconPanel
 	{
 		StringBuilder sb = new StringBuilder();
 		sb.append("Icon");
+		JawIcon jawIcon = fashionManager.virtualIcon();
 		if (jawIcon != null)
 		{
 			if (sb.length() > 0)
