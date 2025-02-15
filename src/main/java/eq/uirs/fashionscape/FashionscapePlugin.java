@@ -204,7 +204,7 @@ public class FashionscapePlugin extends Plugin
 	{
 		if (event.getMenuAction() == MenuAction.RUNELITE_PLAYER && event.getMenuOption().equals(COPY_PLAYER))
 		{
-			Player p = client.getCachedPlayers()[event.getId()];
+			Player p = client.getTopLevelWorldView().players().byIndex(event.getId());
 			if (p == null)
 			{
 				return;
