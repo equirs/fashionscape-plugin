@@ -34,6 +34,7 @@ import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
 import javax.swing.border.EmptyBorder;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
 import net.runelite.api.Player;
@@ -48,6 +49,7 @@ import net.runelite.client.ui.components.materialtabs.MaterialTabGroup;
 import net.runelite.client.util.ImageUtil;
 import net.runelite.client.util.LinkBrowser;
 
+@Slf4j
 public class FashionscapePanel extends PluginPanel
 {
 	private final Client client;
@@ -392,7 +394,7 @@ public class FashionscapePanel extends PluginPanel
 			}
 			catch (IOException e)
 			{
-				e.printStackTrace();
+				log.warn("Failed to import swaps from file", e);
 			}
 		}
 	}

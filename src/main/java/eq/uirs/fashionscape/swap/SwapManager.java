@@ -929,7 +929,7 @@ public class SwapManager
 			}
 			catch (FileNotFoundException e)
 			{
-				e.printStackTrace();
+				log.warn("Could not find selected file for swaps export", e);
 			}
 		});
 	}
