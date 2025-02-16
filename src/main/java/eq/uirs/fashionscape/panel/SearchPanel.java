@@ -35,6 +35,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.swing.ImageIcon;
 import javax.swing.JComboBox;
@@ -51,6 +52,7 @@ import net.runelite.api.ItemComposition;
 import net.runelite.api.kit.KitType;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.game.ItemManager;
+import net.runelite.client.game.ItemStats;
 import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.ui.components.IconTextField;
 import net.runelite.client.ui.components.PluginErrorPanel;
@@ -59,7 +61,6 @@ import net.runelite.client.ui.components.materialtabs.MaterialTabGroup;
 import net.runelite.client.util.AsyncBufferedImage;
 import net.runelite.client.util.ImageUtil;
 import net.runelite.client.util.SwingUtil;
-import net.runelite.http.api.item.ItemStats;
 
 /**
  * Tab panel that houses the search UI: bar, filters, sort, results, etc.
@@ -121,14 +122,23 @@ class SearchPanel extends JPanel
 	private boolean hasSearched = false;
 	private final Map<Integer, Double> scores = new HashMap<>();
 
-	private final Comparator<Result> itemAlphaComparator = Comparator.comparing(o -> o.getItemComposition().getMembersName());
+	private final Comparator<Result> itemAlphaComparator = Comparator.comparing(Result::getName);
 
 	@Value
 	private static class Result
 	{
+		@Nullable
 		ItemComposition itemComposition;
 		BufferedImage icon;
 		KitType slot;
+
+		int getId() {
+			return itemComposition != null ? itemComposition.getId() : NothingItemComposition.ID;
+		}
+
+		String getName() {
+			return itemComposition != null ? itemComposition.getMembersName() : NothingItemComposition.NAME;
+		}
 	}
 
 	@Inject
@@ -446,7 +456,7 @@ class SearchPanel extends JPanel
 						continue;
 					}
 					itemComposition = itemManager.getItemComposition(canonical);
-					stats = itemManager.getItemStats(canonical, false);
+					stats = itemManager.getItemStats(canonical);
 				}
 				catch (Exception ignored)
 				{
@@ -470,9 +480,8 @@ class SearchPanel extends JPanel
 			if (selectedSlot != null && SwapManager.ALLOWS_NOTHING.contains(selectedSlot) &&
 				NothingItemComposition.NAME.toLowerCase().contains(search))
 			{
-				ItemComposition nothing = new NothingItemComposition();
 				BufferedImage image = ImageUtil.loadImageResource(getClass(), selectedSlot.name().toLowerCase() + ".png");
-				results.add(0, new Result(nothing, image, selectedSlot));
+				results.add(0, new Result(null, image, selectedSlot));
 			}
 
 			searchPanels.clear();
@@ -504,11 +513,11 @@ class SearchPanel extends JPanel
 		colorScorer.updatePlayerInfo();
 		for (Result result : results)
 		{
-			int itemId = result.getItemComposition().getId();
+			int itemId = result.getId();
 			scores.put(itemId, colorScorer.score(itemId, selectedSlot));
 		}
 		results.sort(Comparator.comparing(r ->
-			-scores.getOrDefault(r.getItemComposition().getId(), 0.0)));
+			-scores.getOrDefault(r.getId(), 0.0)));
 	}
 
 	// only to be called from updateSearch
@@ -533,7 +542,7 @@ class SearchPanel extends JPanel
 				boolean showScores = true;
 				for (Result result : results)
 				{
-					Integer itemId = result.getItemComposition().getId();
+					Integer itemId = result.getId();
 					Double score = scores.get(itemId);
 					if (firstItem)
 					{

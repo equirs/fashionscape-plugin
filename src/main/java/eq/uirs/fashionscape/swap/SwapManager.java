@@ -62,9 +62,9 @@ import net.runelite.client.chat.ChatColorType;
 import net.runelite.client.chat.ChatMessageBuilder;
 import net.runelite.client.chat.ChatMessageManager;
 import net.runelite.client.chat.QueuedMessage;
+import net.runelite.client.game.ItemEquipmentStats;
 import net.runelite.client.game.ItemManager;
-import net.runelite.http.api.item.ItemEquipmentStats;
-import net.runelite.http.api.item.ItemStats;
+import net.runelite.client.game.ItemStats;
 
 /**
  * Singleton class that maintains the memory and logic of swapping items through the plugin
@@ -2248,7 +2248,7 @@ public class SwapManager
 	@Nullable
 	private ItemEquipmentStats equipmentStatsFor(int itemId)
 	{
-		ItemStats stats = itemManager.getItemStats(itemId, false);
+		ItemStats stats = itemManager.getItemStats(itemId);
 		return stats != null && stats.isEquipable() ? stats.getEquipment() : null;
 	}
 

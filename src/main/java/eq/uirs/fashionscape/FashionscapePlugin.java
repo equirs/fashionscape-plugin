@@ -29,13 +29,13 @@ import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.game.ItemManager;
+import net.runelite.client.game.ItemStats;
 import net.runelite.client.menus.MenuManager;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.ClientToolbar;
 import net.runelite.client.ui.NavigationButton;
 import net.runelite.client.util.ImageUtil;
-import net.runelite.http.api.item.ItemStats;
 
 @PluginDescriptor(
 	name = "Fashionscape",
@@ -236,7 +236,7 @@ public class FashionscapePlugin extends Plugin
 				ITEM_ID_DUPES.add(canonical);
 				continue;
 			}
-			ItemStats itemStats = itemManager.getItemStats(canonical, false);
+			ItemStats itemStats = itemManager.getItemStats(canonical);
 			if (!ids.contains(itemComposition.getId()) && itemStats != null && itemStats.isEquipable())
 			{
 				ItemDupeData itemDupeData = new ItemDupeData(
