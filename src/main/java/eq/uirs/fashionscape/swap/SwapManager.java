@@ -528,7 +528,7 @@ public class SwapManager
 			.sorted(Comparator.comparingInt(Map.Entry::getValue))
 			.map(e -> {
 				KitType slot = e.getKey();
-				Integer itemId = e.getValue();
+				int itemId = e.getValue();
 				if (itemId == 0)
 				{
 					return slot.name() + ":-1 (Nothing)";
@@ -553,7 +553,7 @@ public class SwapManager
 			.sorted(Comparator.comparingInt(Map.Entry::getValue))
 			.map(e -> {
 				ColorType type = e.getKey();
-				Integer colorId = e.getValue();
+				int colorId = e.getValue();
 				return Arrays.stream(type.getColorables())
 					.filter(c -> c.getColorId(type) == colorId)
 					.findFirst()
@@ -929,7 +929,7 @@ public class SwapManager
 			}
 			catch (FileNotFoundException e)
 			{
-				e.printStackTrace();
+				log.warn("Could not find selected file for swaps export", e);
 			}
 		});
 	}
