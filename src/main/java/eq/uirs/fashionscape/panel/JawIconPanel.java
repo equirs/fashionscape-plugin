@@ -1,10 +1,10 @@
 package eq.uirs.fashionscape.panel;
 
 import com.google.common.base.Objects;
+import eq.uirs.fashionscape.core.SwapManager;
+import eq.uirs.fashionscape.core.event.IconChangedListener;
+import eq.uirs.fashionscape.core.event.IconLockChangedListener;
 import eq.uirs.fashionscape.data.kit.JawIcon;
-import eq.uirs.fashionscape.swap.SwapManager;
-import eq.uirs.fashionscape.swap.event.IconChangedListener;
-import eq.uirs.fashionscape.swap.event.IconLockChangedListener;
 import java.awt.BorderLayout;
 import java.awt.Cursor;
 import java.awt.GridBagConstraints;

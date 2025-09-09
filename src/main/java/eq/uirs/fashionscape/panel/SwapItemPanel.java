@@ -1,9 +1,9 @@
 package eq.uirs.fashionscape.panel;
 
-import eq.uirs.fashionscape.swap.SwapManager;
-import eq.uirs.fashionscape.swap.event.ItemChangedListener;
-import eq.uirs.fashionscape.swap.event.LockChanged;
-import eq.uirs.fashionscape.swap.event.LockChangedListener;
+import eq.uirs.fashionscape.core.SwapManager;
+import eq.uirs.fashionscape.core.event.ItemChangedListener;
+import eq.uirs.fashionscape.core.event.LockChanged;
+import eq.uirs.fashionscape.core.event.LockChangedListener;
 import java.awt.BorderLayout;
 import java.awt.Cursor;
 import java.awt.Dimension;

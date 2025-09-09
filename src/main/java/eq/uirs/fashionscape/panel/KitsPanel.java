@@ -1,9 +1,9 @@
 package eq.uirs.fashionscape.panel;
 
 import eq.uirs.fashionscape.FashionscapeConfig;
-import eq.uirs.fashionscape.data.ColorType;
+import eq.uirs.fashionscape.core.SwapManager;
+import eq.uirs.fashionscape.data.color.ColorType;
 import eq.uirs.fashionscape.data.kit.JawIcon;
-import eq.uirs.fashionscape.swap.SwapManager;
 import java.awt.BorderLayout;
 import java.awt.Dimension;
 import java.awt.GridBagConstraints;

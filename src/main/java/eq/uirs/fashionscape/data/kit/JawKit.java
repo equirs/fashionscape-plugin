@@ -1,7 +1,7 @@
 package eq.uirs.fashionscape.data.kit;
 
 import com.google.common.collect.ImmutableMap;
-import eq.uirs.fashionscape.swap.SwapManager;
+import eq.uirs.fashionscape.core.SwapManager;
 import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nonnull;

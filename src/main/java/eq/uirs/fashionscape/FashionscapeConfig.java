@@ -1,8 +1,7 @@
 package eq.uirs.fashionscape;
 
-import eq.uirs.fashionscape.data.ColorType;
+import eq.uirs.fashionscape.core.RandomizerIntelligence;
 import eq.uirs.fashionscape.panel.SortBy;
-import eq.uirs.fashionscape.swap.RandomizerIntelligence;
 import java.util.HashMap;
 import net.runelite.api.kit.KitType;
 import net.runelite.client.config.Config;
@@ -144,20 +143,18 @@ public interface FashionscapeConfig extends Config
 	void setCurrentIcon(Integer iconId);
 
 	@ConfigItem(
-		// key name is not very accurate, oops
-		keyName = "currentItems",
+		keyName = "currentColors",
 		name = "Current colors",
-		description = "The player's color ids set by the plugin (hidden)",
+		description = "The player's color ids (map of color type ordinal -> color id) set by the plugin (hidden)",
 		hidden = true
 	)
 	default byte[] currentColors()
 	{
-		return SerializationUtils.serialize(new HashMap<ColorType, Integer>());
+		return SerializationUtils.serialize(new HashMap<Integer, Integer>());
 	}
 
 	@ConfigItem(
-		// key name is not very accurate, oops
-		keyName = "currentItems",
+		keyName = "currentColors",
 		name = "Current colors",
 		description = "The player's color ids set by the plugin (hidden)",
 		hidden = true

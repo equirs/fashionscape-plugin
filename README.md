@@ -13,11 +13,11 @@ to turn off in combat / dangerous areas.
 All the UI lives in a dedicated side panel. If the plugin is on, you'll find it near the bottom of the list
 (beneath notes). Look for the dress form:
  
-![Panel icon](icon.png)
+![Panel icon](github-res/icon.png)
 
 The panel has a row of button controls, and below it, three tabs: outfit, base, and search. 
 
-![Top buttons](top_buttons.png)
+![Top buttons](github-res/top_buttons.png)
 
 #### Top controls
 The buttons are, in order from left to right:
@@ -32,7 +32,7 @@ outfit folder in your system file browser by **right-clicking either save or loa
 everything *except* locked slots, there's a right-click option to soft clear.
   
 #### Items tab
-![Items tab](items_panel.png)
+![Items tab](github-res/items_panel.png)
 
 "Items" shows every item you're wearing via the plugin. Note that certain slots, like ammo, are not shown because no
 items equipped in those slots change your appearance. Each item shows an icon that can be clicked to bring up a search
@@ -42,7 +42,7 @@ whatever your character is actually wearing in-game. If you'd like to override w
 this is possible by selecting **"Nothing"** in the search results (note: this is only possible for certain item slots).
 
 #### Base tab
-![Base tab](base_panel.png)
+![Base tab](github-res/base_panel.png)
 
 "Base" is similar to "items", only this tab allows changing your character's base models and colours, essentially 
 combining every makeover NPC into one. The icons in this tab have a rounded border indicating the colour you've 
@@ -56,7 +56,7 @@ technically items, their mechanics function more like base models, and the UI fo
 in "base".
 
 #### Search tab
-![Search tab](search_tab.png)
+![Search tab](github-res/search_tab.png)
 
 Here you can search for equipment to try on. Leaving the search bar empty will show all the results for a selected
 slot (except the "all" tab, where too many results would be displayed). The results will update as you type. Hovering

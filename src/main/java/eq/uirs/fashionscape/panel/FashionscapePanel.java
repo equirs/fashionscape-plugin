@@ -1,14 +1,14 @@
 package eq.uirs.fashionscape.panel;
 
 import eq.uirs.fashionscape.FashionscapePlugin;
-import eq.uirs.fashionscape.data.ColorType;
-import eq.uirs.fashionscape.swap.SwapManager;
-import eq.uirs.fashionscape.swap.event.ColorChangedListener;
-import eq.uirs.fashionscape.swap.event.ColorLockChangedListener;
-import eq.uirs.fashionscape.swap.event.IconChangedListener;
-import eq.uirs.fashionscape.swap.event.ItemChangedListener;
-import eq.uirs.fashionscape.swap.event.KitChangedListener;
-import eq.uirs.fashionscape.swap.event.LockChangedListener;
+import eq.uirs.fashionscape.core.SwapManager;
+import eq.uirs.fashionscape.core.event.ColorChangedListener;
+import eq.uirs.fashionscape.core.event.ColorLockChangedListener;
+import eq.uirs.fashionscape.core.event.IconChangedListener;
+import eq.uirs.fashionscape.core.event.ItemChangedListener;
+import eq.uirs.fashionscape.core.event.KitChangedListener;
+import eq.uirs.fashionscape.core.event.LockChangedListener;
+import eq.uirs.fashionscape.data.color.ColorType;
 import java.awt.BorderLayout;
 import java.awt.Cursor;
 import java.awt.GridBagConstraints;

@@ -1,7 +1,7 @@
 package eq.uirs.fashionscape.panel;
 
-import eq.uirs.fashionscape.swap.SwapManager;
-import eq.uirs.fashionscape.swap.event.KnownKitChangedListener;
+import eq.uirs.fashionscape.core.SwapManager;
+import eq.uirs.fashionscape.core.event.KnownKitChangedListener;
 import java.awt.BorderLayout;
 import java.awt.Dimension;
 import java.awt.GridBagConstraints;

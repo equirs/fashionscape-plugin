@@ -1,6 +1,6 @@
 package eq.uirs.fashionscape.panel;
 
-import eq.uirs.fashionscape.swap.SwapManager;
+import eq.uirs.fashionscape.core.SwapManager;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Cursor;

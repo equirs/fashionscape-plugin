@@ -1,9 +1,9 @@
 package eq.uirs.fashionscape;
 
 import com.google.inject.Provides;
-import eq.uirs.fashionscape.data.ItemInteractions;
+import eq.uirs.fashionscape.core.SwapManager;
+import eq.uirs.fashionscape.data.anim.ItemInteractions;
 import eq.uirs.fashionscape.panel.FashionscapePanel;
-import eq.uirs.fashionscape.swap.SwapManager;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.util.HashSet;

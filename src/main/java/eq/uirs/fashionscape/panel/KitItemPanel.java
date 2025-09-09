@@ -1,15 +1,14 @@
 package eq.uirs.fashionscape.panel;
 
-import com.google.common.base.Objects;
-import eq.uirs.fashionscape.data.ColorType;
-import eq.uirs.fashionscape.data.Colorable;
+import eq.uirs.fashionscape.core.SwapManager;
+import eq.uirs.fashionscape.core.event.ColorChangedListener;
+import eq.uirs.fashionscape.core.event.ColorLockChangedListener;
+import eq.uirs.fashionscape.core.event.KitChangedListener;
+import eq.uirs.fashionscape.core.event.LockChanged;
+import eq.uirs.fashionscape.core.event.LockChangedListener;
+import eq.uirs.fashionscape.data.color.ColorType;
+import eq.uirs.fashionscape.data.color.Colorable;
 import eq.uirs.fashionscape.data.kit.Kit;
-import eq.uirs.fashionscape.swap.SwapManager;
-import eq.uirs.fashionscape.swap.event.ColorChangedListener;
-import eq.uirs.fashionscape.swap.event.ColorLockChangedListener;
-import eq.uirs.fashionscape.swap.event.KitChangedListener;
-import eq.uirs.fashionscape.swap.event.LockChanged;
-import eq.uirs.fashionscape.swap.event.LockChangedListener;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Cursor;
