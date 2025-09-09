@@ -12,7 +12,7 @@ import lombok.extern.slf4j.Slf4j;
  */
 @RequiredArgsConstructor
 @Slf4j
-class SwapDiffHistory
+public class SwapDiffHistory
 {
 	private final Function<SwapDiff, SwapDiff> restoration;
 	private static final int MAX_LIST_SIZE = 10;
@@ -63,7 +63,7 @@ class SwapDiffHistory
 		addUndoDiff(restore);
 	}
 
-	void appendToUndo(SwapDiff swapDiff)
+	public void appendToUndo(SwapDiff swapDiff)
 	{
 		if (swapDiff.isBlank())
 		{

@@ -1,6 +1,6 @@
 package eq.uirs.fashionscape.panel;
 
-import eq.uirs.fashionscape.core.SwapManager;
+import eq.uirs.fashionscape.core.FashionManager;
 import eq.uirs.fashionscape.core.event.ItemChangedListener;
 import eq.uirs.fashionscape.core.event.LockChanged;
 import eq.uirs.fashionscape.core.event.LockChangedListener;
@@ -32,7 +32,7 @@ class SwapItemPanel extends AbsItemPanel
 	private static final Dimension ICON_SIZE = new Dimension(20, 20);
 
 	private final KitType slot;
-	private final SwapManager swapManager;
+	private final FashionManager fashionManager;
 	private final JButton lockButton;
 	private final JButton xButton;
 	private final SearchOpener searchOpener;
@@ -41,13 +41,13 @@ class SwapItemPanel extends AbsItemPanel
 	private MouseAdapter hoverAdapter = null;
 
 	public SwapItemPanel(@Nullable Integer itemId, BufferedImage icon, ItemManager itemManager,
-						 ClientThread clientThread, SwapManager swapManager, KitType slot,
+						 ClientThread clientThread, FashionManager fashionManager, KitType slot,
 						 SearchOpener searchOpener)
 	{
 		super(itemId, icon, itemManager, clientThread);
 		this.slot = slot;
 		this.itemId = itemId;
-		this.swapManager = swapManager;
+		this.fashionManager = fashionManager;
 		this.searchOpener = searchOpener;
 		// Item details panel
 		JPanel rightPanel = new JPanel(new BorderLayout());
@@ -66,7 +66,7 @@ class SwapItemPanel extends AbsItemPanel
 		lockButton.setBorderPainted(false);
 		lockButton.setContentAreaFilled(false);
 		lockButton.addActionListener(e -> {
-			swapManager.toggleItemLocked(slot);
+			fashionManager.toggleItemLocked(slot);
 			updateLockButton();
 			updateXButton();
 		});
@@ -81,7 +81,7 @@ class SwapItemPanel extends AbsItemPanel
 		xButton.setContentAreaFilled(false);
 		xButton.setIcon(new ImageIcon(ImageUtil.loadImageResource(this.getClass(), "x.png")));
 		xButton.addActionListener(e -> clientThread.invokeLater(() -> {
-			swapManager.revertSlot(slot);
+			fashionManager.revertSlot(slot);
 			SwingUtilities.invokeLater(() -> {
 				updateLockButton();
 				updateXButton();
@@ -96,7 +96,7 @@ class SwapItemPanel extends AbsItemPanel
 
 		add(rightPanel, BorderLayout.CENTER);
 
-		swapManager.addEventListener(new ItemChangedListener(e -> {
+		fashionManager.addEventListener(new ItemChangedListener(e -> {
 			if (e.getSlot() == slot)
 			{
 				Integer newId = e.getItemId();
@@ -108,7 +108,7 @@ class SwapItemPanel extends AbsItemPanel
 			}
 		}));
 
-		swapManager.addEventListener(new LockChangedListener(e -> {
+		fashionManager.addEventListener(new LockChangedListener(e -> {
 			if (e.getSlot() == slot && e.getType() != LockChanged.Type.KIT)
 			{
 				updateLockButton();
@@ -137,7 +137,7 @@ class SwapItemPanel extends AbsItemPanel
 
 	void updateLockButton()
 	{
-		boolean locked = swapManager.isItemLocked(slot);
+		boolean locked = fashionManager.isItemLocked(slot);
 		String lockIcon = locked ? "lock" : "unlock";
 		lockButton.setIcon(
 			new ImageIcon(ImageUtil.loadImageResource(this.getClass(), lockIcon + ".png")));

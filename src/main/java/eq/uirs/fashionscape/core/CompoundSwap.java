@@ -16,7 +16,7 @@ import net.runelite.api.kit.KitType;
  * that they're submitted for swapping at the same time.
  */
 @Getter
-class CompoundSwap
+public class CompoundSwap
 {
 	@NonNull
 	private final Type type;
@@ -112,7 +112,7 @@ class CompoundSwap
 		return new CompoundSwap(Type.SINGLE, map, null);
 	}
 
-	static CompoundSwap fromIcon(JawIcon icon)
+	public static CompoundSwap fromIcon(JawIcon icon)
 	{
 		return new CompoundSwap(Type.HEAD, new HashMap<>(), icon);
 	}

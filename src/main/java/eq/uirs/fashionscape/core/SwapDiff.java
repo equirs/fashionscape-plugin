@@ -17,7 +17,7 @@ import net.runelite.api.kit.KitType;
 @RequiredArgsConstructor
 @ToString
 @EqualsAndHashCode
-class SwapDiff
+public class SwapDiff
 {
 	@Value
 	public static class Change
@@ -57,7 +57,7 @@ class SwapDiff
 	}
 
 	// This diff will take priority of the other diff in the event of a collision.
-	SwapDiff mergeOver(SwapDiff other)
+	public SwapDiff mergeOver(SwapDiff other)
 	{
 		Map<KitType, Change> mergedSlots = new HashMap<>();
 		mergedSlots.putAll(other.slotChanges);

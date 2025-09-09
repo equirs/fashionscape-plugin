@@ -1,7 +1,7 @@
 package eq.uirs.fashionscape.panel;
 
 import eq.uirs.fashionscape.FashionscapePlugin;
-import eq.uirs.fashionscape.core.SwapManager;
+import eq.uirs.fashionscape.core.FashionManager;
 import eq.uirs.fashionscape.core.event.ColorChangedListener;
 import eq.uirs.fashionscape.core.event.ColorLockChangedListener;
 import eq.uirs.fashionscape.core.event.IconChangedListener;
@@ -54,7 +54,7 @@ public class FashionscapePanel extends PluginPanel
 {
 	private final Client client;
 	private final ClientThread clientThread;
-	private final SwapManager swapManager;
+	private final FashionManager fashionManager;
 
 	private JButton undo;
 	private JButton redo;
@@ -88,13 +88,13 @@ public class FashionscapePanel extends PluginPanel
 	}
 
 	@Inject
-	public FashionscapePanel(SearchPanel searchPanel, KitsPanel kitsPanel, SwapManager swapManager,
+	public FashionscapePanel(SearchPanel searchPanel, KitsPanel kitsPanel, FashionManager fashionManager,
 							 ItemManager itemManager, Client client, ClientThread clientThread)
 	{
 		super(false);
 		this.client = client;
 		this.clientThread = clientThread;
-		this.swapManager = swapManager;
+		this.fashionManager = fashionManager;
 		tabDisplayPanel = new SearchClearingPanel(searchPanel);
 		tabGroup = new MaterialTabGroup(tabDisplayPanel);
 
@@ -115,7 +115,7 @@ public class FashionscapePanel extends PluginPanel
 				searchPanel.clearSearch();
 			}
 		};
-		SwapsPanel swapsPanel = new SwapsPanel(swapManager, itemManager, searchOpener, clientThread);
+		SwapsPanel swapsPanel = new SwapsPanel(fashionManager, itemManager, searchOpener, clientThread);
 		this.searchPanel = searchPanel;
 		this.kitsPanel = kitsPanel;
 
@@ -161,8 +161,8 @@ public class FashionscapePanel extends PluginPanel
 			checkButtonEnabled(shuffle, loggedIn, unlocked, nonEmpty);
 			checkButtonEnabled(clear, loggedIn, unlocked, nonEmpty);
 		};
-		swapManager.addEventListener(new LockChangedListener(e -> lockListener.run()));
-		swapManager.addEventListener(new ColorLockChangedListener(e -> lockListener.run()));
+		fashionManager.addEventListener(new LockChangedListener(e -> lockListener.run()));
+		fashionManager.addEventListener(new ColorLockChangedListener(e -> lockListener.run()));
 		final Runnable saveClearListener = () -> {
 			boolean loggedIn = client.getGameState() == GameState.LOGGED_IN;
 			boolean unlocked = hasUnlocked();
@@ -170,10 +170,10 @@ public class FashionscapePanel extends PluginPanel
 			checkButtonEnabled(save, loggedIn, unlocked, nonEmpty);
 			checkButtonEnabled(clear, loggedIn, unlocked, nonEmpty);
 		};
-		swapManager.addEventListener(new ItemChangedListener(e -> saveClearListener.run()));
-		swapManager.addEventListener(new KitChangedListener(e -> saveClearListener.run()));
-		swapManager.addEventListener(new ColorChangedListener(e -> saveClearListener.run()));
-		swapManager.addEventListener(new IconChangedListener(e -> saveClearListener.run()));
+		fashionManager.addEventListener(new ItemChangedListener(e -> saveClearListener.run()));
+		fashionManager.addEventListener(new KitChangedListener(e -> saveClearListener.run()));
+		fashionManager.addEventListener(new ColorChangedListener(e -> saveClearListener.run()));
+		fashionManager.addEventListener(new IconChangedListener(e -> saveClearListener.run()));
 	}
 
 	public void onGameStateChanged(GameStateChanged event)
@@ -235,12 +235,12 @@ public class FashionscapePanel extends PluginPanel
 		undo = new JButton(new ImageIcon(ImageUtil.loadImageResource(getClass(), "undo.png")));
 		undo.setToolTipText("Undo");
 		undo.addActionListener(e -> clientThread.invokeLater(() -> {
-			swapManager.undoLastSwap();
+			fashionManager.undoLastSwap();
 			reloadResults();
 		}));
 		checkButtonEnabled(undo, isLoggedIn, hasUnlocked, hasNonEmpty);
 		undo.addMouseListener(createHoverListener(undo));
-		swapManager.addUndoQueueChangeListener(size -> checkButtonEnabled(undo, null, null, null));
+		fashionManager.addUndoQueueChangeListener(size -> checkButtonEnabled(undo, null, null, null));
 		undo.setFocusPainted(false);
 		buttonContainer.add(undo, c);
 		c.gridx++;
@@ -248,12 +248,12 @@ public class FashionscapePanel extends PluginPanel
 		redo = new JButton(new ImageIcon(ImageUtil.loadImageResource(getClass(), "redo.png")));
 		redo.setToolTipText("Redo");
 		redo.addActionListener(e -> clientThread.invokeLater(() -> {
-			swapManager.redoLastSwap();
+			fashionManager.redoLastSwap();
 			reloadResults();
 		}));
 		checkButtonEnabled(redo, isLoggedIn, hasUnlocked, hasNonEmpty);
 		redo.addMouseListener(createHoverListener(redo));
-		swapManager.addRedoQueueChangeListener(size -> checkButtonEnabled(redo, null, null, null));
+		fashionManager.addRedoQueueChangeListener(size -> checkButtonEnabled(redo, null, null, null));
 		redo.setFocusPainted(false);
 		buttonContainer.add(redo, c);
 		c.gridx++;
@@ -262,7 +262,7 @@ public class FashionscapePanel extends PluginPanel
 		shuffle.setSize(12, 12);
 		shuffle.setToolTipText("Randomize");
 		shuffle.addActionListener(e -> clientThread.invokeLater(() -> {
-			swapManager.shuffle();
+			fashionManager.shuffle();
 			reloadResults();
 		}));
 		checkButtonEnabled(shuffle, isLoggedIn, hasUnlocked, hasNonEmpty);
@@ -299,7 +299,7 @@ public class FashionscapePanel extends PluginPanel
 		JPopupMenu softClearMenu = new JPopupMenu();
 		JMenuItem softClear = new JMenuItem("Soft clear");
 		softClear.addActionListener(e -> clientThread.invokeLater(() -> {
-			swapManager.revertSwaps(false, false);
+			fashionManager.revertSwaps(false, false);
 			reloadResults();
 		}));
 		softClearMenu.add(softClear);
@@ -307,7 +307,7 @@ public class FashionscapePanel extends PluginPanel
 		clear = new JButton(new ImageIcon(ImageUtil.loadImageResource(getClass(), "clear.png")));
 		clear.setToolTipText("Clear all");
 		clear.addActionListener(e -> clientThread.invokeLater(() -> {
-			swapManager.revertSwaps(true, false);
+			fashionManager.revertSwaps(true, false);
 			reloadResults();
 		}));
 		clear.setFocusPainted(false);
@@ -370,7 +370,7 @@ public class FashionscapePanel extends PluginPanel
 			{
 				selectedFile = new File(selectedFile.getPath() + ".txt");
 			}
-			swapManager.exportSwaps(selectedFile);
+			fashionManager.exportSwaps(selectedFile);
 		}
 	}
 
@@ -390,7 +390,7 @@ public class FashionscapePanel extends PluginPanel
 			try (BufferedReader reader = new BufferedReader(new FileReader(selectedFile)))
 			{
 				List<String> lines = reader.lines().collect(Collectors.toList());
-				swapManager.loadImports(lines);
+				fashionManager.loadImports(lines);
 			}
 			catch (IOException e)
 			{
@@ -424,17 +424,17 @@ public class FashionscapePanel extends PluginPanel
 	{
 		long numSlotSwaps = Arrays.stream(KitType.values())
 			.filter(slot -> {
-				Integer item = swapManager.swappedItemIdIn(slot);
-				Integer kit = swapManager.swappedKitIdIn(slot);
-				boolean containsNothing = swapManager.isHidden(slot);
+				Integer item = fashionManager.swappedItemIdIn(slot);
+				Integer kit = fashionManager.swappedKitIdIn(slot);
+				boolean containsNothing = fashionManager.isHidden(slot);
 				return item != null || kit != null || containsNothing;
 			})
 			.count();
 		long numColorSwaps = Arrays.stream(ColorType.values())
-			.map(swapManager::swappedColorIdIn)
+			.map(fashionManager::swappedColorIdIn)
 			.filter(Objects::nonNull)
 			.count();
-		boolean hasIcon = swapManager.swappedIcon() != null;
+		boolean hasIcon = fashionManager.swappedIcon() != null;
 		return numSlotSwaps + numColorSwaps > 0 || hasIcon;
 	}
 
@@ -442,15 +442,15 @@ public class FashionscapePanel extends PluginPanel
 	{
 		long numUnlockedSlots = Arrays.stream(KitType.values())
 			.filter(Objects::nonNull)
-			.map(swapManager::isSlotLocked)
+			.map(fashionManager::isSlotLocked)
 			.filter(b -> !b)
 			.count();
 		long numUnlockedColors = Arrays.stream(ColorType.values())
 			.filter(Objects::nonNull)
-			.map(swapManager::isColorLocked)
+			.map(fashionManager::isColorLocked)
 			.filter(b -> !b)
 			.count();
-		long unlockedIcon = swapManager.isIconLocked() ? 0 : 1;
+		long unlockedIcon = fashionManager.isIconLocked() ? 0 : 1;
 		return numUnlockedSlots + numUnlockedColors + unlockedIcon > 0;
 	}
 
@@ -466,11 +466,11 @@ public class FashionscapePanel extends PluginPanel
 		boolean enabled = loggedIn;
 		if (button == undo)
 		{
-			enabled &= swapManager.canUndo();
+			enabled &= fashionManager.canUndo();
 		}
 		else if (button == redo)
 		{
-			enabled &= swapManager.canRedo();
+			enabled &= fashionManager.canRedo();
 		}
 		else if (button == shuffle)
 		{

@@ -47,7 +47,7 @@ import org.apache.commons.lang3.SerializationUtils;
  */
 @Singleton
 @Slf4j
-class SavedSwaps
+public class SavedSwaps
 {
 	private static final int DEBOUNCE_DELAY_MS = 500;
 	// when player's kit info is not known, fall back to showing some default values
@@ -136,13 +136,13 @@ class SavedSwaps
 		{
 			Map<KitType, Integer> equipIds = SerializationUtils.deserialize(equipment);
 			equipIds.forEach((slot, equipId) -> {
-				if (equipId >= SwapManager.KIT_OFFSET && equipId < SwapManager.ITEM_OFFSET)
+				if (equipId >= FashionManager.KIT_OFFSET && equipId < FashionManager.ITEM_OFFSET)
 				{
-					putKit(slot, equipId - SwapManager.KIT_OFFSET);
+					putKit(slot, equipId - FashionManager.KIT_OFFSET);
 				}
-				else if (equipId >= SwapManager.ITEM_OFFSET)
+				else if (equipId >= FashionManager.ITEM_OFFSET)
 				{
-					putItem(slot, equipId - SwapManager.ITEM_OFFSET);
+					putItem(slot, equipId - FashionManager.ITEM_OFFSET);
 				}
 			});
 			Map<Integer, Integer> colorIds = SerializationUtils.deserialize(colors);
@@ -214,7 +214,7 @@ class SavedSwaps
 		return ImmutableSet.copyOf(swappedColorIds.entrySet());
 	}
 
-	Integer getItem(KitType slot)
+	public Integer getItem(KitType slot)
 	{
 		return swappedItemIds.get(slot);
 	}
@@ -255,18 +255,18 @@ class SavedSwaps
 	{
 		if (gender == null || slot == null)
 		{
-			return -SwapManager.KIT_OFFSET;
+			return -FashionManager.KIT_OFFSET;
 		}
 		Map<KitType, Integer> map = gender == 1 ? FALLBACK_FEM_KITS : FALLBACK_MASC_KITS;
-		int result = map.getOrDefault(slot, -SwapManager.KIT_OFFSET);
-		if (result != -SwapManager.KIT_OFFSET)
+		int result = map.getOrDefault(slot, -FashionManager.KIT_OFFSET);
+		if (result != -FashionManager.KIT_OFFSET)
 		{
 			fireEvent(new KnownKitChanged(true, slot));
 		}
 		return result;
 	}
 
-	boolean containsSlot(KitType slot)
+	public boolean containsSlot(KitType slot)
 	{
 		if (swappedKitIds.containsKey(slot))
 		{
@@ -275,22 +275,22 @@ class SavedSwaps
 		return containsItem(slot);
 	}
 
-	boolean containsItem(KitType slot)
+	public boolean containsItem(KitType slot)
 	{
 		return swappedItemIds.containsKey(slot);
 	}
 
-	boolean containsIcon()
+	public boolean containsIcon()
 	{
 		return swappedIcon != null;
 	}
 
-	boolean isHidden(KitType slot)
+	public boolean isHidden(KitType slot)
 	{
 		return hiddenSlots.contains(slot);
 	}
 
-	boolean containsColor(ColorType type)
+	public boolean containsColor(ColorType type)
 	{
 		return swappedColorIds.containsKey(type);
 	}
@@ -524,27 +524,27 @@ class SavedSwaps
 		lockedIcon = locked;
 	}
 
-	boolean isSlotLocked(KitType slot)
+	public boolean isSlotLocked(KitType slot)
 	{
 		return isKitLocked(slot) || isItemLocked(slot);
 	}
 
-	boolean isKitLocked(KitType slot)
+	public boolean isKitLocked(KitType slot)
 	{
 		return lockedKits.contains(slot);
 	}
 
-	boolean isItemLocked(KitType slot)
+	public boolean isItemLocked(KitType slot)
 	{
 		return lockedItems.contains(slot);
 	}
 
-	boolean isColorLocked(ColorType type)
+	public boolean isColorLocked(ColorType type)
 	{
 		return lockedColors.contains(type);
 	}
 
-	boolean isIconLocked()
+	public boolean isIconLocked()
 	{
 		return lockedIcon;
 	}
@@ -655,9 +655,9 @@ class SavedSwaps
 		}
 		equipSaveFuture = executor.schedule(() -> {
 			Map<KitType, Integer> itemEquips = swappedItemIds.entrySet().stream()
-				.collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue() + SwapManager.ITEM_OFFSET));
+				.collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue() + FashionManager.ITEM_OFFSET));
 			Map<KitType, Integer> kitEquips = swappedKitIds.entrySet().stream()
-				.collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue() + SwapManager.KIT_OFFSET));
+				.collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue() + FashionManager.KIT_OFFSET));
 			Map<KitType, Integer> hides = hiddenSlots.stream()
 				.collect(Collectors.toMap(v -> v, v -> 0));
 			HashMap<KitType, Integer> equips = new HashMap<>(itemEquips);

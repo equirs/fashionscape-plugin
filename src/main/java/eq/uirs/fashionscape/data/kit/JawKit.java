@@ -1,7 +1,7 @@
 package eq.uirs.fashionscape.data.kit;
 
 import com.google.common.collect.ImmutableMap;
-import eq.uirs.fashionscape.core.SwapManager;
+import eq.uirs.fashionscape.core.FashionManager;
 import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nonnull;
@@ -204,11 +204,11 @@ public enum JawKit implements Kit
 	{
 		for (JawKit kit : JawKit.values())
 		{
-			reverseLookupKit.put(kit.mascKitId + SwapManager.KIT_OFFSET, kit);
-			reverseLookupKit.put(kit.femKitId + SwapManager.KIT_OFFSET, kit);
+			reverseLookupKit.put(kit.mascKitId + FashionManager.KIT_OFFSET, kit);
+			reverseLookupKit.put(kit.femKitId + FashionManager.KIT_OFFSET, kit);
 			kit.icons.forEach((icon, itemId) -> {
 				reverseLookupIcon.put(itemId, icon);
-				reverseLookupKit.put(itemId + SwapManager.ITEM_OFFSET, kit);
+				reverseLookupKit.put(itemId + FashionManager.ITEM_OFFSET, kit);
 			});
 		}
 	}

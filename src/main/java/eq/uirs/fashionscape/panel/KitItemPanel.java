@@ -1,6 +1,6 @@
 package eq.uirs.fashionscape.panel;
 
-import eq.uirs.fashionscape.core.SwapManager;
+import eq.uirs.fashionscape.core.FashionManager;
 import eq.uirs.fashionscape.core.event.ColorChangedListener;
 import eq.uirs.fashionscape.core.event.ColorLockChangedListener;
 import eq.uirs.fashionscape.core.event.KitChangedListener;
@@ -53,7 +53,7 @@ public class KitItemPanel extends DropdownIconPanel
 	@Getter
 	private final KitType slot;
 
-	private final SwapManager swapManager;
+	private final FashionManager fashionManager;
 	private final KitColorOpener kitColorOpener;
 
 	private final Map<Integer, Colorable> colorMap = new HashMap<>();
@@ -65,11 +65,11 @@ public class KitItemPanel extends DropdownIconPanel
 	private Color color;
 	private Integer kitId;
 
-	public KitItemPanel(SwapManager swapManager, ColorType type, Integer colorId, KitType slot, Integer kitId,
+	public KitItemPanel(FashionManager fashionManager, ColorType type, Integer colorId, KitType slot, Integer kitId,
 						KitColorOpener kitColorOpener, BufferedImage image, ClientThread clientThread)
 	{
 		super(image, clientThread);
-		this.swapManager = swapManager;
+		this.fashionManager = fashionManager;
 		this.kitColorOpener = kitColorOpener;
 		this.slot = slot;
 		this.type = type;
@@ -101,7 +101,7 @@ public class KitItemPanel extends DropdownIconPanel
 			allKits.addAll(Arrays.asList(Kit.allInSlot(slot, false)));
 			setKitName();
 			setIcon(icon, image);
-			swapManager.addEventListener(new KitChangedListener(e -> {
+			fashionManager.addEventListener(new KitChangedListener(e -> {
 				if (slot == e.getSlot())
 				{
 					this.kitId = e.getKitId();
@@ -111,7 +111,7 @@ public class KitItemPanel extends DropdownIconPanel
 			}));
 			configureButton(lockButton);
 			lockButton.addActionListener(e -> {
-				swapManager.toggleKitLocked(slot);
+				fashionManager.toggleKitLocked(slot);
 				updateLockButton();
 				updateXButton();
 			});
@@ -127,7 +127,7 @@ public class KitItemPanel extends DropdownIconPanel
 		if (type != null)
 		{
 			setIconColor();
-			swapManager.addEventListener(new ColorChangedListener(e -> {
+			fashionManager.addEventListener(new ColorChangedListener(e -> {
 				if (type == e.getType())
 				{
 					this.colorId = e.getColorId();
@@ -142,7 +142,7 @@ public class KitItemPanel extends DropdownIconPanel
 			}));
 			configureButton(lockColorButton);
 			lockColorButton.addActionListener(e -> {
-				swapManager.toggleColorLocked(type);
+				fashionManager.toggleColorLocked(type);
 				updateColorLockButton();
 				updateXButton();
 			});
@@ -156,7 +156,7 @@ public class KitItemPanel extends DropdownIconPanel
 		configureButton(xButton);
 		xButton.setIcon(new ImageIcon(ImageUtil.loadImageResource(this.getClass(), "x.png")));
 		xButton.addActionListener(e -> clientThread.invokeLater(() -> {
-			swapManager.revert(slot, type);
+			fashionManager.revert(slot, type);
 			SwingUtilities.invokeLater(() -> {
 				updateLockButton();
 				updateColorLockButton();
@@ -176,13 +176,13 @@ public class KitItemPanel extends DropdownIconPanel
 		rightPanel.add(buttons, BorderLayout.EAST);
 		add(rightPanel, BorderLayout.CENTER);
 
-		swapManager.addEventListener(new LockChangedListener(e -> {
+		fashionManager.addEventListener(new LockChangedListener(e -> {
 			if (e.getSlot() == slot && e.getType() != LockChanged.Type.ITEM)
 			{
 				updateLockButton();
 			}
 		}));
-		swapManager.addEventListener(new ColorLockChangedListener(e -> {
+		fashionManager.addEventListener(new ColorLockChangedListener(e -> {
 			if (e.getType() == type)
 			{
 				updateColorLockButton();
@@ -289,24 +289,24 @@ public class KitItemPanel extends DropdownIconPanel
 			@Override
 			public void mouseEntered(MouseEvent e)
 			{
-				if (!swapManager.isColorLocked(type))
+				if (!fashionManager.isColorLocked(type))
 				{
 					setCursor(new Cursor(Cursor.HAND_CURSOR));
 				}
-				swapManager.hoverOverColor(type, colorable.getColorId(type));
+				fashionManager.hoverOverColor(type, colorable.getColorId(type));
 			}
 
 			@Override
 			public void mouseExited(MouseEvent e)
 			{
 				setCursor(new Cursor(Cursor.DEFAULT_CURSOR));
-				swapManager.hoverAway();
+				fashionManager.hoverAway();
 			}
 
 			@Override
 			public void mouseReleased(MouseEvent e)
 			{
-				swapManager.hoverSelectColor(type, colorable.getColorId(type));
+				fashionManager.hoverSelectColor(type, colorable.getColorId(type));
 			}
 		});
 		return colorLabel;
@@ -322,24 +322,24 @@ public class KitItemPanel extends DropdownIconPanel
 			@Override
 			public void mouseEntered(MouseEvent e)
 			{
-				if (!swapManager.isKitLocked(slot))
+				if (!fashionManager.isKitLocked(slot))
 				{
 					setCursor(new Cursor(Cursor.HAND_CURSOR));
 				}
-				swapManager.hoverOverKit(slot, kitId);
+				fashionManager.hoverOverKit(slot, kitId);
 			}
 
 			@Override
 			public void mouseExited(MouseEvent e)
 			{
 				setCursor(new Cursor(Cursor.DEFAULT_CURSOR));
-				swapManager.hoverAway();
+				fashionManager.hoverAway();
 			}
 
 			@Override
 			public void mouseReleased(MouseEvent e)
 			{
-				swapManager.hoverSelectKit(slot, kitId);
+				fashionManager.hoverSelectKit(slot, kitId);
 			}
 		});
 		return kitLabel;
@@ -356,7 +356,7 @@ public class KitItemPanel extends DropdownIconPanel
 		String kitName = "Not set";
 		if (kitId != null)
 		{
-			Kit kit = SwapManager.KIT_ID_TO_KIT.get(kitId);
+			Kit kit = FashionManager.KIT_ID_TO_KIT.get(kitId);
 			if (kit != null)
 			{
 				kitName = kit.getDisplayName();
@@ -428,7 +428,7 @@ public class KitItemPanel extends DropdownIconPanel
 	{
 		if (slot != null)
 		{
-			boolean locked = swapManager.isKitLocked(slot);
+			boolean locked = fashionManager.isKitLocked(slot);
 			String lockIcon = locked ? "lock" : "unlock";
 			lockButton.setIcon(
 				new ImageIcon(ImageUtil.loadImageResource(this.getClass(), lockIcon + ".png")));
@@ -441,7 +441,7 @@ public class KitItemPanel extends DropdownIconPanel
 	{
 		if (type != null)
 		{
-			boolean locked = swapManager.isColorLocked(type);
+			boolean locked = fashionManager.isColorLocked(type);
 			String lockStr = locked ? "lock" : "unlock";
 			BufferedImage lockIcon = ImageUtil.loadImageResource(this.getClass(), lockStr + ".png");
 			lockIcon = fillImage(lockIcon, color, 50);

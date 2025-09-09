@@ -3,7 +3,7 @@ package eq.uirs.fashionscape.colors;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
-import eq.uirs.fashionscape.core.SwapManager;
+import eq.uirs.fashionscape.core.FashionManager;
 import eq.uirs.fashionscape.data.color.ColorType;
 import eq.uirs.fashionscape.data.color.Colorable;
 import eq.uirs.fashionscape.data.kit.JawIcon;
@@ -35,7 +35,7 @@ import net.runelite.api.kit.KitType;
 public class ColorScorer
 {
 	private final Client client;
-	private final SwapManager swapManager;
+	private final FashionManager fashionManager;
 
 	private final Map<Integer, GenderItemColors> allColors;
 	private final Map<KitType, List<ItemColorInfo>> kitColors = new ConcurrentHashMap<>();
@@ -53,10 +53,10 @@ public class ColorScorer
 	}
 
 	@Inject
-	ColorScorer(Client client, SwapManager swapManager, Gson baseGson)
+	ColorScorer(Client client, FashionManager fashionManager, Gson baseGson)
 	{
 		this.client = client;
-		this.swapManager = swapManager;
+		this.fashionManager = fashionManager;
 		GsonBuilder builder = baseGson.newBuilder()
 			.registerTypeAdapter(ItemColors.class, new ItemColors.Deserializer());
 		Gson gson = builder.create();
@@ -90,17 +90,17 @@ public class ColorScorer
 			return;
 		}
 		playerColors.clear();
-		playerColors.putAll(swapManager.swappedColorsMap());
+		playerColors.putAll(fashionManager.swappedColorsMap());
 		gender = composition.getGender();
 		for (KitType slot : KitType.values())
 		{
-			Integer itemId = swapManager.swappedItemIdIn(slot);
+			Integer itemId = fashionManager.swappedItemIdIn(slot);
 			if (itemId != null)
 			{
 				kitColors.put(slot, colorsFor(itemId));
 			}
 		}
-		JawIcon icon = swapManager.swappedIcon();
+		JawIcon icon = fashionManager.swappedIcon();
 		if (icon != null)
 		{
 			Integer iconItemId = JawKit.NO_JAW.getIconItemId(icon);

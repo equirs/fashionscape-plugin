@@ -1,7 +1,7 @@
 package eq.uirs.fashionscape.panel;
 
 import eq.uirs.fashionscape.FashionscapeConfig;
-import eq.uirs.fashionscape.core.SwapManager;
+import eq.uirs.fashionscape.core.FashionManager;
 import eq.uirs.fashionscape.data.color.ColorType;
 import eq.uirs.fashionscape.data.kit.JawIcon;
 import java.awt.BorderLayout;
@@ -35,7 +35,7 @@ import net.runelite.client.util.ImageUtil;
 @Slf4j
 public class KitsPanel extends JPanel
 {
-	private final SwapManager swapManager;
+	private final FashionManager fashionManager;
 	private final ClientThread clientThread;
 	private final ItemManager itemManager;
 	private final Client client;
@@ -88,10 +88,10 @@ public class KitsPanel extends JPanel
 	}
 
 	@Inject
-	public KitsPanel(SwapManager swapManager, ClientThread clientThread, Client client, FashionscapeConfig config,
+	public KitsPanel(FashionManager fashionManager, ClientThread clientThread, Client client, FashionscapeConfig config,
 					 ItemManager itemManager)
 	{
-		this.swapManager = swapManager;
+		this.fashionManager = fashionManager;
 		this.clientThread = clientThread;
 		this.client = client;
 		this.config = config;
@@ -143,7 +143,7 @@ public class KitsPanel extends JPanel
 					{
 						continue;
 					}
-					JawIcon jawIcon = swapManager.swappedIcon();
+					JawIcon jawIcon = fashionManager.swappedIcon();
 					Integer iconId = jawIcon != null ? jawIcon.getId() : null;
 					results.add(new KitColorResult(null, iconId, null, null));
 				}
@@ -151,11 +151,11 @@ public class KitsPanel extends JPanel
 				{
 					if (kitType != null)
 					{
-						kitId = swapManager.swappedKitIdIn(kitType);
+						kitId = fashionManager.swappedKitIdIn(kitType);
 					}
 					if (colorType != null)
 					{
-						colorId = swapManager.swappedColorIdIn(colorType);
+						colorId = fashionManager.swappedColorIdIn(colorType);
 					}
 					results.add(new KitColorResult(kitType, kitId, colorType, colorId));
 				}
@@ -183,7 +183,7 @@ public class KitsPanel extends JPanel
 			if (result.colorType == null && result.slot == null)
 			{
 				image = ImageUtil.loadImageResource(getClass(), "icon.png");
-				JawIconPanel jawPanel = new JawIconPanel(image, clientThread, swapManager, itemManager, kitColorOpener,
+				JawIconPanel jawPanel = new JawIconPanel(image, clientThread, fashionManager, itemManager, kitColorOpener,
 					result.id);
 				jawIconPanel = jawPanel;
 				panel = jawPanel;
@@ -194,7 +194,7 @@ public class KitsPanel extends JPanel
 				{
 					image = ImageUtil.loadImageResource(getClass(), result.slot.name().toLowerCase() + ".png");
 				}
-				KitItemPanel kitPanel = new KitItemPanel(swapManager, result.colorType, result.colorId, result.slot,
+				KitItemPanel kitPanel = new KitItemPanel(fashionManager, result.colorType, result.colorId, result.slot,
 					result.id, kitColorOpener, image, clientThread);
 				kitPanels.add(kitPanel);
 				panel = kitPanel;

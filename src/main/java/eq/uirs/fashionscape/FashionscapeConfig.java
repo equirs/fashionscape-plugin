@@ -1,6 +1,6 @@
 package eq.uirs.fashionscape;
 
-import eq.uirs.fashionscape.core.RandomizerIntelligence;
+import eq.uirs.fashionscape.core.randomizer.RandomizerIntelligence;
 import eq.uirs.fashionscape.panel.SortBy;
 import java.util.HashMap;
 import net.runelite.api.kit.KitType;

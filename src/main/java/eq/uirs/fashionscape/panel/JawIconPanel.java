@@ -1,7 +1,7 @@
 package eq.uirs.fashionscape.panel;
 
 import com.google.common.base.Objects;
-import eq.uirs.fashionscape.core.SwapManager;
+import eq.uirs.fashionscape.core.FashionManager;
 import eq.uirs.fashionscape.core.event.IconChangedListener;
 import eq.uirs.fashionscape.core.event.IconLockChangedListener;
 import eq.uirs.fashionscape.data.kit.JawIcon;
@@ -34,16 +34,16 @@ import net.runelite.client.util.ImageUtil;
 @Slf4j
 public class JawIconPanel extends DropdownIconPanel
 {
-	private final SwapManager swapManager;
+	private final FashionManager fashionManager;
 	private final ItemManager itemManager;
 	private final KitColorOpener kitColorOpener;
 	private JawIcon jawIcon = null;
 
-	JawIconPanel(BufferedImage image, ClientThread clientThread, SwapManager swapManager, ItemManager itemManager,
+	JawIconPanel(BufferedImage image, ClientThread clientThread, FashionManager fashionManager, ItemManager itemManager,
 				 KitColorOpener kitColorOpener, @Nullable Integer iconId)
 	{
 		super(image, clientThread);
-		this.swapManager = swapManager;
+		this.fashionManager = fashionManager;
 		this.itemManager = itemManager;
 		this.kitColorOpener = kitColorOpener;
 		Arrays.stream(JawIcon.values())
@@ -65,7 +65,7 @@ public class JawIconPanel extends DropdownIconPanel
 		setIcon(icon, image);
 		icon.setBorder(new RoundedBorder(ColorScheme.LIGHT_GRAY_COLOR, ICON_CORNER_RADIUS));
 
-		swapManager.addEventListener(new IconChangedListener(e -> {
+		fashionManager.addEventListener(new IconChangedListener(e -> {
 			if (jawIcon != e.getIcon())
 			{
 				this.jawIcon = e.getIcon();
@@ -74,10 +74,10 @@ public class JawIconPanel extends DropdownIconPanel
 				updateXButton();
 			}
 		}));
-		swapManager.addEventListener(new IconLockChangedListener(e -> updateLockButton()));
+		fashionManager.addEventListener(new IconLockChangedListener(e -> updateLockButton()));
 		configureButton(lockButton);
 		lockButton.addActionListener(e -> {
-			swapManager.toggleIconLocked();
+			fashionManager.toggleIconLocked();
 			updateLockButton();
 			updateXButton();
 		});
@@ -86,7 +86,7 @@ public class JawIconPanel extends DropdownIconPanel
 		configureButton(xButton);
 		xButton.setIcon(new ImageIcon(ImageUtil.loadImageResource(this.getClass(), "x.png")));
 		xButton.addActionListener(e -> clientThread.invokeLater(() -> {
-			swapManager.revertIcon();
+			fashionManager.revertIcon();
 			SwingUtilities.invokeLater(() -> {
 				updateLockButton();
 				updateXButton();
@@ -164,24 +164,24 @@ public class JawIconPanel extends DropdownIconPanel
 			@Override
 			public void mouseEntered(MouseEvent e)
 			{
-				if (!swapManager.isIconLocked())
+				if (!fashionManager.isIconLocked())
 				{
 					setCursor(new Cursor(Cursor.HAND_CURSOR));
 				}
-				swapManager.hoverOverIcon(jawIcon);
+				fashionManager.hoverOverIcon(jawIcon);
 			}
 
 			@Override
 			public void mouseExited(MouseEvent e)
 			{
 				setCursor(new Cursor(Cursor.DEFAULT_CURSOR));
-				swapManager.hoverAway();
+				fashionManager.hoverAway();
 			}
 
 			@Override
 			public void mouseReleased(MouseEvent e)
 			{
-				swapManager.hoverSelectIcon(jawIcon);
+				fashionManager.hoverSelectIcon(jawIcon);
 			}
 		});
 		return iconLabel;
@@ -228,7 +228,7 @@ public class JawIconPanel extends DropdownIconPanel
 
 	private void updateLockButton()
 	{
-		boolean locked = swapManager.isIconLocked();
+		boolean locked = fashionManager.isIconLocked();
 		String lockIcon = locked ? "lock" : "unlock";
 		lockButton.setIcon(
 			new ImageIcon(ImageUtil.loadImageResource(this.getClass(), lockIcon + ".png")));

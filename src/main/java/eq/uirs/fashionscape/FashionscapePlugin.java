@@ -1,7 +1,7 @@
 package eq.uirs.fashionscape;
 
 import com.google.inject.Provides;
-import eq.uirs.fashionscape.core.SwapManager;
+import eq.uirs.fashionscape.core.FashionManager;
 import eq.uirs.fashionscape.data.anim.ItemInteractions;
 import eq.uirs.fashionscape.panel.FashionscapePanel;
 import java.awt.image.BufferedImage;
@@ -91,7 +91,7 @@ public class FashionscapePlugin extends Plugin
 	private ItemManager itemManager;
 
 	@Inject
-	private SwapManager swapManager;
+	private FashionManager fashionManager;
 
 	@Inject
 	private FashionscapeConfig config;
@@ -123,7 +123,7 @@ public class FashionscapePlugin extends Plugin
 		refreshMenuEntries();
 		clientThread.invokeLater(() -> {
 			populateDupes();
-			swapManager.startUp();
+			fashionManager.startUp();
 		});
 	}
 
@@ -131,7 +131,7 @@ public class FashionscapePlugin extends Plugin
 	protected void shutDown()
 	{
 		menuManager.get().removePlayerMenuItem(COPY_PLAYER);
-		clientThread.invokeLater(() -> swapManager.shutDown());
+		clientThread.invokeLater(() -> fashionManager.shutDown());
 		clientToolbar.removeNavigation(navButton);
 		ITEM_ID_DUPES.clear();
 	}
@@ -142,7 +142,7 @@ public class FashionscapePlugin extends Plugin
 		Player player = event.getPlayer();
 		if (player != null && player == client.getLocalPlayer())
 		{
-			swapManager.onPlayerChanged();
+			fashionManager.onPlayerChanged();
 			if (panel != null)
 			{
 				panel.onPlayerChanged(player);
@@ -155,7 +155,7 @@ public class FashionscapePlugin extends Plugin
 	{
 		if (event.getContainerId() == InventoryID.EQUIPMENT.getId())
 		{
-			swapManager.onEquipmentChanged();
+			fashionManager.onEquipmentChanged();
 		}
 	}
 
@@ -187,11 +187,11 @@ public class FashionscapePlugin extends Plugin
 		if (event.getGameState() == GameState.LOGGED_IN)
 		{
 			populateDupes();
-			swapManager.onEquipmentChanged();
+			fashionManager.onEquipmentChanged();
 		}
 		else if (event.getGameState() == GameState.LOGIN_SCREEN)
 		{
-			swapManager.setGender(null);
+			fashionManager.setGender(null);
 		}
 		if (panel != null)
 		{
@@ -209,7 +209,7 @@ public class FashionscapePlugin extends Plugin
 			{
 				return;
 			}
-			swapManager.copyOutfit(p.getPlayerComposition());
+			fashionManager.copyOutfit(p.getPlayerComposition());
 			panel.reloadResults();
 		}
 	}

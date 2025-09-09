@@ -1,6 +1,6 @@
 package eq.uirs.fashionscape.panel;
 
-import eq.uirs.fashionscape.core.SwapManager;
+import eq.uirs.fashionscape.core.FashionManager;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Cursor;
@@ -24,15 +24,15 @@ import net.runelite.client.ui.ColorScheme;
 @Slf4j
 class SearchItemPanel extends AbsItemPanel
 {
-	private final SwapManager swapManager;
+	private final FashionManager fashionManager;
 	private final KitType slot;
 
 	public SearchItemPanel(@Nullable Integer itemId, BufferedImage icon, KitType slot,
-						   ItemManager itemManager, SwapManager swapManager, ClientThread clientThread,
+						   ItemManager itemManager, FashionManager fashionManager, ClientThread clientThread,
 						   OnSelectionChangingListener listener, Double score)
 	{
 		super(itemId, icon, itemManager, clientThread);
-		this.swapManager = swapManager;
+		this.fashionManager = fashionManager;
 		this.slot = slot;
 
 		MouseAdapter itemPanelMouseListener = new MouseAdapter()
@@ -40,7 +40,7 @@ class SearchItemPanel extends AbsItemPanel
 			@Override
 			public void mouseEntered(MouseEvent e)
 			{
-				if (!swapManager.isItemLocked(slot))
+				if (!fashionManager.isItemLocked(slot))
 				{
 					for (JPanel panel : highlightPanels)
 					{
@@ -48,7 +48,7 @@ class SearchItemPanel extends AbsItemPanel
 					}
 					setCursor(new Cursor(Cursor.HAND_CURSOR));
 				}
-				swapManager.hoverOverItem(slot, itemId);
+				fashionManager.hoverOverItem(slot, itemId);
 			}
 
 			@Override
@@ -59,7 +59,7 @@ class SearchItemPanel extends AbsItemPanel
 					matchComponentBackground(panel, defaultBackgroundColor());
 				}
 				setCursor(new Cursor(Cursor.DEFAULT_CURSOR));
-				swapManager.hoverAway();
+				fashionManager.hoverAway();
 			}
 
 			@Override
@@ -74,10 +74,10 @@ class SearchItemPanel extends AbsItemPanel
 				}
 				// now swap it
 				clientThread.invokeLater(() -> {
-					if (!swapManager.isItemLocked(slot))
+					if (!fashionManager.isItemLocked(slot))
 					{
 						listener.onSearchSelectionChanging(slot);
-						swapManager.hoverSelectItem(slot, itemId);
+						fashionManager.hoverSelectItem(slot, itemId);
 					}
 				});
 			}
@@ -136,11 +136,11 @@ class SearchItemPanel extends AbsItemPanel
 	{
 		if (itemId < 0)
 		{
-			return swapManager.isHidden(slot);
+			return fashionManager.isHidden(slot);
 		}
 		else
 		{
-			return Objects.equals(itemId, swapManager.swappedItemIdIn(slot));
+			return Objects.equals(itemId, fashionManager.swappedItemIdIn(slot));
 		}
 	}
 

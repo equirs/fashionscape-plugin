@@ -5,7 +5,7 @@ import com.google.common.collect.ImmutableMap;
 import eq.uirs.fashionscape.FashionscapeConfig;
 import eq.uirs.fashionscape.FashionscapePlugin;
 import eq.uirs.fashionscape.colors.ColorScorer;
-import eq.uirs.fashionscape.core.SwapManager;
+import eq.uirs.fashionscape.core.FashionManager;
 import eq.uirs.fashionscape.core.event.LockChanged;
 import eq.uirs.fashionscape.core.event.LockChangedListener;
 import java.awt.BorderLayout;
@@ -77,7 +77,7 @@ class SearchPanel extends JPanel
 		.collect(Collectors.toSet());
 
 	private final Client client;
-	private final SwapManager swapManager;
+	private final FashionManager fashionManager;
 	private final ItemManager itemManager;
 	private final ClientThread clientThread;
 	private final FashionscapeConfig config;
@@ -105,8 +105,8 @@ class SearchPanel extends JPanel
 		{
 			for (SearchItemPanel item : searchPanels)
 			{
-				if (Objects.equals(item.itemId, swapManager.swappedItemIdIn(slot)) ||
-					(item.itemId != null && item.itemId < 0 && swapManager.isHidden(slot)))
+				if (Objects.equals(item.itemId, fashionManager.swappedItemIdIn(slot)) ||
+					(item.itemId != null && item.itemId < 0 && fashionManager.isHidden(slot)))
 				{
 					item.resetBackground();
 				}
@@ -142,12 +142,12 @@ class SearchPanel extends JPanel
 	}
 
 	@Inject
-	public SearchPanel(Client client, SwapManager swapManager, ClientThread clientThread,
+	public SearchPanel(Client client, FashionManager fashionManager, ClientThread clientThread,
 					   ItemManager itemManager, ScheduledExecutorService executor,
 					   FashionscapeConfig config, ColorScorer colorScorer)
 	{
 		this.client = client;
-		this.swapManager = swapManager;
+		this.fashionManager = fashionManager;
 		this.itemManager = itemManager;
 		this.clientThread = clientThread;
 		this.executor = executor;
@@ -228,7 +228,7 @@ class SearchPanel extends JPanel
 
 		SwingUtilities.invokeLater(searchBar::requestFocusInWindow);
 
-		swapManager.addEventListener(new LockChangedListener((e) -> {
+		fashionManager.addEventListener(new LockChangedListener((e) -> {
 			if (e.getType() != LockChanged.Type.KIT)
 			{
 				updateTabIcon(e);
@@ -312,7 +312,7 @@ class SearchPanel extends JPanel
 			}
 			else
 			{
-				isLocked = swapManager.isItemLocked(filterSlot.getKitType());
+				isLocked = fashionManager.isItemLocked(filterSlot.getKitType());
 			}
 			ImageIcon icon = iconFor(filterSlot, isLocked);
 			tab.setIcon(icon);
@@ -335,7 +335,7 @@ class SearchPanel extends JPanel
 				filter = itemComposition -> {
 					KitType kitType = filterSlot.getKitType();
 					selectedSlot = kitType;
-					Integer slotId = swapManager.slotIdFor(itemComposition);
+					Integer slotId = fashionManager.slotIdFor(itemComposition);
 					if (kitType == null)
 					{
 						// allow any equipment slot that is also a KitType (so no ammo, etc)
@@ -477,7 +477,7 @@ class SearchPanel extends JPanel
 					}
 				}
 			}
-			if (selectedSlot != null && SwapManager.ALLOWS_NOTHING.contains(selectedSlot) &&
+			if (selectedSlot != null && FashionManager.ALLOWS_NOTHING.contains(selectedSlot) &&
 				NothingItemComposition.NAME.toLowerCase().contains(search))
 			{
 				BufferedImage image = ImageUtil.loadImageResource(getClass(), selectedSlot.name().toLowerCase() + ".png");
@@ -553,7 +553,7 @@ class SearchPanel extends JPanel
 						score = null;
 					}
 					SearchItemPanel panel = new SearchItemPanel(itemId, result.getIcon(),
-						result.getSlot(), itemManager, swapManager, clientThread, listener, score);
+						result.getSlot(), itemManager, fashionManager, clientThread, listener, score);
 					searchPanels.add(panel);
 					int topPadding = firstItem ? 0 : 5;
 					firstItem = false;

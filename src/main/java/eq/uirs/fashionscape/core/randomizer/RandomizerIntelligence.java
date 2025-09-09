@@ -1,4 +1,4 @@
-package eq.uirs.fashionscape.core;
+package eq.uirs.fashionscape.core.randomizer;
 
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;

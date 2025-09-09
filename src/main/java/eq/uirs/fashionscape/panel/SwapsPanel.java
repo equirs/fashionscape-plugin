@@ -1,6 +1,6 @@
 package eq.uirs.fashionscape.panel;
 
-import eq.uirs.fashionscape.core.SwapManager;
+import eq.uirs.fashionscape.core.FashionManager;
 import eq.uirs.fashionscape.core.event.KnownKitChangedListener;
 import java.awt.BorderLayout;
 import java.awt.Dimension;
@@ -34,7 +34,7 @@ import net.runelite.client.util.Text;
 @Slf4j
 class SwapsPanel extends JPanel
 {
-	private final SwapManager swapManager;
+	private final FashionManager fashionManager;
 	private final ItemManager itemManager;
 	private final ClientThread clientThread;
 	private final SearchOpener searchOpener;
@@ -52,10 +52,10 @@ class SwapsPanel extends JPanel
 		BufferedImage image;
 	}
 
-	public SwapsPanel(SwapManager swapManager, ItemManager itemManager, SearchOpener searchOpener,
+	public SwapsPanel(FashionManager fashionManager, ItemManager itemManager, SearchOpener searchOpener,
 					  ClientThread clientThread)
 	{
-		this.swapManager = swapManager;
+		this.fashionManager = fashionManager;
 		this.itemManager = itemManager;
 		this.searchOpener = searchOpener;
 		this.clientThread = clientThread;
@@ -77,7 +77,7 @@ class SwapsPanel extends JPanel
 
 		add(scrollPane, BorderLayout.CENTER);
 
-		swapManager.addEventListener(new KnownKitChangedListener(e -> {
+		fashionManager.addEventListener(new KnownKitChangedListener(e -> {
 			KitType slot = e.getSlot();
 			if (e.isUnknown())
 			{
@@ -133,7 +133,7 @@ class SwapsPanel extends JPanel
 				{
 					continue;
 				}
-				Integer itemId = swapManager.swappedItemIdIn(slot);
+				Integer itemId = fashionManager.swappedItemIdIn(slot);
 				BufferedImage image;
 				if (itemId != null && itemId >= 0)
 				{
@@ -163,7 +163,7 @@ class SwapsPanel extends JPanel
 		for (SlotResult s : results)
 		{
 			SwapItemPanel itemPanel = new SwapItemPanel(s.itemId, s.image, itemManager,
-				clientThread, swapManager, s.slot, searchOpener);
+				clientThread, fashionManager, s.slot, searchOpener);
 			JPanel marginWrapper = new JPanel(new BorderLayout());
 			marginWrapper.setBackground(ColorScheme.DARK_GRAY_COLOR);
 			marginWrapper.setBorder(new EmptyBorder(5, 0, 0, 0));
