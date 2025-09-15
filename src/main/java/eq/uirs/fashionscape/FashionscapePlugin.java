@@ -1,11 +1,11 @@
 package eq.uirs.fashionscape;
 
 import com.google.inject.Provides;
+import eq.uirs.fashionscape.core.Exporter;
 import eq.uirs.fashionscape.core.FashionManager;
 import eq.uirs.fashionscape.data.anim.ItemInteractions;
 import eq.uirs.fashionscape.panel.FashionscapePanel;
 import java.awt.image.BufferedImage;
-import java.io.File;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -15,7 +15,6 @@ import lombok.Value;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
-import net.runelite.api.InventoryID;
 import net.runelite.api.ItemComposition;
 import net.runelite.api.MenuAction;
 import net.runelite.api.Player;
@@ -23,7 +22,7 @@ import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.ItemContainerChanged;
 import net.runelite.api.events.MenuOptionClicked;
 import net.runelite.api.events.PlayerChanged;
-import net.runelite.client.RuneLite;
+import net.runelite.api.gameval.InventoryID;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
@@ -44,8 +43,6 @@ import net.runelite.client.util.ImageUtil;
 @Slf4j
 public class FashionscapePlugin extends Plugin
 {
-	public static final File OUTFITS_DIR = new File(RuneLite.RUNELITE_DIR, "outfits");
-	public static final Pattern PROFILE_PATTERN = Pattern.compile("^(\\w+):(-?\\d+).*");
 	private static final Pattern PAREN_REPLACE = Pattern.compile("\\(.*\\)");
 
 	private static final String COPY_PLAYER = "Copy-outfit";
@@ -92,6 +89,9 @@ public class FashionscapePlugin extends Plugin
 
 	@Inject
 	private FashionManager fashionManager;
+
+	@Inject
+	private Exporter exporter;
 
 	@Inject
 	private FashionscapeConfig config;
@@ -153,7 +153,7 @@ public class FashionscapePlugin extends Plugin
 	@Subscribe
 	public void onItemContainerChanged(ItemContainerChanged event)
 	{
-		if (event.getContainerId() == InventoryID.EQUIPMENT.getId())
+		if (event.getContainerId() == InventoryID.WORN)
 		{
 			fashionManager.onEquipmentChanged();
 		}
@@ -209,7 +209,7 @@ public class FashionscapePlugin extends Plugin
 			{
 				return;
 			}
-			fashionManager.copyOutfit(p.getPlayerComposition());
+			exporter.importPlayer(p.getPlayerComposition());
 			panel.reloadResults();
 		}
 	}

@@ -65,7 +65,7 @@ import net.runelite.client.util.SwingUtil;
 /**
  * Tab panel that houses the search UI: bar, filters, sort, results, etc.
  */
-class SearchPanel extends JPanel
+public class SearchPanel extends JPanel
 {
 	private static final int DEBOUNCE_DELAY_MS = 200;
 	private static final String ERROR_PANEL = "ERROR_PANEL";

@@ -2,7 +2,6 @@ package eq.uirs.fashionscape.core;
 
 import com.google.common.collect.BiMap;
 import com.google.common.collect.ImmutableList;
-import eq.uirs.fashionscape.FashionscapePlugin;
 import eq.uirs.fashionscape.core.event.SwapEvent;
 import eq.uirs.fashionscape.core.event.SwapEventListener;
 import eq.uirs.fashionscape.core.randomizer.Randomizer;
@@ -17,14 +16,8 @@ import eq.uirs.fashionscape.data.color.SkinColor;
 import eq.uirs.fashionscape.data.kit.JawIcon;
 import eq.uirs.fashionscape.data.kit.JawKit;
 import eq.uirs.fashionscape.data.kit.Kit;
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.PrintWriter;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Comparator;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -34,9 +27,7 @@ import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
-import java.util.regex.Matcher;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
@@ -44,7 +35,6 @@ import javax.inject.Singleton;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
-import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
 import net.runelite.api.Item;
 import net.runelite.api.ItemComposition;
@@ -54,10 +44,7 @@ import net.runelite.api.PlayerComposition;
 import net.runelite.api.gameval.InventoryID;
 import net.runelite.api.kit.KitType;
 import net.runelite.client.callback.ClientThread;
-import net.runelite.client.chat.ChatColorType;
-import net.runelite.client.chat.ChatMessageBuilder;
 import net.runelite.client.chat.ChatMessageManager;
-import net.runelite.client.chat.QueuedMessage;
 import net.runelite.client.game.ItemEquipmentStats;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.game.ItemStats;
@@ -78,9 +65,6 @@ public class FashionManager
 
 	private static final List<KitType> NEVER_ZERO_SLOTS = ImmutableList.of(KitType.TORSO, KitType.LEGS,
 		KitType.HAIR, KitType.HANDS, KitType.BOOTS, KitType.JAW);
-	private static final String KIT_SUFFIX = "_KIT";
-	private static final String COLOR_SUFFIX = "_COLOR";
-	private static final String ICON_KEY = "ICON";
 
 	static
 	{
@@ -504,60 +488,6 @@ public class FashionManager
 		});
 	}
 
-	// this should only be called from the client thread
-	public List<String> stringifySwaps()
-	{
-		Set<Map.Entry<KitType, Integer>> itemEntries = new HashSet<>(savedSwaps.hiddenSlotEntries());
-		itemEntries.addAll(savedSwaps.itemEntries());
-		List<String> items = itemEntries.stream()
-			.sorted(Comparator.comparingInt(Map.Entry::getValue))
-			.map(e -> {
-				KitType slot = e.getKey();
-				int itemId = e.getValue();
-				if (itemId == 0)
-				{
-					return slot.name() + ":-1 (Nothing)";
-				}
-				else
-				{
-					String itemName = itemManager.getItemComposition(itemId).getMembersName();
-					return slot.name() + ":" + itemId + " (" + itemName + ")";
-				}
-			})
-			.collect(Collectors.toList());
-		List<String> kits = savedSwaps.kitEntries().stream()
-			.sorted(Comparator.comparingInt(Map.Entry::getValue))
-			.map(e -> {
-				KitType slot = e.getKey();
-				Integer kitId = e.getValue();
-				String kitName = KIT_ID_TO_KIT.get(kitId).getDisplayName();
-				return slot.name() + KIT_SUFFIX + ":" + kitId + " (" + kitName + ")";
-			})
-			.collect(Collectors.toList());
-		List<String> colors = savedSwaps.colorEntries().stream()
-			.sorted(Comparator.comparingInt(Map.Entry::getValue))
-			.map(e -> {
-				ColorType type = e.getKey();
-				int colorId = e.getValue();
-				return Arrays.stream(type.getColorables())
-					.filter(c -> c.getColorId(type) == colorId)
-					.findFirst()
-					.map(c -> type.name() + COLOR_SUFFIX + ":" + colorId + " (" + c.getDisplayName() + ")")
-					.orElse("");
-			})
-			.collect(Collectors.toList());
-		List<String> icons = new ArrayList<>();
-		JawIcon icon = savedSwaps.getSwappedIcon();
-		if (savedSwaps.containsIcon())
-		{
-			icons.add(ICON_KEY + ":" + icon.getId() + " (" + icon.getDisplayName() + ")");
-		}
-		items.addAll(kits);
-		items.addAll(colors);
-		items.addAll(icons);
-		return items;
-	}
-
 	@Nullable
 	public Integer swappedItemIdIn(KitType slot)
 	{
@@ -834,126 +764,6 @@ public class FashionManager
 			return equipStats.getSlot();
 		}
 		return null;
-	}
-
-	public void loadImports(List<String> allLines)
-	{
-		Map<KitType, Integer> itemImports = new HashMap<>();
-		Map<KitType, Integer> kitImports = new HashMap<>();
-		Map<ColorType, Integer> colorImports = new HashMap<>();
-		JawIcon icon = null;
-		Set<KitType> removes = new HashSet<>();
-		for (String line : allLines)
-		{
-			if (line.trim().isEmpty())
-			{
-				continue;
-			}
-			Matcher matcher = FashionscapePlugin.PROFILE_PATTERN.matcher(line);
-			if (matcher.matches())
-			{
-				String slotStr = matcher.group(1);
-				// could be item id, kit id, or color id
-				int id = Integer.parseInt(matcher.group(2));
-				KitType itemSlot = itemSlotMatch(slotStr);
-				KitType kitSlot = kitSlotMatch(slotStr);
-				ColorType colorType = colorSlotMatch(slotStr);
-				if (itemSlot != null)
-				{
-					if (id <= 0)
-					{
-						removes.add(itemSlot);
-					}
-					else
-					{
-						itemImports.put(itemSlot, id);
-					}
-				}
-				else if (kitSlot != null)
-				{
-					kitImports.put(kitSlot, id);
-				}
-				else if (colorType != null)
-				{
-					colorImports.put(colorType, id);
-				}
-				else if (slotStr.equals(ICON_KEY))
-				{
-					icon = JawIcon.fromId(id);
-				}
-				else
-				{
-					sendHighlightedMessage("Could not import line: " + line);
-				}
-			}
-		}
-		// if not explicitly included, items without data should be explicitly hidden
-		ALLOWS_NOTHING.forEach(slot -> {
-			if (!itemImports.containsKey(slot))
-			{
-				removes.add(slot);
-			}
-		});
-		if (!itemImports.isEmpty() || !kitImports.isEmpty() || !colorImports.isEmpty())
-		{
-			importSwaps(itemImports, kitImports, colorImports, icon, removes);
-		}
-	}
-
-	public void exportSwaps(File selected)
-	{
-		clientThread.invokeLater(() -> {
-			try (PrintWriter out = new PrintWriter(selected))
-			{
-				List<String> exports = stringifySwaps();
-				for (String line : exports)
-				{
-					out.println(line);
-				}
-				sendHighlightedMessage("Saved fashionscape to " + selected.getName());
-			}
-			catch (FileNotFoundException e)
-			{
-				log.warn("Could not find selected file for swaps export", e);
-			}
-		});
-	}
-
-	public void copyOutfit(PlayerComposition other)
-	{
-		int[] equipmentIds = other.getEquipmentIds();
-		KitType[] slots = KitType.values();
-		Map<KitType, Integer> equipIdImports = IntStream.range(0, equipmentIds.length).boxed()
-			.collect(Collectors.toMap(i -> slots[i], i -> equipmentIds[i]));
-
-		Map<KitType, Integer> itemImports = equipIdImports.entrySet().stream()
-			.filter(e -> e.getValue() >= ITEM_OFFSET)
-			.collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue() - ITEM_OFFSET));
-		Map<KitType, Integer> kitImports = equipIdImports.entrySet().stream()
-			.filter(e -> e.getValue() >= KIT_OFFSET && e.getValue() < ITEM_OFFSET)
-			.collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue() - KIT_OFFSET));
-		Set<KitType> removals = equipIdImports.entrySet().stream()
-			.filter(e -> e.getValue() <= 0)
-			.map(Map.Entry::getKey)
-			.collect(Collectors.toSet());
-
-		int[] colors = other.getColors();
-		ColorType[] types = ColorType.values();
-		Map<ColorType, Integer> colorImports = IntStream.range(0, colors.length).boxed()
-			.collect(Collectors.toMap(i -> types[i], i -> colors[i]));
-
-		JawIcon icon = null;
-		Integer jawItemId = itemImports.get(KitType.JAW);
-		if (jawItemId != null)
-		{
-			icon = JawKit.iconFromItemId(jawItemId);
-			itemImports.remove(KitType.JAW);
-		}
-
-		if (!itemImports.isEmpty() || !kitImports.isEmpty() || !colorImports.isEmpty() || !removals.isEmpty())
-		{
-			importSwaps(itemImports, kitImports, colorImports, icon, removals);
-		}
 	}
 
 	/**
@@ -2106,60 +1916,6 @@ public class FashionManager
 			.reduce(SwapDiff::mergeOver)
 			.orElse(SwapDiff.blank());
 		return slotRestore.mergeOver(colorRestore);
-	}
-
-	@Nullable
-	private KitType itemSlotMatch(String name)
-	{
-		try
-		{
-			return KitType.valueOf(name);
-		}
-		catch (Exception e)
-		{
-			return null;
-		}
-	}
-
-	@Nullable
-	private KitType kitSlotMatch(String name)
-	{
-		try
-		{
-			String k = name.replace(KIT_SUFFIX, "");
-			return KitType.valueOf(k);
-		}
-		catch (Exception e)
-		{
-			return null;
-		}
-	}
-
-	@Nullable
-	private ColorType colorSlotMatch(String name)
-	{
-		try
-		{
-			String c = name.replace(COLOR_SUFFIX, "");
-			return ColorType.valueOf(c);
-		}
-		catch (Exception e)
-		{
-			return null;
-		}
-	}
-
-	private void sendHighlightedMessage(String message)
-	{
-		String chatMessage = new ChatMessageBuilder()
-			.append(ChatColorType.HIGHLIGHT)
-			.append(message)
-			.build();
-
-		chatMessageManager.queue(QueuedMessage.builder()
-			.type(ChatMessageType.CONSOLE)
-			.runeLiteFormattedMessage(chatMessage)
-			.build());
 	}
 
 }

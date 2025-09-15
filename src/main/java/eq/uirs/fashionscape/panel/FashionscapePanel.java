@@ -1,6 +1,6 @@
 package eq.uirs.fashionscape.panel;
 
-import eq.uirs.fashionscape.FashionscapePlugin;
+import eq.uirs.fashionscape.core.Exporter;
 import eq.uirs.fashionscape.core.FashionManager;
 import eq.uirs.fashionscape.core.event.ColorChangedListener;
 import eq.uirs.fashionscape.core.event.ColorLockChangedListener;
@@ -55,6 +55,7 @@ public class FashionscapePanel extends PluginPanel
 	private final Client client;
 	private final ClientThread clientThread;
 	private final FashionManager fashionManager;
+	private final Exporter exporter;
 
 	private JButton undo;
 	private JButton redo;
@@ -89,12 +90,13 @@ public class FashionscapePanel extends PluginPanel
 
 	@Inject
 	public FashionscapePanel(SearchPanel searchPanel, KitsPanel kitsPanel, FashionManager fashionManager,
-							 ItemManager itemManager, Client client, ClientThread clientThread)
+							 ItemManager itemManager, Client client, ClientThread clientThread, Exporter exporter)
 	{
 		super(false);
 		this.client = client;
 		this.clientThread = clientThread;
 		this.fashionManager = fashionManager;
+		this.exporter = exporter;
 		tabDisplayPanel = new SearchClearingPanel(searchPanel);
 		tabGroup = new MaterialTabGroup(tabDisplayPanel);
 
@@ -273,7 +275,7 @@ public class FashionscapePanel extends PluginPanel
 
 		JPopupMenu openSavedFolderMenu = new JPopupMenu();
 		JMenuItem openAll = new JMenuItem("Open outfits folder");
-		openAll.addActionListener(e -> LinkBrowser.open(FashionscapePlugin.OUTFITS_DIR.toString()));
+		openAll.addActionListener(e -> LinkBrowser.open(Exporter.OUTFITS_DIR.toString()));
 		openSavedFolderMenu.add(openAll);
 
 		save = new JButton(new ImageIcon(ImageUtil.loadImageResource(getClass(), "save.png")));
@@ -322,7 +324,7 @@ public class FashionscapePanel extends PluginPanel
 	@SuppressWarnings("ResultOfMethodCallIgnored")
 	private void openSaveDialog()
 	{
-		File outputDir = FashionscapePlugin.OUTFITS_DIR;
+		File outputDir = Exporter.OUTFITS_DIR;
 		outputDir.mkdirs();
 
 		JFileChooser fileChooser = new JFileChooser(outputDir)
@@ -370,14 +372,14 @@ public class FashionscapePanel extends PluginPanel
 			{
 				selectedFile = new File(selectedFile.getPath() + ".txt");
 			}
-			fashionManager.exportSwaps(selectedFile);
+			exporter.export(selectedFile);
 		}
 	}
 
 	@SuppressWarnings("ResultOfMethodCallIgnored")
 	private void openLoadDialog()
 	{
-		File outputDir = FashionscapePlugin.OUTFITS_DIR;
+		File outputDir = Exporter.OUTFITS_DIR;
 		outputDir.mkdirs();
 
 		JFileChooser fileChooser = new JFileChooser(outputDir);
@@ -390,7 +392,7 @@ public class FashionscapePanel extends PluginPanel
 			try (BufferedReader reader = new BufferedReader(new FileReader(selectedFile)))
 			{
 				List<String> lines = reader.lines().collect(Collectors.toList());
-				fashionManager.loadImports(lines);
+				exporter.parseImports(lines);
 			}
 			catch (IOException e)
 			{
