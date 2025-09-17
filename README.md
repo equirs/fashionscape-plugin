@@ -13,7 +13,7 @@ to turn off in combat / dangerous areas.
 All the UI lives in a dedicated side panel. If the plugin is on, you'll find it near the bottom of the list
 (beneath notes). Look for the dress form:
  
-![Panel icon](github-res/icon.png)
+![Panel icon](icon.png)
 
 The panel has a row of button controls, and below it, three tabs: outfit, base, and search. 
 
