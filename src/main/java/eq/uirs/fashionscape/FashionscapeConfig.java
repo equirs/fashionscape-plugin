@@ -2,13 +2,10 @@ package eq.uirs.fashionscape;
 
 import eq.uirs.fashionscape.core.randomizer.RandomizerIntelligence;
 import eq.uirs.fashionscape.panel.SortBy;
-import java.util.HashMap;
-import net.runelite.api.kit.KitType;
 import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
 import net.runelite.client.config.ConfigSection;
-import org.apache.commons.lang3.SerializationUtils;
 
 @ConfigGroup(FashionscapeConfig.GROUP)
 public interface FashionscapeConfig extends Config
@@ -112,7 +109,7 @@ public interface FashionscapeConfig extends Config
 	)
 	default byte[] currentEquipment()
 	{
-		return SerializationUtils.serialize(new HashMap<KitType, Integer>());
+		return null;
 	}
 
 	@ConfigItem(
@@ -150,7 +147,7 @@ public interface FashionscapeConfig extends Config
 	)
 	default byte[] currentColors()
 	{
-		return SerializationUtils.serialize(new HashMap<Integer, Integer>());
+		return null;
 	}
 
 	@ConfigItem(
@@ -169,7 +166,7 @@ public interface FashionscapeConfig extends Config
 	)
 	default byte[] realKitIds()
 	{
-		return SerializationUtils.serialize(new HashMap<KitType, Integer>());
+		return null;
 	}
 
 	// endregion

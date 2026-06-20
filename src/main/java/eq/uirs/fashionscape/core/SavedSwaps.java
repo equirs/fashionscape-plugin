@@ -3,6 +3,7 @@ package eq.uirs.fashionscape.core;
 import com.google.common.base.Objects;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
+import com.google.gson.reflect.TypeToken;
 import eq.uirs.fashionscape.FashionscapeConfig;
 import eq.uirs.fashionscape.core.event.ColorChanged;
 import eq.uirs.fashionscape.core.event.ColorLockChanged;
@@ -14,6 +15,7 @@ import eq.uirs.fashionscape.core.event.KnownKitChanged;
 import eq.uirs.fashionscape.core.event.LockChanged;
 import eq.uirs.fashionscape.core.event.SwapEvent;
 import eq.uirs.fashionscape.core.event.SwapEventListener;
+import eq.uirs.fashionscape.core.utils.ConfigSerializer;
 import eq.uirs.fashionscape.data.color.ColorType;
 import eq.uirs.fashionscape.data.kit.ArmsKit;
 import eq.uirs.fashionscape.data.kit.BootsKit;
@@ -23,6 +25,7 @@ import eq.uirs.fashionscape.data.kit.JawIcon;
 import eq.uirs.fashionscape.data.kit.JawKit;
 import eq.uirs.fashionscape.data.kit.LegsKit;
 import eq.uirs.fashionscape.data.kit.TorsoKit;
+import java.lang.reflect.Type;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -40,7 +43,6 @@ import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.kit.KitType;
 import net.runelite.client.config.ConfigManager;
-import org.apache.commons.lang3.SerializationUtils;
 
 /**
  * observable wrapper for user's item swaps. Persists swaps to plugin config.
@@ -49,6 +51,10 @@ import org.apache.commons.lang3.SerializationUtils;
 @Slf4j
 public class SavedSwaps
 {
+	//@formatter:off
+	private static final Type KIT_MAP_TYPE = new TypeToken<HashMap<KitType, Integer>>(){}.getType();
+	private static final Type COLOR_MAP_TYPE = new TypeToken<HashMap<Integer, Integer>>(){}.getType();
+	//@formatter:on
 	private static final int DEBOUNCE_DELAY_MS = 500;
 	// when player's kit info is not known, fall back to showing some default values
 	private static final Map<KitType, Integer> FALLBACK_MASC_KITS = new HashMap<>();
@@ -75,6 +81,9 @@ public class SavedSwaps
 
 	@Inject
 	private FashionscapeConfig config;
+
+	@Inject
+	private ConfigSerializer configSerializer;
 
 	@Inject
 	private ConfigManager configManager;
@@ -134,20 +143,26 @@ public class SavedSwaps
 		Integer iconId = config.currentIcon();
 		try
 		{
-			Map<KitType, Integer> equipIds = SerializationUtils.deserialize(equipment);
-			equipIds.forEach((slot, equipId) -> {
-				if (equipId >= FashionManager.KIT_OFFSET && equipId < FashionManager.ITEM_OFFSET)
-				{
-					putKit(slot, equipId - FashionManager.KIT_OFFSET);
-				}
-				else if (equipId >= FashionManager.ITEM_OFFSET)
-				{
-					putItem(slot, equipId - FashionManager.ITEM_OFFSET);
-				}
-			});
-			Map<Integer, Integer> colorIds = SerializationUtils.deserialize(colors);
-			ColorType[] allColorTypes = ColorType.values();
-			colorIds.forEach((typeId, colorId) -> putColor(allColorTypes[typeId], colorId));
+			Map<KitType, Integer> equipIds = configSerializer.deserialize(equipment, KIT_MAP_TYPE);
+			if (equipIds != null)
+			{
+				equipIds.forEach((slot, equipId) -> {
+					if (equipId >= FashionManager.KIT_OFFSET && equipId < FashionManager.ITEM_OFFSET)
+					{
+						putKit(slot, equipId - FashionManager.KIT_OFFSET);
+					}
+					else if (equipId >= FashionManager.ITEM_OFFSET)
+					{
+						putItem(slot, equipId - FashionManager.ITEM_OFFSET);
+					}
+				});
+			}
+			Map<Integer, Integer> colorIds = configSerializer.deserialize(colors, COLOR_MAP_TYPE);
+			if (colorIds != null)
+			{
+				ColorType[] allColorTypes = ColorType.values();
+				colorIds.forEach((typeId, colorId) -> putColor(allColorTypes[typeId], colorId));
+			}
 			JawIcon icon = JawIcon.fromId(iconId);
 			if (icon != null)
 			{
@@ -169,7 +184,11 @@ public class SavedSwaps
 			FashionscapeConfig.KEY_REAL_KITS, byte[].class);
 		try
 		{
-			realKitIds.putAll(SerializationUtils.deserialize(realKits));
+			Map<KitType, Integer> savedKits = configSerializer.deserialize(realKits, KIT_MAP_TYPE);
+			if (savedKits != null)
+			{
+				realKitIds.putAll(savedKits);
+			}
 		}
 		catch (Exception ignored)
 		{
@@ -642,7 +661,7 @@ public class SavedSwaps
 	// this needs to be immediate so that changes are reflected when loading from config
 	void saveRealKitsImmediate()
 	{
-		byte[] bytes = SerializationUtils.serialize(realKitIds);
+		byte[] bytes = configSerializer.serialize(realKitIds);
 		configManager.setRSProfileConfiguration(FashionscapeConfig.GROUP, FashionscapeConfig.KEY_REAL_KITS, bytes);
 	}
 
@@ -663,7 +682,7 @@ public class SavedSwaps
 			HashMap<KitType, Integer> equips = new HashMap<>(itemEquips);
 			equips.putAll(kitEquips);
 			equips.putAll(hides);
-			byte[] bytes = SerializationUtils.serialize(equips);
+			byte[] bytes = configSerializer.serialize(equips);
 			config.setCurrentEquipment(bytes);
 			Integer iconId = swappedIcon != null ? swappedIcon.getId() : null;
 			config.setCurrentIcon(iconId);
@@ -680,7 +699,7 @@ public class SavedSwaps
 		colorSaveFuture = executor.schedule(() -> {
 			Map<Integer, Integer> serialMap = swappedColorIds.entrySet().stream()
 				.collect(Collectors.toMap(e -> e.getKey().ordinal(), Map.Entry::getValue));
-			byte[] bytes = SerializationUtils.serialize(new HashMap<>(serialMap));
+			byte[] bytes = configSerializer.serialize(new HashMap<>(serialMap));
 			config.setCurrentColors(bytes);
 		}, DEBOUNCE_DELAY_MS, TimeUnit.MILLISECONDS);
 	}
@@ -693,7 +712,7 @@ public class SavedSwaps
 			future.cancel(false);
 		}
 		kitsSaveFuture = executor.schedule(() -> {
-			byte[] bytes = SerializationUtils.serialize(realKitIds);
+			byte[] bytes = configSerializer.serialize(realKitIds);
 			configManager.setRSProfileConfiguration(FashionscapeConfig.GROUP, FashionscapeConfig.KEY_REAL_KITS, bytes);
 		}, DEBOUNCE_DELAY_MS, TimeUnit.MILLISECONDS);
 	}
