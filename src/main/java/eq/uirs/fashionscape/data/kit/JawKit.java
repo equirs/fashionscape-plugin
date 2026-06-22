@@ -200,6 +200,30 @@ public enum JawKit implements Kit
 		return reverseLookupKit.get(equipId);
 	}
 
+	/**
+	 * Attempts to combine kit id and icon into an equipment id.
+	 * Falls back on returning the original kit id as an equipment id.
+	 */
+	public static int getEquipmentId(int kitId, @Nullable JawIcon icon)
+	{
+		int baseEquipId = kitId + FashionManager.KIT_OFFSET;
+		if (icon == null || icon == JawIcon.NOTHING)
+		{
+			return baseEquipId;
+		}
+		JawKit k = fromEquipmentId(baseEquipId);
+		if (k == null)
+		{
+			return baseEquipId;
+		}
+		Integer itemId = k.getIconItemId(icon);
+		if (itemId == null)
+		{
+			return baseEquipId;
+		}
+		return itemId + FashionManager.ITEM_OFFSET;
+	}
+
 	static
 	{
 		for (JawKit kit : JawKit.values())
