@@ -103,22 +103,42 @@ public interface FashionscapeConfig extends Config
 
 	@ConfigItem(
 		keyName = "currentEquipment",
-		name = "Current equipment",
-		description = "The player's equipment ids set by the plugin (hidden)",
+		name = "Legacy equipment",
+		description = "Deprecated config, migrated to currentEquipmentInfo",
 		hidden = true
 	)
-	default byte[] currentEquipment()
+	default byte[] legacyEquipment()
 	{
 		return null;
 	}
 
 	@ConfigItem(
 		keyName = "currentEquipment",
-		name = "Current equipment",
-		description = "The player's equipment ids set by the plugin (hidden)",
+		name = "Legacy equipment",
+		description = "Deprecated config, migrated to currentEquipmentInfo",
 		hidden = true
 	)
-	void setCurrentEquipment(byte[] equipIdsMapBytes);
+	void setLegacyEquipment(byte[] equipmentIds);
+
+	// replaces older currentEquipment key
+	@ConfigItem(
+		keyName = "currentEquipmentInfo",
+		name = "Current equipment info",
+		description = "The player's virtual equipment info (hidden)",
+		hidden = true
+	)
+	default byte[] equipmentInfo()
+	{
+		return null;
+	}
+
+	@ConfigItem(
+		keyName = "currentEquipmentInfo",
+		name = "Current equipment info",
+		description = "The player's virtual equipment info (hidden)",
+		hidden = true
+	)
+	void setEquipmentInfo(byte[] equipIdsMapBytes);
 
 	@ConfigItem(
 		keyName = "currentIcon",
@@ -126,7 +146,7 @@ public interface FashionscapeConfig extends Config
 		description = "The player's jaw icon set by the plugin (hidden)",
 		hidden = true
 	)
-	default Integer currentIcon()
+	default Integer icon()
 	{
 		return null;
 	}
@@ -137,7 +157,7 @@ public interface FashionscapeConfig extends Config
 		description = "The player's jaw icon set by the plugin (hidden)",
 		hidden = true
 	)
-	void setCurrentIcon(Integer iconId);
+	void setIcon(Integer iconId);
 
 	@ConfigItem(
 		keyName = "currentColors",
@@ -145,7 +165,7 @@ public interface FashionscapeConfig extends Config
 		description = "The player's color ids (map of color type ordinal -> color id) set by the plugin (hidden)",
 		hidden = true
 	)
-	default byte[] currentColors()
+	default byte[] colors()
 	{
 		return null;
 	}
@@ -156,7 +176,64 @@ public interface FashionscapeConfig extends Config
 		description = "The player's color ids set by the plugin (hidden)",
 		hidden = true
 	)
-	void setCurrentColors(byte[] colorMapBytes);
+	void setColors(byte[] colorMapBytes);
+
+	@ConfigItem(
+		keyName = "currentLocks",
+		name = "Current locks",
+		description = "The player's lock statuses set by the plugin (hidden)",
+		hidden = true
+	)
+	default byte[] locks()
+	{
+		return null;
+	}
+
+	@ConfigItem(
+		keyName = "currentLocks",
+		name = "Current locks",
+		description = "The player's lock statuses set by the plugin (hidden)",
+		hidden = true
+	)
+	void setLocks(byte[] locks);
+
+	@ConfigItem(
+		keyName = "currentColorLocks",
+		name = "Current color locks",
+		description = "The player's color lock statuses set by the plugin (hidden)",
+		hidden = true
+	)
+	default byte[] colorLocks()
+	{
+		return null;
+	}
+
+	@ConfigItem(
+		keyName = "currentColorLocks",
+		name = "Current color locks",
+		description = "The player's color lock statuses set by the plugin (hidden)",
+		hidden = true
+	)
+	void setColorLocks(byte[] colorLocks);
+
+	@ConfigItem(
+		keyName = "currentIconLocked",
+		name = "Current icon locked",
+		description = "The player's icon lock status set by the plugin (hidden)",
+		hidden = true
+	)
+	default boolean iconLocked()
+	{
+		return false;
+	}
+
+	@ConfigItem(
+		keyName = "currentIconLocked",
+		name = "Current icon locked",
+		description = "The player's icon lock status set by the plugin (hidden)",
+		hidden = true
+	)
+	void setIconLocked(boolean value);
 
 	@ConfigItem(
 		keyName = KEY_REAL_KITS,

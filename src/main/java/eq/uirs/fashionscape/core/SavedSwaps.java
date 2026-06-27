@@ -138,9 +138,9 @@ public class SavedSwaps
 		{
 			return;
 		}
-		byte[] equipment = config.currentEquipment();
-		byte[] colors = config.currentColors();
-		Integer iconId = config.currentIcon();
+		byte[] equipment = config.legacyEquipment();
+		byte[] colors = config.colors();
+		Integer iconId = config.icon();
 		try
 		{
 			Map<KitType, Integer> equipIds = configSerializer.deserialize(equipment, KIT_MAP_TYPE);
@@ -683,9 +683,9 @@ public class SavedSwaps
 			equips.putAll(kitEquips);
 			equips.putAll(hides);
 			byte[] bytes = configSerializer.serialize(equips);
-			config.setCurrentEquipment(bytes);
+			config.setLegacyEquipment(bytes);
 			Integer iconId = swappedIcon != null ? swappedIcon.getId() : null;
-			config.setCurrentIcon(iconId);
+			config.setIcon(iconId);
 		}, DEBOUNCE_DELAY_MS, TimeUnit.MILLISECONDS);
 	}
 
@@ -700,7 +700,7 @@ public class SavedSwaps
 			Map<Integer, Integer> serialMap = swappedColorIds.entrySet().stream()
 				.collect(Collectors.toMap(e -> e.getKey().ordinal(), Map.Entry::getValue));
 			byte[] bytes = configSerializer.serialize(new HashMap<>(serialMap));
-			config.setCurrentColors(bytes);
+			config.setColors(bytes);
 		}, DEBOUNCE_DELAY_MS, TimeUnit.MILLISECONDS);
 	}
 
