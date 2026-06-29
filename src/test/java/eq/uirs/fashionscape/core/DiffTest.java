@@ -15,6 +15,7 @@ public class DiffTest
 	void unchangedColorIsEmpty()
 	{
 		assertTrue(Diff.ofColor(ColorType.HAIR, 5, 5).isEmpty());
+		// null -> null is also a no-op
 		assertTrue(Diff.ofColor(ColorType.HAIR, null, null).isEmpty());
 	}
 

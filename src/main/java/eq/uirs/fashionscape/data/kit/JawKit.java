@@ -4,7 +4,6 @@ import com.google.common.collect.ImmutableMap;
 import eq.uirs.fashionscape.core.FashionManager;
 import java.util.HashMap;
 import java.util.Map;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
@@ -18,7 +17,7 @@ import net.runelite.api.kit.KitType;
 public enum JawKit implements Kit
 {
 	// only valid when worn items obscure the player's jaw
-	NO_JAW(-256, -256,
+	NO_JAW(-FashionManager.KIT_OFFSET, -FashionManager.KIT_OFFSET,
 		new ImmutableMap.Builder<JawIcon, Integer>()
 			.put(JawIcon.BA_ATTACKER, 10556)
 			.put(JawIcon.BA_DEFENDER, 10558)
@@ -183,18 +182,13 @@ public enum JawKit implements Kit
 	// equipment id -> kit
 	private static final Map<Integer, JawKit> reverseLookupKit = new HashMap<>();
 
-	@Nonnull
+	@Nullable
 	public static JawIcon iconFromItemId(Integer itemId)
 	{
-		JawIcon icon = reverseLookupIcon.get(itemId);
-		return icon != null ? icon : JawIcon.NOTHING;
+		return reverseLookupIcon.get(itemId);
 	}
 
-	public static boolean isNoJawIcon(int itemId)
-	{
-		return JawKit.NO_JAW.icons.containsValue(itemId);
-	}
-
+	@Nullable
 	public static JawKit fromEquipmentId(int equipId)
 	{
 		return reverseLookupKit.get(equipId);
@@ -242,7 +236,7 @@ public enum JawKit implements Kit
 	@Getter
 	private final Integer femKitId;
 
-	// values are equipment ids
+	// values are item ids
 	private final Map<JawIcon, Integer> icons;
 
 	@Override

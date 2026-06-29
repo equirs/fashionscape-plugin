@@ -7,6 +7,7 @@ import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
 import javax.swing.JButton;
 import javax.swing.JPanel;
+import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.client.callback.ClientThread;
@@ -47,7 +48,14 @@ abstract class DropdownIconPanel extends AbsIconLabelPanel
 			@Override
 			public void mouseReleased(MouseEvent e)
 			{
-				openDropdown();
+				if (SwingUtilities.isRightMouseButton(e))
+				{
+					tryClear();
+				}
+				else
+				{
+					openDropdown(e);
+				}
 			}
 		});
 	}
@@ -60,7 +68,26 @@ abstract class DropdownIconPanel extends AbsIconLabelPanel
 		button.setFocusPainted(false);
 		button.setBorderPainted(false);
 		button.setContentAreaFilled(false);
+		button.addMouseListener(new MouseAdapter()
+		{
+			@Override
+			public void mouseEntered(MouseEvent e)
+			{
+				if (e.getComponent().isEnabled())
+				{
+					setCursor(new Cursor(Cursor.HAND_CURSOR));
+				}
+			}
+
+			@Override
+			public void mouseExited(MouseEvent e)
+			{
+				setCursor(new Cursor(Cursor.DEFAULT_CURSOR));
+			}
+		});
 	}
 
-	abstract void openDropdown();
+	abstract void openDropdown(MouseEvent e);
+
+	abstract void tryClear();
 }

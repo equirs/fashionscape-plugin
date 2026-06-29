@@ -4,15 +4,15 @@ public enum SortBy
 {
 	COLOR_MATCH,
 	ALPHABETICAL,
-	RELEASE;
+	ITEM_ID;
 
 	@Override
 	public String toString()
 	{
 		switch (this)
 		{
-			case RELEASE:
-				return "Release";
+			case ITEM_ID:
+				return "Default";
 			case ALPHABETICAL:
 				return "Alphabetical";
 			case COLOR_MATCH:

@@ -11,21 +11,9 @@ import net.runelite.client.config.ConfigSection;
 public interface FashionscapeConfig extends Config
 {
 	String GROUP = "fashionscape";
-	String KEY_EXCLUDE_NON_STANDARD = "excludeNonStandardItems";
 	String KEY_EXCLUDE_MEMBERS = "excludeMembersItems";
 	String KEY_IMPORT_MENU_ENTRY = "copyMenuEntry";
 	String KEY_REAL_KITS = "realKitIds";
-
-	@ConfigItem(
-		position = 0,
-		keyName = KEY_EXCLUDE_NON_STANDARD,
-		name = "Exclude non-standard items",
-		description = "Filters out items that cannot be normally equipped anywhere"
-	)
-	default boolean excludeNonStandardItems()
-	{
-		return false;
-	}
 
 	@ConfigItem(
 		position = 1,
@@ -41,8 +29,8 @@ public interface FashionscapeConfig extends Config
 	@ConfigItem(
 		position = 2,
 		keyName = KEY_IMPORT_MENU_ENTRY,
-		name = "\"Copy-outfit\" entry",
-		description = "Adds \"copy-outfit\" right click option to other players"
+		name = "\"Copy-fashion\" entry",
+		description = "Adds \"copy-fashion\" right click option to other players"
 	)
 	default boolean copyMenuEntry()
 	{
@@ -101,25 +89,6 @@ public interface FashionscapeConfig extends Config
 	)
 	void setPreferredSort(SortBy sort);
 
-	@ConfigItem(
-		keyName = "currentEquipment",
-		name = "Legacy equipment",
-		description = "Deprecated config, migrated to currentEquipmentInfo",
-		hidden = true
-	)
-	default byte[] legacyEquipment()
-	{
-		return null;
-	}
-
-	@ConfigItem(
-		keyName = "currentEquipment",
-		name = "Legacy equipment",
-		description = "Deprecated config, migrated to currentEquipmentInfo",
-		hidden = true
-	)
-	void setLegacyEquipment(byte[] equipmentIds);
-
 	// replaces older currentEquipment key
 	@ConfigItem(
 		keyName = "currentEquipmentInfo",
@@ -139,6 +108,25 @@ public interface FashionscapeConfig extends Config
 		hidden = true
 	)
 	void setEquipmentInfo(byte[] equipIdsMapBytes);
+
+	@ConfigItem(
+		keyName = "currentEquipment",
+		name = "Legacy equipment",
+		description = "Deprecated config, migrated to currentEquipmentInfo",
+		hidden = true
+	)
+	default byte[] legacyEquipment()
+	{
+		return null;
+	}
+
+	@ConfigItem(
+		keyName = "currentEquipment",
+		name = "Legacy equipment",
+		description = "Deprecated config, migrated to currentEquipmentInfo",
+		hidden = true
+	)
+	void setLegacyEquipment(byte[] equipmentIds);
 
 	@ConfigItem(
 		keyName = "currentIcon",

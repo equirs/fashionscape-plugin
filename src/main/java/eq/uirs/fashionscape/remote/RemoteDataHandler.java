@@ -66,22 +66,9 @@ public class RemoteDataHandler
 
 	public void fetch()
 	{
-		retry(true);
-	}
-
-	public void retry()
-	{
-		retry(false);
-	}
-
-	private void retry(boolean forced)
-	{
 		for (RemoteCategory category : RemoteCategory.values())
 		{
-			if (forced || failedCategories.contains(category))
-			{
-				fetch(category);
-			}
+			fetch(category);
 		}
 	}
 

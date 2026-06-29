@@ -1,9 +1,10 @@
 package eq.uirs.fashionscape.panel;
 
 import eq.uirs.fashionscape.core.FashionManager;
-import eq.uirs.fashionscape.core.event.ItemChangedListener;
+import eq.uirs.fashionscape.core.SlotInfo;
+import eq.uirs.fashionscape.core.event.ItemChanged;
 import eq.uirs.fashionscape.core.event.LockChanged;
-import eq.uirs.fashionscape.core.event.LockChangedListener;
+import eq.uirs.fashionscape.core.layer.ModelType;
 import java.awt.BorderLayout;
 import java.awt.Cursor;
 import java.awt.Dimension;
@@ -11,11 +12,9 @@ import java.awt.GridLayout;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
-import javax.annotation.Nullable;
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JPanel;
-import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.ItemComposition;
@@ -26,8 +25,11 @@ import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.util.AsyncBufferedImage;
 import net.runelite.client.util.ImageUtil;
 
+/**
+ * Panel for each item slot, showing virtual item, nothing, or unset
+ */
 @Slf4j
-class SwapItemPanel extends AbsItemPanel
+class ItemPanel extends AbsItemPanel
 {
 	private static final Dimension ICON_SIZE = new Dimension(20, 20);
 
@@ -36,19 +38,18 @@ class SwapItemPanel extends AbsItemPanel
 	private final JButton lockButton;
 	private final JButton xButton;
 	private final SearchOpener searchOpener;
-	private Integer itemId;
 	private MouseAdapter mouseAdapter = null;
 	private MouseAdapter hoverAdapter = null;
 
-	public SwapItemPanel(@Nullable Integer itemId, BufferedImage icon, ItemManager itemManager,
-						 ClientThread clientThread, FashionManager fashionManager, KitType slot,
-						 SearchOpener searchOpener)
+	public ItemPanel(BufferedImage icon, ItemManager itemManager,
+					 ClientThread clientThread, FashionManager fashionManager, KitType slot,
+					 SearchOpener searchOpener, boolean developerMode)
 	{
-		super(itemId, icon, itemManager, clientThread);
+		super(icon, itemManager, clientThread, developerMode);
 		this.slot = slot;
-		this.itemId = itemId;
 		this.fashionManager = fashionManager;
 		this.searchOpener = searchOpener;
+
 		// Item details panel
 		JPanel rightPanel = new JPanel(new BorderLayout());
 		rightPanel.setBackground(nonHighlightColor);
@@ -65,11 +66,7 @@ class SwapItemPanel extends AbsItemPanel
 		lockButton.setFocusPainted(false);
 		lockButton.setBorderPainted(false);
 		lockButton.setContentAreaFilled(false);
-		lockButton.addActionListener(e -> {
-			fashionManager.toggleItemLocked(slot);
-			updateLockButton();
-			updateXButton();
-		});
+		lockButton.addActionListener(e -> fashionManager.toggleItemLocked(slot));
 		buttons.add(lockButton);
 
 		xButton = new JButton();
@@ -80,41 +77,45 @@ class SwapItemPanel extends AbsItemPanel
 		xButton.setBorderPainted(false);
 		xButton.setContentAreaFilled(false);
 		xButton.setIcon(new ImageIcon(ImageUtil.loadImageResource(this.getClass(), "x.png")));
-		xButton.addActionListener(e -> clientThread.invokeLater(() -> {
-			fashionManager.revertSlot(slot);
-			SwingUtilities.invokeLater(() -> {
-				updateLockButton();
-				updateXButton();
-			});
-		}));
+		xButton.addActionListener(e -> clientThread.invokeLater(() -> fashionManager.revertSlot(slot)));
 		buttons.add(xButton);
-
-		updateLockButton();
-		updateXButton();
 
 		rightPanel.add(buttons, BorderLayout.EAST);
 
 		add(rightPanel, BorderLayout.CENTER);
+		refreshData();
+	}
 
-		fashionManager.addEventListener(new ItemChangedListener(e -> {
-			if (e.getSlot() == slot)
-			{
-				Integer newId = e.getItemId();
-				this.itemId = newId;
-				setItemName(newId);
-				setItemIcon(newId);
-				resetMouseListeners();
-				updateXButton();
-			}
-		}));
+	void onItemChanged(ItemChanged e)
+	{
+		if (e.getModelType() == ModelType.VIRTUAL && e.getSlot() == slot)
+		{
+			updateItem();
+			updateXButton();
+		}
+	}
 
-		fashionManager.addEventListener(new LockChangedListener(e -> {
-			if (e.getSlot() == slot && e.getType() != LockChanged.Type.KIT)
-			{
-				updateLockButton();
-			}
-		}));
+	void onLockChanged(LockChanged e)
+	{
+		if (e.getSlot() == slot)
+		{
+			updateLockButton();
+		}
+	}
 
+	private void refreshData()
+	{
+		updateItem();
+		updateXButton();
+		updateLockButton();
+	}
+
+	private void updateItem()
+	{
+		SlotInfo slotInfo = fashionManager.getLayers().getVirtualModels().getItems().get(slot);
+		Integer newId = slotInfo != null ? slotInfo.getItemId() : null;
+		setItemName(newId);
+		setItemIcon(newId);
 		resetMouseListeners();
 	}
 
@@ -147,8 +148,35 @@ class SwapItemPanel extends AbsItemPanel
 
 	void updateXButton()
 	{
-		xButton.setEnabled(itemId != null);
+		boolean occupied = fashionManager.getLayers().getVirtualModels().getItems().containsKey(slot);
+		xButton.setEnabled(occupied);
 		xButton.setToolTipText("Clear " + slot.name().toLowerCase() + " slot");
+	}
+
+	private void setItemIcon(Integer itemId)
+	{
+		if (itemId != null && itemId >= 0)
+		{
+			clientThread.invokeLater(() -> {
+				// this can throw if run early in game client lifecycle
+				try
+				{
+					ItemComposition itemComposition = itemManager.getItemComposition(itemId);
+					AsyncBufferedImage image = itemManager.getImage(itemComposition.getId());
+					image.addTo(icon);
+				}
+				catch (Exception e)
+				{
+					return false;
+				}
+				return true;
+			});
+		}
+		else
+		{
+			BufferedImage image = ImageUtil.loadImageResource(getClass(), slot.name().toLowerCase() + ".png");
+			setIcon(icon, image);
+		}
 	}
 
 	private MouseAdapter createOpenSearchClickListener()
@@ -183,22 +211,4 @@ class SwapItemPanel extends AbsItemPanel
 			}
 		};
 	}
-
-	private void setItemIcon(Integer itemId)
-	{
-		if (itemId != null && itemId >= 0)
-		{
-			clientThread.invokeLater(() -> {
-				ItemComposition itemComposition = itemManager.getItemComposition(itemId);
-				AsyncBufferedImage image = itemManager.getImage(itemComposition.getId());
-				image.addTo(icon);
-			});
-		}
-		else
-		{
-			BufferedImage image = ImageUtil.loadImageResource(getClass(), slot.name().toLowerCase() + ".png");
-			setIcon(icon, image);
-		}
-	}
-
 }

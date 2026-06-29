@@ -55,6 +55,10 @@ public class Exclusions
 		String strippedName;
 	}
 
+	/**
+	 * populates excluded items after remote data is fetched.
+	 * @return false if client doesn't have items populated
+	 */
 	public boolean loadAll()
 	{
 		// item count will be 0 if cache is not ready yet

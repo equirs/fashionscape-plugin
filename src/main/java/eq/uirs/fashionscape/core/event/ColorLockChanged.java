@@ -6,7 +6,7 @@ import lombok.Value;
 
 @EqualsAndHashCode(callSuper = false)
 @Value
-public class ColorLockChanged extends SwapEvent
+public class ColorLockChanged
 {
 	ColorType type;
 	boolean isLocked;

@@ -9,7 +9,6 @@ import javax.swing.border.AbstractBorder;
 
 public class RoundedBorder extends AbstractBorder
 {
-
 	private final Color color;
 	private final int radius;
 

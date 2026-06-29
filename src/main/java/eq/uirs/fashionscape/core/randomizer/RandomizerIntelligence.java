@@ -11,9 +11,10 @@ import lombok.RequiredArgsConstructor;
 public enum RandomizerIntelligence
 {
 	NONE(1),
-	LOW(15),
-	MODERATE(30),
-	HIGH(50);
+	LOW(10),
+	MODERATE(50),
+	HIGH(100),
+	CURSED(50); // prefers mismatched colors
 
 	private final int depth;
 }

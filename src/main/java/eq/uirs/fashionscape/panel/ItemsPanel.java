@@ -1,7 +1,9 @@
 package eq.uirs.fashionscape.panel;
 
 import eq.uirs.fashionscape.core.FashionManager;
-import eq.uirs.fashionscape.core.event.KnownKitChangedListener;
+import eq.uirs.fashionscape.core.event.ItemChanged;
+import eq.uirs.fashionscape.core.event.KnownKitChanged;
+import eq.uirs.fashionscape.core.event.LockChanged;
 import java.awt.BorderLayout;
 import java.awt.Dimension;
 import java.awt.GridBagConstraints;
@@ -29,17 +31,19 @@ import net.runelite.client.util.ImageUtil;
 import net.runelite.client.util.Text;
 
 /**
- * Tab panel that houses all equipment swaps and the main controls
+ * Tab panel for managing virtual items
  */
 @Slf4j
-class SwapsPanel extends JPanel
+class ItemsPanel extends JPanel
 {
 	private final FashionManager fashionManager;
 	private final ItemManager itemManager;
 	private final ClientThread clientThread;
 	private final SearchOpener searchOpener;
+	private final boolean developerMode;
 
 	private final Set<KitType> unknownSlots = new HashSet<>();
+	private final List<ItemPanel> itemPanels = new ArrayList<>();
 
 	private JPanel slotsPanel;
 	private JPanel warningsPanel;
@@ -48,26 +52,26 @@ class SwapsPanel extends JPanel
 	private static class SlotResult
 	{
 		KitType slot;
-		Integer itemId;
 		BufferedImage image;
 	}
 
-	public SwapsPanel(FashionManager fashionManager, ItemManager itemManager, SearchOpener searchOpener,
-					  ClientThread clientThread)
+	public ItemsPanel(FashionManager fashionManager, ItemManager itemManager, SearchOpener searchOpener,
+					  ClientThread clientThread, boolean developerMode)
 	{
 		this.fashionManager = fashionManager;
 		this.itemManager = itemManager;
 		this.searchOpener = searchOpener;
 		this.clientThread = clientThread;
+		this.developerMode = developerMode;
 
 		setLayout(new BorderLayout());
 		setBackground(ColorScheme.DARK_GRAY_COLOR);
 		setBorder(new EmptyBorder(5, 10, 5, 10));
 
-		JPanel swapsPanel = setUpContentPanel();
+		JPanel contentPanel = setUpContentPanel();
 		JPanel scrollWrapper = new JPanel(new BorderLayout());
 		scrollWrapper.setBackground(ColorScheme.DARK_GRAY_COLOR);
-		scrollWrapper.add(swapsPanel, BorderLayout.NORTH);
+		scrollWrapper.add(contentPanel, BorderLayout.NORTH);
 
 		JScrollPane scrollPane = new JScrollPane(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
 			JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
@@ -76,19 +80,6 @@ class SwapsPanel extends JPanel
 		scrollPane.setViewportView(scrollWrapper);
 
 		add(scrollPane, BorderLayout.CENTER);
-
-		fashionManager.addEventListener(new KnownKitChangedListener(e -> {
-			KitType slot = e.getSlot();
-			if (e.isUnknown())
-			{
-				this.unknownSlots.add(slot);
-			}
-			else
-			{
-				this.unknownSlots.remove(slot);
-			}
-			SwingUtilities.invokeLater(this::refreshWarnings);
-		}));
 	}
 
 	private JPanel setUpContentPanel()
@@ -108,7 +99,7 @@ class SwapsPanel extends JPanel
 		slotsPanel = new JPanel();
 		slotsPanel.setLayout(new GridBagLayout());
 		slotsPanel.setBackground(ColorScheme.DARK_GRAY_COLOR);
-		populateSwapSlots();
+		populateSlots();
 		contentContainer.add(slotsPanel, c);
 		c.gridy++;
 
@@ -122,7 +113,7 @@ class SwapsPanel extends JPanel
 		return contentContainer;
 	}
 
-	private void populateSwapSlots()
+	private void populateSlots()
 	{
 		clientThread.invokeLater(() -> {
 			List<SlotResult> slotResults = new ArrayList<>();
@@ -133,7 +124,7 @@ class SwapsPanel extends JPanel
 				{
 					continue;
 				}
-				Integer itemId = fashionManager.swappedItemIdIn(slot);
+				Integer itemId = fashionManager.virtualItemIdFor(slot);
 				BufferedImage image;
 				if (itemId != null && itemId >= 0)
 				{
@@ -144,7 +135,7 @@ class SwapsPanel extends JPanel
 				{
 					image = ImageUtil.loadImageResource(getClass(), slot.name().toLowerCase() + ".png");
 				}
-				slotResults.add(new SlotResult(slot, itemId, image));
+				slotResults.add(new SlotResult(slot, image));
 			}
 			SwingUtilities.invokeLater(() -> addSlotItemPanels(slotResults));
 		});
@@ -162,8 +153,9 @@ class SwapsPanel extends JPanel
 
 		for (SlotResult s : results)
 		{
-			SwapItemPanel itemPanel = new SwapItemPanel(s.itemId, s.image, itemManager,
-				clientThread, fashionManager, s.slot, searchOpener);
+			ItemPanel itemPanel = new ItemPanel(s.image, itemManager,
+				clientThread, fashionManager, s.slot, searchOpener, developerMode);
+			itemPanels.add(itemPanel);
 			JPanel marginWrapper = new JPanel(new BorderLayout());
 			marginWrapper.setBackground(ColorScheme.DARK_GRAY_COLOR);
 			marginWrapper.setBorder(new EmptyBorder(5, 0, 0, 0));
@@ -171,6 +163,30 @@ class SwapsPanel extends JPanel
 			slotsPanel.add(marginWrapper, c);
 			c.gridy++;
 		}
+	}
+
+	void onItemChanged(ItemChanged e)
+	{
+		itemPanels.forEach(p -> p.onItemChanged(e));
+	}
+
+	void onLockChanged(LockChanged e)
+	{
+		itemPanels.forEach(p -> p.onLockChanged(e));
+	}
+
+	void onKnownKitChanged(KnownKitChanged e)
+	{
+		KitType slot = e.getSlot();
+		if (e.isUnknown())
+		{
+			this.unknownSlots.add(slot);
+		}
+		else
+		{
+			this.unknownSlots.remove(slot);
+		}
+		SwingUtilities.invokeLater(this::refreshWarnings);
 	}
 
 	public void refreshWarnings()
@@ -205,5 +221,4 @@ class SwapsPanel extends JPanel
 		}
 		revalidate();
 	}
-
 }

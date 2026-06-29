@@ -1,43 +1,40 @@
 package eq.uirs.fashionscape.core.randomizer;
 
+import com.google.common.annotations.VisibleForTesting;
 import eq.uirs.fashionscape.FashionscapeConfig;
-import eq.uirs.fashionscape.FashionscapePlugin;
 import eq.uirs.fashionscape.colors.ColorScorer;
-import eq.uirs.fashionscape.core.CompoundSwap;
+import eq.uirs.fashionscape.core.Diff;
+import eq.uirs.fashionscape.core.Exclusions;
 import eq.uirs.fashionscape.core.FashionManager;
-import eq.uirs.fashionscape.core.SavedSwaps;
-import eq.uirs.fashionscape.core.SwapDiff;
-import eq.uirs.fashionscape.core.SwapMode;
-import eq.uirs.fashionscape.data.anim.ItemInteractions;
+import eq.uirs.fashionscape.core.SlotInfo;
+import eq.uirs.fashionscape.core.layer.Layers;
+import eq.uirs.fashionscape.core.layer.Locks;
+import eq.uirs.fashionscape.core.model.ModelInfo;
+import eq.uirs.fashionscape.core.utils.ItemSlotUtil;
+import eq.uirs.fashionscape.core.utils.KitUtil;
+import eq.uirs.fashionscape.core.utils.ListUtil;
 import eq.uirs.fashionscape.data.color.ColorType;
 import eq.uirs.fashionscape.data.color.Colorable;
 import eq.uirs.fashionscape.data.kit.JawIcon;
 import eq.uirs.fashionscape.data.kit.JawKit;
-import eq.uirs.fashionscape.data.kit.Kit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.Iterator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Random;
 import java.util.Set;
-import java.util.function.Supplier;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 import javax.inject.Inject;
-import javax.inject.Provider;
 import javax.inject.Singleton;
 import lombok.RequiredArgsConstructor;
-import lombok.Value;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.ItemComposition;
 import net.runelite.api.kit.KitType;
-import net.runelite.client.game.ItemEquipmentStats;
 import net.runelite.client.game.ItemManager;
 
 @Slf4j
@@ -45,164 +42,235 @@ import net.runelite.client.game.ItemManager;
 @RequiredArgsConstructor(onConstructor_ = {@Inject})
 public class Randomizer
 {
-	private static final Map<KitType, List<Kit>> KIT_TYPE_TO_KITS = Arrays.stream(KitType.values())
-		.collect(Collectors.toMap(s -> s, s -> Arrays.asList(Kit.allInSlot(s, true))));;
-
-	private final Client client;
-	private final ItemManager itemManager;
+	private final Layers layers;
+	private final Locks locks;
 	private final FashionscapeConfig config;
 	private final ColorScorer colorScorer;
-	private final SavedSwaps savedSwaps;
-	private final Provider<FashionManager> fashionManagerProvider;
+	private final Client client;
+	private final ItemManager itemManager;
+	private final Exclusions exclusions;
 
-	@Value
-	private static class Candidate
+	private final Map<KitType, List<SlotInfo>> slotToItemsMemo = new HashMap<>();
+	private final Random random = new Random();
+
+	@VisibleForTesting
+	void setRandomSeed(long seed)
 	{
-		public int itemId;
-		public KitType slot;
+		random.setSeed(seed);
 	}
 
-	/**
-	 * Randomizes items/kits/colors in unlocked slots.
-	 * Can only be called from the client thread.
-	 */
-	public void shuffle()
+	public Diff shuffle()
 	{
-		FashionManager fashionManager = fashionManagerProvider.get();
-		final Random r = new Random();
+		if (slotToItemsMemo.isEmpty())
+		{
+			repopulateMemo();
+		}
+
 		RandomizerIntelligence intelligence = config.randomizerIntelligence();
-		int size = intelligence.getDepth();
-		if (size > 1)
+		if (intelligence != RandomizerIntelligence.NONE)
 		{
-			Map<KitType, Integer> lockedItems = Arrays.stream(KitType.values())
-				.filter(s -> savedSwaps.isItemLocked(s) && savedSwaps.containsItem(s))
-				.collect(Collectors.toMap(s -> s, savedSwaps::getItem));
-			if (savedSwaps.isIconLocked() && savedSwaps.containsIcon())
-			{
-				Integer iconItemId = JawKit.NO_JAW.getIconItemId(savedSwaps.getSwappedIcon());
-				if (iconItemId != null)
-				{
-					lockedItems.put(KitType.JAW, iconItemId);
-				}
-			}
-			Map<ColorType, Colorable> lockedColors = fashionManager.swappedColorsMap().entrySet().stream()
-				.filter(e -> savedSwaps.isColorLocked(e.getKey()) && savedSwaps.containsColor(e.getKey()))
-				.collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-			colorScorer.setPlayerInfo(lockedItems, lockedColors);
+			computeLockedColorScores();
 		}
-		Map<KitType, Boolean> itemSlotsToRevert = Arrays.stream(KitType.values())
-			.collect(Collectors.toMap(slot -> slot, savedSwaps::isItemLocked));
-
-		// pre-fill slots that will be skipped with -1 as a placeholder
-		Map<KitType, Integer> newSwaps = Arrays.stream(KitType.values())
-			.filter(itemSlotsToRevert::get)
-			.collect(Collectors.toMap(s -> s, s -> -1));
-		Set<Integer> skips = FashionscapePlugin.getItemIdsToExclude(config);
-		List<Candidate> candidates = new ArrayList<>(size);
-		List<Integer> randomOrder = IntStream.range(0, client.getItemCount()).boxed().collect(Collectors.toList());
-		Collections.shuffle(randomOrder);
-		Iterator<Integer> randomIterator = randomOrder.iterator();
-		while (newSwaps.size() < KitType.values().length && randomIterator.hasNext())
+		Diff diff = Diff.empty();
+		// first, try to occupy all unlocked slots with items
+		List<SlotInfo> slottedItems = findItems();
+		for (SlotInfo item : slottedItems)
 		{
-			Integer i = randomIterator.next();
+			diff = Diff.merge(layers.set(item.getSlot(), item, false), diff);
+		}
+
+		// next, try to occupy remaining slots with random kits (no color scoring since they're recolor-able)
+		List<SlotInfo> slottedKits = findKits(slottedItems);
+		for (SlotInfo kit : slottedKits)
+		{
+			diff = Diff.merge(layers.set(kit.getSlot(), kit, false), diff);
+		}
+
+		// find the icon that most closely matches on color
+		JawIcon icon = findIcon();
+		if (icon != null)
+		{
+			diff = Diff.merge(layers.setIcon(icon, false), diff);
+		}
+
+		// lastly, shuffle the player's base model colors
+		Map<ColorType, Colorable> colors = findColors();
+		for (Map.Entry<ColorType, Colorable> entry : colors.entrySet())
+		{
+			ColorType colorType = entry.getKey();
+			Colorable color = entry.getValue();
+			diff = Diff.merge(layers.setColor(colorType, color.getColorId(colorType), false), diff);
+		}
+		return diff;
+	}
+
+	public void repopulateMemo()
+	{
+		slotToItemsMemo.clear();
+		Set<Integer> skips = exclusions.getAll();
+		for (int i = 0; i < client.getItemCount(); i++)
+		{
 			int canonical = itemManager.canonicalize(i);
-			if (skips.contains(canonical))
+			// can skip banknote/placeholder items since the canonical version will come up eventually
+			if (i != canonical || skips.contains(canonical))
 			{
 				continue;
 			}
-			ItemComposition itemComposition = itemManager.getItemComposition(canonical);
+			ItemComposition itemComposition = itemManager.getItemComposition(i);
 			int itemId = itemComposition.getId();
-			KitType slot = fashionManager.slotForId(fashionManager.slotIdFor(itemComposition));
-			if (slot != null && !newSwaps.containsKey(slot))
+			KitType slot = ItemSlotUtil.getSlot(itemId, itemManager);
+			if (slot == null)
 			{
-				// Don't equip a 2h weapon if we already have a shield
-				if (slot == KitType.WEAPON)
-				{
-					ItemEquipmentStats stats = fashionManager.equipmentStatsFor(itemId);
-					if (stats != null && stats.isTwoHanded() && newSwaps.get(KitType.SHIELD) != null)
-					{
-						continue;
-					}
-				}
-				// Don't equip a shield if we already have a 2h weapon (mark shield as removed instead)
-				else if (slot == KitType.SHIELD)
-				{
-					Integer weaponItemId = newSwaps.get(KitType.WEAPON);
-					if (weaponItemId != null)
-					{
-						ItemEquipmentStats stats = fashionManager.equipmentStatsFor(weaponItemId);
-						if (stats != null && stats.isTwoHanded())
-						{
-							newSwaps.put(KitType.SHIELD, -1);
-							continue;
-						}
-					}
-				}
-				else if (slot == KitType.HEAD)
-				{
-					// Don't equip a helm if it hides hair and hair is locked
-					if (!ItemInteractions.HAIR_HELMS.contains(itemId) && savedSwaps.isKitLocked(KitType.HAIR))
-					{
-						continue;
-					}
-					// Don't equip a helm if it hides jaw and jaw is locked
-					if (ItemInteractions.NO_JAW_HELMS.contains(itemId) && savedSwaps.isKitLocked(KitType.JAW))
-					{
-						continue;
-					}
-				}
-				else if (slot == KitType.TORSO)
-				{
-					// Don't equip torso if it hides arms and arms is locked
-					if (!ItemInteractions.ARMS_TORSOS.contains(itemId) && savedSwaps.isKitLocked(KitType.ARMS))
-					{
-						continue;
-					}
-				}
-				candidates.add(new Candidate(itemComposition.getId(), slot));
+				continue;
 			}
+			SlotInfo slotInfo = SlotInfo.lookUp(itemId + FashionManager.ITEM_OFFSET, slot);
+			List<SlotInfo> itemsInSlot = slotToItemsMemo.getOrDefault(slot, new ArrayList<>());
+			itemsInSlot.add(slotInfo);
+			slotToItemsMemo.put(slot, itemsInSlot);
+		}
+	}
 
-			if (!candidates.isEmpty() && candidates.size() >= size)
+	private void computeLockedColorScores()
+	{
+		ModelInfo info = layers.getVirtualModels();
+		Map<KitType, Integer> lockedItems = info.getItems().getAll().values().stream()
+			.filter(i -> locks.contains(i.getSlot()))
+			.collect(Collectors.toMap(SlotInfo::getSlot, SlotInfo::getItemId));
+		if (locks.isIcon() && info.getIcon() != null && info.getIcon() != JawIcon.NOTHING)
+		{
+			// consider only the icon part of the model, not the built-in facial hair
+			Integer iconItemId = JawKit.NO_JAW.getIconItemId(info.getIcon());
+			if (iconItemId != null)
 			{
-				Candidate best;
-				if (size > 1)
-				{
-					best = candidates.stream()
-						.max(Comparator.comparingDouble(c -> colorScorer.score(c.itemId, c.slot)))
-						.get();
-					colorScorer.addPlayerInfo(best.slot, best.itemId);
-				}
-				else
-				{
-					best = candidates.get(0);
-				}
-				newSwaps.put(best.slot, best.itemId);
-				candidates.clear();
+				lockedItems.put(KitType.JAW, iconItemId);
 			}
 		}
-		// slots filled with -1 were placeholders that need to be removed
-		List<KitType> removes = newSwaps.entrySet().stream()
-			.filter(e -> e.getValue() < 0)
-			.map(Map.Entry::getKey)
-			.collect(Collectors.toList());
-		removes.forEach(newSwaps::remove);
+		Map<ColorType, Colorable> lockedColors = info.getColors().getAllColorable().entrySet().stream()
+			.filter(e -> locks.getColor(e.getKey()))
+			.collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+		colorScorer.setPlayerInfo(lockedItems, lockedColors);
+	}
 
-		// shuffle colors
-		Map<ColorType, Integer> newColors = new HashMap<>();
-		List<ColorType> allColorTypes = Arrays.asList(ColorType.values().clone());
-		Collections.shuffle(allColorTypes);
-		for (ColorType type : allColorTypes)
+	@VisibleForTesting
+	List<SlotInfo> findItems()
+	{
+		List<KitType> remainingItemSlots = Arrays.stream(KitType.values())
+			.filter(s -> !locks.contains(s))
+			.collect(Collectors.toList());
+		Collections.shuffle(remainingItemSlots, random);
+		List<SlotInfo> result = new ArrayList<>();
+		RandomizerIntelligence intelligence = config.randomizerIntelligence();
+		while (!remainingItemSlots.isEmpty())
 		{
-			if (savedSwaps.isColorLocked(type))
+			KitType slot = remainingItemSlots.remove(0);
+			// skip jaw items, as these are handled later as icons
+			if (slot == KitType.JAW)
 			{
 				continue;
 			}
-			List<Colorable> colorables = Arrays.asList(type.getColorables().clone());
-			if (colorables.isEmpty())
+			// items in this slot cannot conflict with locked or already-filled slots
+			Set<KitType> remainingSet = new HashSet<>(remainingItemSlots);
+			List<SlotInfo> allCandidates = slotToItemsMemo.getOrDefault(slot, new ArrayList<>()).stream()
+				.filter(slotInfo -> locks.isAllowed(slot, slotInfo) &&
+					remainingSet.containsAll(slotInfo.getHidden()))
+				.collect(Collectors.toList());
+			if (!allCandidates.isEmpty())
+			{
+				List<SlotInfo> candidates = ListUtil.takeRandomSample(allCandidates, intelligence.getDepth(), random);
+				int multiplier = intelligence == RandomizerIntelligence.CURSED ? -1 : 1;
+				SlotInfo bestMatch = candidates.stream()
+					.max(Comparator.comparingDouble(c -> multiplier * colorScorer.score(c.getItemId(), c.getSlot())))
+					.orElse(candidates.get(0));
+				result.add(bestMatch);
+				// also remove slots that the match hides
+				bestMatch.getHidden().forEach(remainingItemSlots::remove);
+				colorScorer.addPlayerInfo(bestMatch.getSlot(), bestMatch.getItemId());
+			}
+		}
+		return result;
+	}
+
+	@VisibleForTesting
+	List<SlotInfo> findKits(List<SlotInfo> existingItems)
+	{
+		List<SlotInfo> result = new ArrayList<>();
+		Integer gender = layers.getGender();
+		if (gender != null && !config.excludeBaseModels())
+		{
+			// check locks and items from last step to ensure kit model can be shown
+			List<KitType> remainingKitSlots = Arrays.stream(KitType.values())
+				// kit id doesn't matter, just need to check if kit is allowed for current locks
+				.filter(slot -> locks.isAllowed(slot, SlotInfo.kit(0, slot)) &&
+					existingItems.stream().noneMatch(item -> item.getSlot() == slot || item.hides(slot)))
+				.collect(Collectors.toList());
+			Collections.shuffle(remainingKitSlots, random);
+			while (!remainingKitSlots.isEmpty())
+			{
+				KitType slot = remainingKitSlots.remove(0);
+				// only consider kits applicable to current gender
+				List<SlotInfo> candidates = KitUtil.KIT_TYPE_TO_KITS.getOrDefault(slot, new ArrayList<>()).stream()
+					.filter(k -> !k.isHidden() && k.getKitId(gender) != null && k != JawKit.NO_JAW)
+					.map(k -> SlotInfo.kit(k, gender))
+					.collect(Collectors.toList());
+				if (!candidates.isEmpty())
+				{
+					result.add(candidates.get(random.nextInt(candidates.size())));
+				}
+			}
+		}
+		return result;
+	}
+
+	@VisibleForTesting
+	JawIcon findIcon()
+	{
+		if (locks.isIcon() || config.excludeBaseModels())
+		{
+			return null;
+		}
+		JawIcon icon = JawIcon.NOTHING;
+		List<JawIcon> icons = Arrays.asList(JawIcon.values());
+		// score colors if intelligence is not minimal
+		RandomizerIntelligence intelligence = config.randomizerIntelligence();
+		if (intelligence != RandomizerIntelligence.NONE && intelligence != RandomizerIntelligence.CURSED)
+		{
+			Map<JawIcon, Double> scores = icons.stream()
+				.collect(Collectors.toMap(i -> i, i -> {
+					Integer itemId = JawKit.NO_JAW.getIconItemId(i);
+					return itemId != null ? colorScorer.score(itemId, null) : 0;
+				}));
+			// use icon if >75% match
+			icon = scores.entrySet().stream()
+				.filter(e -> e.getValue() > 0.75)
+				.max(Comparator.comparingDouble(Map.Entry::getValue))
+				.map(Map.Entry::getKey)
+				.orElse(JawIcon.NOTHING);
+		}
+		else if (random.nextDouble() > 0.33)
+		{
+			// since there aren't many icons, just prefer not showing one most of the time
+			icon = icons.get(random.nextInt(icons.size()));
+		}
+		return icon;
+	}
+
+	@VisibleForTesting
+	Map<ColorType, Colorable> findColors()
+	{
+		Map<ColorType, Colorable> result = new HashMap<>();
+		if (config.excludeBaseModels())
+		{
+			return result;
+		}
+		RandomizerIntelligence intelligence = config.randomizerIntelligence();
+		for (ColorType colorType : ColorType.values())
+		{
+			if (locks.getColor(colorType))
 			{
 				continue;
 			}
-			Collections.shuffle(colorables);
+			List<Colorable> colorables = Arrays.asList(colorType.getColorables().clone());
+			Collections.shuffle(colorables, random);
 			int limit;
 			switch (intelligence)
 			{
@@ -210,6 +278,7 @@ public class Randomizer
 					limit = Math.max(1, colorables.size() / 4);
 					break;
 				case MODERATE:
+				case CURSED:
 					limit = Math.max(1, colorables.size() / 2);
 					break;
 				case HIGH:
@@ -218,137 +287,14 @@ public class Randomizer
 				default:
 					limit = 1;
 			}
+			int multiplier = intelligence == RandomizerIntelligence.CURSED ? -1 : 1;
 			Colorable best = colorables.stream()
 				.limit(limit)
-				.max(Comparator.comparingDouble(c -> colorScorer.score(c, type)))
+				.max(Comparator.comparingDouble(c -> colorScorer.score(c, colorType) * multiplier))
 				.orElse(colorables.get(0));
-			colorScorer.addPlayerColor(type, best);
-			newColors.put(type, best.getColorId(type));
+			result.put(colorType, best);
+			colorScorer.addPlayerColor(colorType, best);
 		}
-
-		SwapDiff totalDiff = SwapDiff.blank();
-
-		// convert to equipment ids
-		Map<KitType, Integer> newEquipSwaps = newSwaps.entrySet().stream()
-			.collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue() + FashionManager.ITEM_OFFSET));
-
-		// swap items now before moving on to kits
-		SwapDiff itemsDiff = CompoundSwap.fromMap(newEquipSwaps, null).stream()
-			.map(c -> fashionManager.swap(c, SwapMode.SAVE))
-			.reduce(SwapDiff::mergeOver)
-			.orElse(SwapDiff.blank());
-		totalDiff = totalDiff.mergeOver(itemsDiff);
-
-		// See if remaining slots can be kit-swapped
-		if (fashionManager.getGender() != null && !config.excludeBaseModels())
-		{
-			Map<KitType, Integer> kitSwaps = Arrays.stream(KitType.values())
-				.filter(slot -> !newSwaps.containsKey(slot) && isOpen(slot))
-				.map(slot -> {
-					List<Kit> kits = KIT_TYPE_TO_KITS.getOrDefault(slot, new ArrayList<>()).stream()
-						.filter(k -> k.getKitId(fashionManager.getGender()) != null)
-						.collect(Collectors.toList());
-					return kits.isEmpty() ? null : kits.get(r.nextInt(kits.size()));
-				})
-				.filter(Objects::nonNull)
-				.collect(Collectors.toMap(Kit::getKitType, k -> k.getKitId(fashionManager.getGender())));
-
-			Map<KitType, Integer> kitEquipSwaps = kitSwaps.entrySet().stream()
-				.collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue() + FashionManager.KIT_OFFSET));
-
-			SwapDiff kitsDiff = CompoundSwap.fromMap(kitEquipSwaps, null)
-				.stream()
-				.map(c -> fashionManager.swap(c, SwapMode.SAVE))
-				.reduce(SwapDiff::mergeOver)
-				.orElse(SwapDiff.blank());
-
-			totalDiff = totalDiff.mergeOver(kitsDiff);
-		}
-
-		if (!config.excludeNonStandardItems() && !config.excludeMembersItems() && !savedSwaps.isIconLocked())
-		{
-			List<JawIcon> icons = Arrays.asList(JawIcon.values());
-			Collections.shuffle(icons);
-			int limit = icons.size();
-			if (intelligence == RandomizerIntelligence.NONE)
-			{
-				limit = 1;
-			}
-			Map<JawIcon, Double> scores = icons.stream()
-				.limit(limit)
-				.collect(Collectors.toMap(i -> i, i -> {
-					Integer itemId = JawKit.NO_JAW.getIconItemId(i);
-					return itemId != null ? colorScorer.score(itemId, null) : 0;
-				}));
-			// only icon swap if >75% match (if intelligence is > NONE)
-			JawIcon icon = scores.entrySet().stream()
-				.filter(e -> intelligence == RandomizerIntelligence.NONE || e.getValue() > 0.75)
-				.max(Comparator.comparingDouble(Map.Entry::getValue))
-				.map(Map.Entry::getKey)
-				.orElse(JawIcon.NOTHING);
-			SwapDiff iconDiff = fashionManager.swap(CompoundSwap.fromIcon(icon), SwapMode.PREVIEW, SwapMode.SAVE);
-			totalDiff = totalDiff.mergeOver(iconDiff);
-		}
-
-		SwapDiff colorsDiff = newColors.entrySet().stream()
-			.filter(e -> e.getValue() >= 0)
-			.map(e -> fashionManager.swap(e.getKey(), e.getValue(), SwapMode.SAVE))
-			.reduce(SwapDiff::mergeOver)
-			.orElse(SwapDiff.blank());
-
-		totalDiff = totalDiff.mergeOver(colorsDiff);
-
-		fashionManager.getSwapDiffHistory().appendToUndo(totalDiff);
+		return result;
 	}
-
-	/**
-	 * @return true if the slot does not have an item (real or virtual) obscuring it (directly or indirectly)
-	 */
-	public boolean isOpen(KitType slot)
-	{
-		if (slot == null || savedSwaps.isKitLocked(slot) || savedSwaps.containsItem(slot))
-		{
-			return false;
-		}
-		FashionManager fashionManager = fashionManagerProvider.get();
-		Supplier<Boolean> fallback = () -> {
-			if (fashionManager.equipmentIdInSlot(slot) > 0)
-			{
-				// equipment id must be a kit since there can't be an item at this point
-				return true;
-			}
-			else
-			{
-				Integer actualEquipId = fashionManager.inventoryItemId(slot);
-				return actualEquipId == null || actualEquipId < FashionManager.ITEM_OFFSET;
-			}
-		};
-		switch (slot)
-		{
-			case HAIR:
-			case JAW:
-				int headEquipId = fashionManager.equipmentIdInSlot(KitType.HEAD);
-				if (headEquipId > FashionManager.ITEM_OFFSET)
-				{
-					int headItemId = headEquipId - FashionManager.ITEM_OFFSET;
-					if (slot == KitType.HAIR)
-					{
-						return ItemInteractions.HAIR_HELMS.contains(headItemId);
-					}
-					return !ItemInteractions.NO_JAW_HELMS.contains(headItemId);
-				}
-				return fallback.get();
-			case ARMS:
-				int torsoEquipId = fashionManager.equipmentIdInSlot(KitType.TORSO);
-				if (torsoEquipId > FashionManager.ITEM_OFFSET)
-				{
-					int torsoItemId = torsoEquipId - FashionManager.ITEM_OFFSET;
-					return ItemInteractions.ARMS_TORSOS.contains(torsoItemId);
-				}
-				return fallback.get();
-			default:
-				return fallback.get();
-		}
-	}
-
 }

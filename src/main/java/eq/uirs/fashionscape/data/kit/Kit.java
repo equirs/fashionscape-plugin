@@ -56,6 +56,7 @@ public interface Kit
 	boolean isHidden();
 
 	Integer getMascKitId();
+
 	Integer getFemKitId();
 
 	default Integer getKitId(Integer gender)

@@ -66,6 +66,7 @@ public enum HairKit implements Kit
 	STRAIGHT_BRAIDS(232, 127),
 	TWO_BACK(233, 143);
 
+	// TODO support hat hair ids
 	private final Integer mascKitId;
 	private final Integer femKitId;
 

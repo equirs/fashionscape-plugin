@@ -1,11 +1,14 @@
 package eq.uirs.fashionscape.panel;
 
 import eq.uirs.fashionscape.core.FashionManager;
-import eq.uirs.fashionscape.core.event.ColorChangedListener;
-import eq.uirs.fashionscape.core.event.ColorLockChangedListener;
-import eq.uirs.fashionscape.core.event.KitChangedListener;
+import eq.uirs.fashionscape.core.SlotInfo;
+import eq.uirs.fashionscape.core.event.ColorChanged;
+import eq.uirs.fashionscape.core.event.ColorLockChanged;
+import eq.uirs.fashionscape.core.event.ItemChanged;
+import eq.uirs.fashionscape.core.event.KitChanged;
 import eq.uirs.fashionscape.core.event.LockChanged;
-import eq.uirs.fashionscape.core.event.LockChangedListener;
+import eq.uirs.fashionscape.core.layer.ModelType;
+import eq.uirs.fashionscape.core.utils.KitUtil;
 import eq.uirs.fashionscape.data.color.ColorType;
 import eq.uirs.fashionscape.data.color.Colorable;
 import eq.uirs.fashionscape.data.kit.Kit;
@@ -24,12 +27,13 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import javax.annotation.Nullable;
 import javax.swing.BorderFactory;
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
-import javax.swing.SwingUtilities;
 import javax.swing.border.Border;
 import javax.swing.border.EmptyBorder;
 import lombok.Getter;
@@ -44,13 +48,16 @@ import net.runelite.client.util.Text;
  * Could represent either a player's kit, a color, or both for a given slot.
  */
 @Slf4j
-public class KitItemPanel extends DropdownIconPanel
+public class KitPanel extends DropdownIconPanel
 {
 	private static final Dimension COLOR_CHOOSER_SIZE = new Dimension(15, 15);
 
 	@Getter
+	@Nullable
 	private final ColorType type;
+
 	@Getter
+	@Nullable
 	private final KitType slot;
 
 	private final FashionManager fashionManager;
@@ -61,20 +68,17 @@ public class KitItemPanel extends DropdownIconPanel
 	private final JButton lockColorButton = new JButton();
 	private final List<Kit> allKits = new ArrayList<>();
 
-	private Integer colorId;
 	private Color color;
-	private Integer kitId;
 
-	public KitItemPanel(FashionManager fashionManager, ColorType type, Integer colorId, KitType slot, Integer kitId,
-						KitColorOpener kitColorOpener, BufferedImage image, ClientThread clientThread)
+	public KitPanel(FashionManager fashionManager, @Nullable ColorType type, @Nullable KitType slot,
+					KitColorOpener kitColorOpener, BufferedImage image, ClientThread clientThread)
 	{
 		super(image, clientThread);
 		this.fashionManager = fashionManager;
 		this.kitColorOpener = kitColorOpener;
 		this.slot = slot;
 		this.type = type;
-		this.colorId = colorId;
-		this.kitId = kitId;
+
 		if (type != null)
 		{
 			for (Colorable colorable : type.getColorables())
@@ -89,8 +93,6 @@ public class KitItemPanel extends DropdownIconPanel
 		highlightPanels.add(rightPanel);
 		rightPanel.add(label, BorderLayout.CENTER);
 
-		setIconTooltip();
-
 		int cols = type != null && slot != null ? 3 : 2;
 		JPanel buttons = new JPanel(new GridLayout(1, cols, 2, 0));
 		buttons.setBackground(ColorScheme.DARKER_GRAY_COLOR);
@@ -99,53 +101,21 @@ public class KitItemPanel extends DropdownIconPanel
 		{
 			allKits.clear();
 			allKits.addAll(Arrays.asList(Kit.allInSlot(slot, false)));
-			setKitName();
 			setIcon(icon, image);
-			fashionManager.addEventListener(new KitChangedListener(e -> {
-				if (slot == e.getSlot())
-				{
-					this.kitId = e.getKitId();
-					setKitName();
-					updateXButton();
-				}
-			}));
 			configureButton(lockButton);
-			lockButton.addActionListener(e -> {
-				fashionManager.toggleKitLocked(slot);
-				updateLockButton();
-				updateXButton();
-			});
+			lockButton.addActionListener(e -> fashionManager.toggleKitLocked(slot));
 			buttons.add(lockButton);
 		}
 		else if (type != null)
 		{
 			BufferedImage colorImage = ImageUtil.loadImageResource(this.getClass(), "color.png");
 			setIcon(icon, colorImage);
-			setColorName();
 		}
 
 		if (type != null)
 		{
-			setIconColor();
-			fashionManager.addEventListener(new ColorChangedListener(e -> {
-				if (type == e.getType())
-				{
-					this.colorId = e.getColorId();
-					setIconColor();
-					if (slot == null)
-					{
-						setColorName();
-					}
-					setIconTooltip();
-					updateXButton();
-				}
-			}));
 			configureButton(lockColorButton);
-			lockColorButton.addActionListener(e -> {
-				fashionManager.toggleColorLocked(type);
-				updateColorLockButton();
-				updateXButton();
-			});
+			lockColorButton.addActionListener(e -> fashionManager.toggleColorLocked(type));
 			buttons.add(lockColorButton);
 		}
 		else
@@ -155,19 +125,8 @@ public class KitItemPanel extends DropdownIconPanel
 
 		configureButton(xButton);
 		xButton.setIcon(new ImageIcon(ImageUtil.loadImageResource(this.getClass(), "x.png")));
-		xButton.addActionListener(e -> clientThread.invokeLater(() -> {
-			fashionManager.revert(slot, type);
-			SwingUtilities.invokeLater(() -> {
-				updateLockButton();
-				updateColorLockButton();
-				updateXButton();
-			});
-		}));
+		xButton.addActionListener(e -> clientThread.invokeLater(() -> fashionManager.revert(slot, type)));
 		buttons.add(xButton);
-
-		updateLockButton();
-		updateColorLockButton();
-		updateXButton();
 
 		optionsContainer.setLayout(new BorderLayout());
 		optionsContainer.setBackground(ColorScheme.DARKER_GRAY_COLOR);
@@ -176,24 +135,89 @@ public class KitItemPanel extends DropdownIconPanel
 		rightPanel.add(buttons, BorderLayout.EAST);
 		add(rightPanel, BorderLayout.CENTER);
 
-		fashionManager.addEventListener(new LockChangedListener(e -> {
-			if (e.getSlot() == slot && e.getType() != LockChanged.Type.ITEM)
+		refreshData();
+	}
+
+	void onKitChanged(KitChanged e)
+	{
+		if (e.getModelType() == ModelType.VIRTUAL && Objects.equals(slot, e.getSlot()))
+		{
+			setKitName();
+			updateXButton();
+		}
+	}
+
+	void onItemChanged(ItemChanged e)
+	{
+		if (e.getModelType() == ModelType.VIRTUAL && Objects.equals(slot, e.getSlot()))
+		{
+			SlotInfo newInfo = e.getNewInfo();
+			if (newInfo == null || newInfo.isNothing())
 			{
-				updateLockButton();
+				setKitName();
+				updateXButton();
 			}
-		}));
-		fashionManager.addEventListener(new ColorLockChangedListener(e -> {
-			if (e.getType() == type)
+		}
+	}
+
+	void onColorChanged(ColorChanged e)
+	{
+		if (e.getModelType() == ModelType.VIRTUAL && Objects.equals(type, e.getType()))
+		{
+			setIconColor();
+			if (slot == null)
 			{
-				updateColorLockButton();
+				setColorName();
 			}
-		}));
+			setIconTooltip();
+			updateXButton();
+		}
+	}
+
+	void onLockChanged(LockChanged e)
+	{
+		if (Objects.equals(slot, e.getSlot()))
+		{
+			updateLockButton();
+		}
+	}
+
+	void onColorLockChanged(ColorLockChanged e)
+	{
+		if (Objects.equals(type, e.getType()))
+		{
+			updateColorLockButton();
+		}
+	}
+
+	private void refreshData()
+	{
+		if (slot != null)
+		{
+			setKitName();
+		}
+		else if (type != null)
+		{
+			setColorName();
+		}
+		setIconColor();
+		setIconTooltip();
+		updateLockButton();
+		updateColorLockButton();
+		updateXButton();
+		// icon image for kits is never updated
 	}
 
 	@Override
-	void openDropdown()
+	void openDropdown(MouseEvent e)
 	{
 		kitColorOpener.openOptions(slot, type);
+	}
+
+	@Override
+	void tryClear()
+	{
+		fashionManager.overrideKitWithNothing(slot);
 	}
 
 	public void openOptions(Integer gender)
@@ -292,8 +316,8 @@ public class KitItemPanel extends DropdownIconPanel
 				if (!fashionManager.isColorLocked(type))
 				{
 					setCursor(new Cursor(Cursor.HAND_CURSOR));
+					fashionManager.hoverOverColor(type, colorable.getColorId(type));
 				}
-				fashionManager.hoverOverColor(type, colorable.getColorId(type));
 			}
 
 			@Override
@@ -325,8 +349,8 @@ public class KitItemPanel extends DropdownIconPanel
 				if (!fashionManager.isKitLocked(slot))
 				{
 					setCursor(new Cursor(Cursor.HAND_CURSOR));
+					fashionManager.hoverOverKit(slot, kitId);
 				}
-				fashionManager.hoverOverKit(slot, kitId);
 			}
 
 			@Override
@@ -353,10 +377,15 @@ public class KitItemPanel extends DropdownIconPanel
 
 	private void setKitName()
 	{
-		String kitName = "Not set";
+		if (slot == null)
+		{
+			return;
+		}
+		String kitName = fashionManager.isNothing(slot) ? "Nothing" : "Not set";
+		Integer kitId = fashionManager.virtualKitIdFor(slot);
 		if (kitId != null)
 		{
-			Kit kit = FashionManager.KIT_ID_TO_KIT.get(kitId);
+			Kit kit = KitUtil.KIT_ID_TO_KIT.get(kitId);
 			if (kit != null)
 			{
 				kitName = kit.getDisplayName();
@@ -367,16 +396,15 @@ public class KitItemPanel extends DropdownIconPanel
 
 	private void setColorName()
 	{
-		String colorName = "Not set";
-		if (colorId != null)
+		if (type == null)
 		{
-			try
-			{
-				colorName = colorMap.get(colorId).getDisplayName();
-			}
-			catch (Exception ignored)
-			{
-			}
+			return;
+		}
+		String colorName = "Not set";
+		Integer colorId = fashionManager.virtualColorIdFor(type);
+		if (colorId != null && colorMap.containsKey(colorId))
+		{
+			colorName = colorMap.get(colorId).getDisplayName();
 		}
 		label.setText(colorName);
 	}
@@ -384,6 +412,7 @@ public class KitItemPanel extends DropdownIconPanel
 	private void setIconColor()
 	{
 		color = ColorScheme.LIGHT_GRAY_COLOR;
+		Integer colorId = fashionManager.virtualColorIdFor(type);
 		if (colorId != null)
 		{
 			Colorable colorable = colorMap.get(colorId);
@@ -411,6 +440,7 @@ public class KitItemPanel extends DropdownIconPanel
 
 		if (type != null)
 		{
+			Integer colorId = fashionManager.virtualColorIdFor(type);
 			Colorable colorable = colorMap.get(colorId);
 			if (colorable != null)
 			{
@@ -453,6 +483,8 @@ public class KitItemPanel extends DropdownIconPanel
 
 	private void updateXButton()
 	{
+		Integer colorId = fashionManager.virtualColorIdFor(type);
+		Integer kitId = fashionManager.virtualKitIdFor(slot);
 		xButton.setEnabled(colorId != null || kitId != null);
 		String text = slot != null ?
 			slot.name().toLowerCase() + " slot" :

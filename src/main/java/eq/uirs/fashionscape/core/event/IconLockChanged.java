@@ -5,7 +5,7 @@ import lombok.Value;
 
 @EqualsAndHashCode(callSuper = false)
 @Value
-public class IconLockChanged extends SwapEvent
+public class IconLockChanged
 {
 	boolean isLocked;
 }
