@@ -8,9 +8,9 @@ import net.runelite.api.kit.KitType;
 @Getter
 public enum HandsKit implements Kit
 {
-	BRACERS2("Bracers", 33, 67, true),
+	BASIC2("Basic", 33, 67, true),
 	PLAIN_H("Plain", 34, 68, false),
-	BRACERS("Bracers", 35, 69, false);
+	BASIC("Basic", 35, 69, false);
 
 	private final String displayName;
 

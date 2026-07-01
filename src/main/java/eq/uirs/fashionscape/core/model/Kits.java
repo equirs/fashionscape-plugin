@@ -104,7 +104,7 @@ public class Kits
 		}
 		else
 		{
-			Kit kit = KitUtil.getWithAnalog(kitId, newGender);
+			Kit kit = KitUtil.KIT_ID_TO_KIT.get(kitId);
 			Integer newKitId = kit != null ? kit.getKitId(newGender) : null;
 			put(slot, newKitId);
 		}

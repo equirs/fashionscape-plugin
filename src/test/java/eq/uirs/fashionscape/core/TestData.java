@@ -49,7 +49,7 @@ public class TestData
 	public static final SlotInfo flaresLegs = SlotInfo.kit(LegsKit.FLARES, 0);
 	public static final SlotInfo curlsHair = SlotInfo.kit(HairKit.CURLS, 0);
 	public static final SlotInfo smallBoots = SlotInfo.kit(BootsKit.SMALL, 0);
-	public static final SlotInfo bracersHands = SlotInfo.kit(HandsKit.BRACERS, 0);
+	public static final SlotInfo bracersHands = SlotInfo.kit(HandsKit.BASIC, 0);
 	public static final SlotInfo daliJaw = SlotInfo.kit(JawKit.DALI, 0);
 
 	// equipment ids

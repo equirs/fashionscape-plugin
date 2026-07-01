@@ -1,13 +1,11 @@
 package eq.uirs.fashionscape.core.utils;
 
-import eq.uirs.fashionscape.core.Fallbacks;
 import eq.uirs.fashionscape.data.kit.Kit;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-import javax.annotation.Nullable;
 import net.runelite.api.kit.KitType;
 
 public class KitUtil
@@ -35,20 +33,5 @@ public class KitUtil
 				}
 			}
 		}
-	}
-
-	@Nullable
-	public static Kit getWithAnalog(int kitId, Integer gender)
-	{
-		Kit kit = KIT_ID_TO_KIT.get(kitId);
-		if (kit == null)
-		{
-			return null;
-		}
-		if (kit.getKitId(gender) == null)
-		{
-			kit = Fallbacks.getMirroredKit(kit, gender);
-		}
-		return kit;
 	}
 }

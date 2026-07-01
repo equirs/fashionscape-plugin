@@ -23,7 +23,8 @@ public enum SkinColor implements Colorable
 	BLACK(9, new Color(15, 15, 15)),
 	WHITE(10, new Color(255, 255, 255)),
 	CYAN(11, new Color(5, 152, 159)),
-	PURPLE(12, new Color(100, 65, 164));
+	PURPLE(12, new Color(100, 65, 164)),
+	RED(13, new Color(127, 25, 13));
 
 	private static final SkinColor[] sorted = Arrays.stream(values())
 		.sorted(Comparator.comparing(SkinColor::getColorId))

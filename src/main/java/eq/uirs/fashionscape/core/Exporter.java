@@ -251,12 +251,12 @@ public class Exporter
 				List<SlotInfo> kits = newKits.entrySet().stream()
 					.map(e -> {
 						KitType slot = e.getKey();
-						Kit kit = KitUtil.getWithAnalog(e.getValue(), gender);
+						Kit kit = KitUtil.KIT_ID_TO_KIT.get(e.getValue());
 						// if no analog exists, use a fallback (don't notify UI that the player's slot is unknown)
 						if (kit == null)
 						{
 							int kitId = fallbacks.getKit(slot, gender, false);
-							kit = KitUtil.getWithAnalog(kitId, gender);
+							kit = KitUtil.KIT_ID_TO_KIT.get(kitId);
 						}
 						return kit != null ? SlotInfo.kit(kit, gender) : SlotInfo.nothing(slot);
 					})

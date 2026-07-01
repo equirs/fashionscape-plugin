@@ -8,26 +8,23 @@ import net.runelite.api.kit.KitType;
 @RequiredArgsConstructor
 public enum ArmsKit implements Kit
 {
-	REGULAR(26, null),
-	MUSCLEBOUND(27, null),
-	LOOSE_SLEEVED(28, null),
-	LARGE_CUFFED(29, null),
-	THIN(30, null),
-	SHOULDER_PADS(31, null),
+	REGULAR(26, 61),
+	MUSCLY(27, 63),
+	LOOSE_SLEEVED(28, 248),
+	LARGE_CUFFS(29, 65),
+	THIN_SLEEVES(30, 249),
+	SHOULDER_PADS(31, 250),
 	THIN_STRIPE(32, 97),
-	THICK_STRIPE(84, null),
+	THICK_STRIPES(84, 95),
 	WHITE_CUFFS(85, 96),
-	PRINCELY_A(86, null),
-	TATTY(87, 98),
-	RIPPED(88, null),
-	SHORT_SLEEVES(null, 61),
-	BARE_ARMS(null, 62),
-	MUSCLEY(null, 63),
-	LONG_SLEEVED(null, 64),
-	LARGE_CUFFS(null, 65),
-	FRILLY_A(null, 66),
-	SWEATER_A(null, 95),
-	BARE_SHOULDERS(null, 99);
+	REGAL_A(86, 251),
+	TATTY(87, 252),
+	TATTY_SHOULDERS(263, 98),
+	RIPPED(88, 253),
+	BARE_SLEEVES(260, 62),
+	LONG_SLEEVED(261, 64),
+	FRILLY_A(262, 66),
+	BARE_SHOULDERS(264, 99);
 
 	private final Integer mascKitId;
 	private final Integer femKitId;
@@ -43,12 +40,10 @@ public enum ArmsKit implements Kit
 	{
 		switch (this)
 		{
-			case PRINCELY_A:
-				return "Princely";
+			case REGAL_A:
+				return "Regal";
 			case FRILLY_A:
 				return "Frilly";
-			case SWEATER_A:
-				return "Sweater";
 		}
 		return Kit.sentenceCaseName(this);
 	}
