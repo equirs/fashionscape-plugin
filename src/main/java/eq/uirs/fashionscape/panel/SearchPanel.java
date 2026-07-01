@@ -13,14 +13,11 @@ import eq.uirs.fashionscape.core.utils.ItemSlotUtil;
 import java.awt.BorderLayout;
 import java.awt.CardLayout;
 import java.awt.Color;
-import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.GridLayout;
 import java.awt.event.ItemEvent;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -322,20 +319,7 @@ public class SearchPanel extends JPanel
 			ImageIcon icon = iconFor(filterSlot, isLocked);
 			tab.setIcon(icon);
 			tab.setToolTipText(filterSlot.getDisplayName());
-			tab.addMouseListener(new MouseAdapter()
-			{
-				@Override
-				public void mouseEntered(MouseEvent e)
-				{
-					setCursor(new Cursor(Cursor.HAND_CURSOR));
-				}
-
-				@Override
-				public void mouseExited(MouseEvent e)
-				{
-					setCursor(new Cursor(Cursor.DEFAULT_CURSOR));
-				}
-			});
+			tab.addMouseListener(PanelUtil.hoverCursor(this));
 			tab.setOnSelectEvent(() -> {
 				filter = itemComposition -> {
 					KitType kitType = filterSlot.getKitType();

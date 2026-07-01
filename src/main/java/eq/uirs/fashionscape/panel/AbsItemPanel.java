@@ -12,10 +12,10 @@ abstract class AbsItemPanel extends AbsIconLabelPanel
 	protected final ItemManager itemManager;
 	private final boolean developerMode;
 
-	AbsItemPanel(BufferedImage icon, ItemManager itemManager,
+	AbsItemPanel(BufferedImage image, ItemManager itemManager,
 	             ClientThread clientThread, boolean developerMode)
 	{
-		super(icon, clientThread);
+		super(image, clientThread);
 		this.itemManager = itemManager;
 		this.developerMode = developerMode;
 	}

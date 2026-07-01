@@ -15,12 +15,9 @@ import eq.uirs.fashionscape.data.color.ColorType;
 import eq.uirs.fashionscape.remote.RemoteCategory;
 import eq.uirs.fashionscape.remote.RemoteDataHandler;
 import java.awt.BorderLayout;
-import java.awt.Cursor;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
@@ -31,7 +28,6 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.inject.Named;
-import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JFileChooser;
 import javax.swing.JMenuItem;
@@ -50,7 +46,6 @@ import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.ui.PluginPanel;
 import net.runelite.client.ui.components.materialtabs.MaterialTab;
 import net.runelite.client.ui.components.materialtabs.MaterialTabGroup;
-import net.runelite.client.util.ImageUtil;
 import net.runelite.client.util.LinkBrowser;
 
 @Slf4j
@@ -289,31 +284,31 @@ public class FashionscapePanel extends PluginPanel
 		c.gridx = 0;
 		c.gridy = 0;
 
-		undo = new JButton(new ImageIcon(ImageUtil.loadImageResource(getClass(), "undo.png")));
+		undo = new JButton(PanelUtil.icon("undo"));
 		undo.setToolTipText("Undo");
 		undo.addActionListener(e -> clientThread.invokeLater(() -> {
 			fashionManager.undo();
 			reloadResults();
 		}));
 		checkButtonEnabled(undo);
-		undo.addMouseListener(createHoverListener(undo));
+		undo.addMouseListener(PanelUtil.hoverCursor(this));
 		undo.setFocusPainted(false);
 		buttonContainer.add(undo, c);
 		c.gridx++;
 
-		redo = new JButton(new ImageIcon(ImageUtil.loadImageResource(getClass(), "redo.png")));
+		redo = new JButton(PanelUtil.icon("redo"));
 		redo.setToolTipText("Redo");
 		redo.addActionListener(e -> clientThread.invokeLater(() -> {
 			fashionManager.redo();
 			reloadResults();
 		}));
 		checkButtonEnabled(redo);
-		redo.addMouseListener(createHoverListener(redo));
+		redo.addMouseListener(PanelUtil.hoverCursor(this));
 		redo.setFocusPainted(false);
 		buttonContainer.add(redo, c);
 		c.gridx++;
 
-		shuffle = new JButton(new ImageIcon(ImageUtil.loadImageResource(getClass(), "shuffle.png")));
+		shuffle = new JButton(PanelUtil.icon("shuffle"));
 		shuffle.setSize(12, 12);
 		shuffle.setToolTipText("Randomize");
 		shuffle.addActionListener(e -> clientThread.invokeLater(() -> {
@@ -322,7 +317,7 @@ public class FashionscapePanel extends PluginPanel
 		}));
 		checkButtonEnabled(shuffle);
 		shuffle.setFocusPainted(false);
-		shuffle.addMouseListener(createHoverListener(shuffle));
+		shuffle.addMouseListener(PanelUtil.hoverCursor(this));
 		buttonContainer.add(shuffle, c);
 		c.gridx++;
 
@@ -331,11 +326,11 @@ public class FashionscapePanel extends PluginPanel
 		openAll.addActionListener(e -> LinkBrowser.open(Exporter.OUTFITS_DIR.toString()));
 		openSavedFolderMenu.add(openAll);
 
-		save = new JButton(new ImageIcon(ImageUtil.loadImageResource(getClass(), "save.png")));
+		save = new JButton(PanelUtil.icon("save"));
 		save.setToolTipText("Save");
 		save.addActionListener(e -> openSaveDialog());
 		save.setFocusPainted(false);
-		save.addMouseListener(createHoverListener(save));
+		save.addMouseListener(PanelUtil.hoverCursor(this));
 		save.setComponentPopupMenu(openSavedFolderMenu);
 		checkButtonEnabled(save);
 		buttonContainer.add(save, c);
@@ -346,13 +341,13 @@ public class FashionscapePanel extends PluginPanel
 		cloneSelf.addActionListener(e -> fashionManager.importSelf());
 		cloneSelfMenu.add(cloneSelf);
 
-		JButton load = new JButton(new ImageIcon(ImageUtil.loadImageResource(getClass(), "load.png")));
+		JButton load = new JButton(PanelUtil.icon("load"));
 		load.setToolTipText("Load");
 		load.addActionListener(e -> openLoadDialog());
 		load.setFocusPainted(false);
 		load.setComponentPopupMenu(cloneSelfMenu);
 		checkButtonEnabled(load);
-		load.addMouseListener(createHoverListener(load));
+		load.addMouseListener(PanelUtil.hoverCursor(this));
 		buttonContainer.add(load, c);
 		c.gridx++;
 
@@ -364,14 +359,14 @@ public class FashionscapePanel extends PluginPanel
 		}));
 		softClearMenu.add(softClear);
 
-		clear = new JButton(new ImageIcon(ImageUtil.loadImageResource(getClass(), "clear.png")));
+		clear = new JButton(PanelUtil.icon("clear"));
 		clear.setToolTipText("Clear all");
 		clear.addActionListener(e -> clientThread.invokeLater(() -> {
 			fashionManager.clear(true);
 			reloadResults();
 		}));
 		clear.setFocusPainted(false);
-		clear.addMouseListener(createHoverListener(clear));
+		clear.addMouseListener(PanelUtil.hoverCursor(this));
 		clear.setComponentPopupMenu(softClearMenu);
 		checkButtonEnabled(clear);
 		buttonContainer.add(clear, c);
@@ -458,27 +453,6 @@ public class FashionscapePanel extends PluginPanel
 				log.warn("Failed to import fashionscape from file", e);
 			}
 		}
-	}
-
-	private MouseAdapter createHoverListener(JButton jButton)
-	{
-		return new MouseAdapter()
-		{
-			@Override
-			public void mouseEntered(MouseEvent e)
-			{
-				if (jButton.isEnabled())
-				{
-					setCursor(new Cursor(Cursor.HAND_CURSOR));
-				}
-			}
-
-			@Override
-			public void mouseExited(MouseEvent e)
-			{
-				setCursor(new Cursor(Cursor.DEFAULT_CURSOR));
-			}
-		};
 	}
 
 	private boolean hasVirtuals()

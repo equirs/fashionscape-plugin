@@ -124,7 +124,7 @@ public class KitPanel extends DropdownIconPanel
 		}
 
 		configureButton(xButton);
-		xButton.setIcon(new ImageIcon(ImageUtil.loadImageResource(this.getClass(), "x.png")));
+		xButton.setIcon(PanelUtil.icon("x"));
 		xButton.addActionListener(e -> clientThread.invokeLater(() -> fashionManager.revert(slot, type)));
 		buttons.add(xButton);
 
@@ -458,12 +458,8 @@ public class KitPanel extends DropdownIconPanel
 	{
 		if (slot != null)
 		{
-			boolean locked = fashionManager.isKitLocked(slot);
-			String lockIcon = locked ? "lock" : "unlock";
-			lockButton.setIcon(
-				new ImageIcon(ImageUtil.loadImageResource(this.getClass(), lockIcon + ".png")));
-			String action = locked ? "Unlock" : "Lock";
-			lockButton.setToolTipText(action + " " + slot.name().toLowerCase() + " slot");
+			PanelUtil.applyLockButton(lockButton, fashionManager.isKitLocked(slot),
+				slot.name().toLowerCase() + " slot");
 		}
 	}
 

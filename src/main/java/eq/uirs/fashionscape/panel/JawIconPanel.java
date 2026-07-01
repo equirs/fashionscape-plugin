@@ -13,7 +13,6 @@ import java.awt.GridLayout;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
-import javax.swing.ImageIcon;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.border.EmptyBorder;
@@ -60,7 +59,7 @@ public class JawIconPanel extends DropdownIconPanel
 		buttons.add(lockButton);
 
 		configureButton(xButton);
-		xButton.setIcon(new ImageIcon(ImageUtil.loadImageResource(this.getClass(), "x.png")));
+		xButton.setIcon(PanelUtil.icon("x"));
 		xButton.addActionListener(e -> clientThread.invokeLater(fashionManager::revertIcon));
 		buttons.add(xButton);
 
@@ -230,12 +229,7 @@ public class JawIconPanel extends DropdownIconPanel
 
 	private void updateLockButton()
 	{
-		boolean locked = fashionManager.isIconLocked();
-		String lockIcon = locked ? "lock" : "unlock";
-		lockButton.setIcon(
-			new ImageIcon(ImageUtil.loadImageResource(this.getClass(), lockIcon + ".png")));
-		String action = locked ? "Unlock" : "Lock";
-		lockButton.setToolTipText(action + " icon");
+		PanelUtil.applyLockButton(lockButton, fashionManager.isIconLocked(), "icon");
 	}
 
 	private void setIconTooltip()

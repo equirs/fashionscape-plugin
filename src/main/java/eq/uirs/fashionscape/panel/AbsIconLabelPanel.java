@@ -8,6 +8,7 @@ import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.List;
 import javax.swing.ImageIcon;
+import javax.swing.JButton;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.border.EmptyBorder;
@@ -18,6 +19,7 @@ import net.runelite.client.util.AsyncBufferedImage;
 abstract class AbsIconLabelPanel extends JPanel
 {
 	static final Dimension ICON_SIZE = new Dimension(32, 32);
+	static final Dimension BUTTON_SIZE = new Dimension(16, 16);
 
 	protected final ClientThread clientThread;
 	protected final List<JPanel> highlightPanels;
@@ -66,6 +68,22 @@ abstract class AbsIconLabelPanel extends JPanel
 				icon.setIcon(new ImageIcon(image));
 			}
 		}
+	}
+
+	protected void configureButton(JButton button)
+	{
+		configureButton(button, BUTTON_SIZE);
+	}
+
+	protected void configureButton(JButton button, Dimension size)
+	{
+		button.setBorder(new EmptyBorder(0, 2, 0, 2));
+		button.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+		button.setPreferredSize(size);
+		button.setFocusPainted(false);
+		button.setBorderPainted(false);
+		button.setContentAreaFilled(false);
+		button.addMouseListener(PanelUtil.hoverCursor(this));
 	}
 
 	protected void matchComponentBackground(JPanel panel, Color color)

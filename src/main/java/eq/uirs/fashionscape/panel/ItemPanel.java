@@ -6,13 +6,11 @@ import eq.uirs.fashionscape.core.event.ItemChanged;
 import eq.uirs.fashionscape.core.event.LockChanged;
 import eq.uirs.fashionscape.core.layer.ModelType;
 import java.awt.BorderLayout;
-import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.GridLayout;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
-import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JPanel;
 import javax.swing.border.EmptyBorder;
@@ -41,11 +39,11 @@ class ItemPanel extends AbsItemPanel
 	private MouseAdapter mouseAdapter = null;
 	private MouseAdapter hoverAdapter = null;
 
-	public ItemPanel(BufferedImage icon, ItemManager itemManager,
-					 ClientThread clientThread, FashionManager fashionManager, KitType slot,
-					 SearchOpener searchOpener, boolean developerMode)
+	public ItemPanel(BufferedImage image, ItemManager itemManager,
+	                 ClientThread clientThread, FashionManager fashionManager, KitType slot,
+	                 SearchOpener searchOpener, boolean developerMode)
 	{
-		super(icon, itemManager, clientThread, developerMode);
+		super(image, itemManager, clientThread, developerMode);
 		this.slot = slot;
 		this.fashionManager = fashionManager;
 		this.searchOpener = searchOpener;
@@ -60,25 +58,17 @@ class ItemPanel extends AbsItemPanel
 		buttons.setBackground(ColorScheme.DARKER_GRAY_COLOR);
 
 		lockButton = new JButton();
-		lockButton.setBorder(new EmptyBorder(0, 2, 0, 2));
-		lockButton.setBackground(ColorScheme.DARKER_GRAY_COLOR);
-		lockButton.setPreferredSize(ICON_SIZE);
-		lockButton.setFocusPainted(false);
-		lockButton.setBorderPainted(false);
-		lockButton.setContentAreaFilled(false);
+		configureButton(lockButton, ICON_SIZE);
 		lockButton.addActionListener(e -> fashionManager.toggleItemLocked(slot));
 		buttons.add(lockButton);
 
 		xButton = new JButton();
-		xButton.setPreferredSize(ICON_SIZE);
-		xButton.setBorder(new EmptyBorder(0, 2, 0, 2));
-		xButton.setBackground(ColorScheme.DARKER_GRAY_COLOR);
-		xButton.setFocusPainted(false);
-		xButton.setBorderPainted(false);
-		xButton.setContentAreaFilled(false);
-		xButton.setIcon(new ImageIcon(ImageUtil.loadImageResource(this.getClass(), "x.png")));
+		configureButton(xButton, ICON_SIZE);
+		xButton.setIcon(PanelUtil.icon("x"));
 		xButton.addActionListener(e -> clientThread.invokeLater(() -> fashionManager.revertSlot(slot)));
 		buttons.add(xButton);
+
+		icon.setToolTipText("Open " + slot.name().toLowerCase() + " slot search");
 
 		rightPanel.add(buttons, BorderLayout.EAST);
 
@@ -125,25 +115,16 @@ class ItemPanel extends AbsItemPanel
 		icon.removeMouseListener(mouseAdapter);
 		mouseAdapter = createOpenSearchClickListener();
 		icon.addMouseListener(mouseAdapter);
-		icon.setToolTipText("Open " + slot.name().toLowerCase() + " slot search");
 
 		icon.removeMouseListener(hoverAdapter);
-		xButton.removeMouseListener(hoverAdapter);
-		lockButton.removeMouseListener(hoverAdapter);
-		hoverAdapter = createHoverListener();
+		hoverAdapter = PanelUtil.hoverCursor(this);
 		icon.addMouseListener(hoverAdapter);
-		xButton.addMouseListener(hoverAdapter);
-		lockButton.addMouseListener(hoverAdapter);
 	}
 
 	void updateLockButton()
 	{
-		boolean locked = fashionManager.isItemLocked(slot);
-		String lockIcon = locked ? "lock" : "unlock";
-		lockButton.setIcon(
-			new ImageIcon(ImageUtil.loadImageResource(this.getClass(), lockIcon + ".png")));
-		String action = locked ? "Unlock" : "Lock";
-		lockButton.setToolTipText(action + " " + slot.name().toLowerCase() + " slot");
+		PanelUtil.applyLockButton(lockButton, fashionManager.isItemLocked(slot),
+			slot.name().toLowerCase() + " slot");
 	}
 
 	void updateXButton()
@@ -191,24 +172,4 @@ class ItemPanel extends AbsItemPanel
 		};
 	}
 
-	private MouseAdapter createHoverListener()
-	{
-		return new MouseAdapter()
-		{
-			@Override
-			public void mouseEntered(MouseEvent e)
-			{
-				if (e.getComponent().isEnabled())
-				{
-					setCursor(new Cursor(Cursor.HAND_CURSOR));
-				}
-			}
-
-			@Override
-			public void mouseExited(MouseEvent e)
-			{
-				setCursor(new Cursor(Cursor.DEFAULT_CURSOR));
-			}
-		};
-	}
 }
