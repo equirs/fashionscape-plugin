@@ -37,6 +37,7 @@ import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.swing.ImageIcon;
+import javax.swing.JButton;
 import javax.swing.JComboBox;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
@@ -118,6 +119,7 @@ public class SearchPanel extends JPanel
 	private Function<ItemComposition, Boolean> filter;
 	private boolean allowShortQueries = false;
 	private SortBy sort;
+	private boolean sortInverted;
 	private KitType selectedSlot = null;
 	private boolean hasSearched = false;
 	private final Map<Integer, Double> scores = new HashMap<>();
@@ -145,9 +147,9 @@ public class SearchPanel extends JPanel
 
 	@Inject
 	public SearchPanel(Client client, FashionManager fashionManager, ClientThread clientThread,
-					   ItemManager itemManager, ScheduledExecutorService executor,
-					   FashionscapeConfig config, ColorScorer colorScorer, Exclusions exclusions,
-					   @Named("developerMode") boolean developerMode)
+	                   ItemManager itemManager, ScheduledExecutorService executor,
+	                   FashionscapeConfig config, ColorScorer colorScorer, Exclusions exclusions,
+	                   @Named("developerMode") boolean developerMode)
 	{
 		this.client = client;
 		this.fashionManager = fashionManager;
@@ -206,19 +208,16 @@ public class SearchPanel extends JPanel
 
 		cardLayout.show(centerPanel, ERROR_PANEL);
 
-		JPanel sortBar = new JPanel();
-		sortBar.setLayout(new GridLayout(1, 2));
+		// label takes its natural width, combo box fills the rest, direction button is fixed-width
+		JPanel sortBar = new JPanel(new BorderLayout(5, 0));
 		sortBar.setBorder(new EmptyBorder(5, 0, 0, 0));
 		sortBar.setBackground(ColorScheme.DARK_GRAY_COLOR);
 
 		JLabel sortLabel = new JLabel("Sort by");
 		sortLabel.setForeground(Color.WHITE);
-		sortLabel.setMaximumSize(new Dimension(0, 0));
-		sortLabel.setPreferredSize(new Dimension(0, 0));
-		sortBar.add(sortLabel);
-
-		JComboBox<SortBy> sortBox = createSortBox(config);
-		sortBar.add(sortBox);
+		sortBar.add(sortLabel, BorderLayout.WEST);
+		sortBar.add(createSortBox(config), BorderLayout.CENTER);
+		sortBar.add(createSortDirectionButton(), BorderLayout.EAST);
 
 		container.add(slotFilter, groupConstraints);
 		groupConstraints.gridy++;
@@ -255,6 +254,27 @@ public class SearchPanel extends JPanel
 			}
 		});
 		return sortBox;
+	}
+
+	private JButton createSortDirectionButton()
+	{
+		JButton button = new JButton();
+		button.setPreferredSize(new Dimension(25, 25));
+		button.setFocusPainted(false);
+		button.addMouseListener(PanelUtil.hoverCursor(this));
+		applySortDirection(button);
+		button.addActionListener(e -> {
+			sortInverted = !sortInverted;
+			applySortDirection(button);
+			updateSearchDebounced();
+		});
+		return button;
+	}
+
+	private void applySortDirection(JButton button)
+	{
+		button.setText(sortInverted ? "⬆" : "⬇");
+		button.setToolTipText(sortInverted ? "Inverted order" : "Standard order");
 	}
 
 	public void clearResults()
@@ -477,11 +497,12 @@ public class SearchPanel extends JPanel
 			switch (this.sort)
 			{
 				case ITEM_ID:
+					results.sort(directed(Comparator.comparingInt(Result::getId)));
 					addPendingResults(postExec);
 					break;
 				case ALPHABETICAL:
 					executor.submit(() -> {
-						results.sort(itemAlphaComparator);
+						results.sort(directed(itemAlphaComparator));
 						addPendingResults(postExec);
 					});
 					break;
@@ -504,8 +525,13 @@ public class SearchPanel extends JPanel
 			int itemId = result.getId();
 			scores.put(itemId, colorScorer.score(itemId, selectedSlot));
 		}
-		results.sort(Comparator.comparing(r ->
-			-scores.getOrDefault(r.getId(), 0.0)));
+		results.sort(directed(Comparator.comparingDouble(r ->
+			-scores.getOrDefault(r.getId(), 0.0))));
+	}
+
+	private Comparator<Result> directed(Comparator<Result> comparator)
+	{
+		return sortInverted ? comparator.reversed() : comparator;
 	}
 
 	// only to be called from updateSearch
@@ -526,20 +552,12 @@ public class SearchPanel extends JPanel
 			}
 			else
 			{
+				boolean showScores = scores.values().stream().anyMatch(s -> s != null && s != 0.0);
 				boolean firstItem = true;
-				boolean showScores = true;
 				for (Result result : results)
 				{
 					int itemId = result.getId();
-					Double score = scores.get(itemId);
-					if (firstItem)
-					{
-						showScores = score != null && score != 0.0;
-					}
-					if (!showScores)
-					{
-						score = null;
-					}
+					Double score = showScores ? scores.get(itemId) : null;
 					SearchItemPanel panel = new SearchItemPanel(itemId, result.getIcon(),
 						result.getSlot(), itemManager, fashionManager, clientThread, listener, score, developerMode);
 					searchPanels.add(panel);
