@@ -3,6 +3,7 @@ package eq.uirs.fashionscape.core.layer;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Sets;
+import eq.uirs.fashionscape.core.CompositionHelper;
 import eq.uirs.fashionscape.core.Diff;
 import eq.uirs.fashionscape.core.Exclusions;
 import eq.uirs.fashionscape.core.Fallbacks;
@@ -53,6 +54,7 @@ public class Layers
 	private final IdleAnimations idleAnimations;
 	private final Fallbacks fallbacks;
 	private final EventBus eventBus;
+	private final CompositionHelper compositionHelper;
 
 	private final ModelInfo realModels;
 	private final ModelInfo virtualModels;
@@ -65,11 +67,13 @@ public class Layers
 
 	@Inject
 	public Layers(IdleAnimations idleAnimations, Fallbacks fallbacks, EventBus eventBus,
-				  @Named("real") ModelInfo realModels, @Named("virtual") ModelInfo virtualModels, @Named("preview") ModelInfo previewModels)
+	              CompositionHelper compositionHelper, @Named("real") ModelInfo realModels,
+	              @Named("virtual") ModelInfo virtualModels, @Named("preview") ModelInfo previewModels)
 	{
 		this.idleAnimations = idleAnimations;
 		this.fallbacks = fallbacks;
 		this.eventBus = eventBus;
+		this.compositionHelper = compositionHelper;
 		this.realModels = realModels;
 		this.virtualModels = virtualModels;
 		this.previewModels = previewModels;
@@ -103,9 +107,10 @@ public class Layers
 	}
 
 	// called upon shutting down to reset local player to normal state without clearing plugin state
-	public void revertToRealModels(Player player)
+	public void revertToRealModels(@Nullable Player player)
 	{
-		if (player == null)
+		PlayerComposition composition = compositionHelper.get(player);
+		if (player == null || composition == null)
 		{
 			return;
 		}
@@ -113,11 +118,6 @@ public class Layers
 		if (revertedAnimId != null)
 		{
 			player.setIdlePoseAnimation(revertedAnimId);
-		}
-		PlayerComposition composition = player.getPlayerComposition();
-		if (composition == null)
-		{
-			return;
 		}
 		int[] equipment = computeEquipment(true);
 		for (int i = 0; i < equipment.length; i++)
@@ -136,7 +136,7 @@ public class Layers
 	 * Extracts information about the player after in-game composition changes.
 	 * This must be called in between the player changing and refreshing virtual equipment.
 	 */
-	public void deriveNonEquipment(PlayerComposition composition, int idlePoseAnim)
+	public void deriveNonEquipment(@Nullable PlayerComposition composition, int idlePoseAnim)
 	{
 		if (composition == null)
 		{

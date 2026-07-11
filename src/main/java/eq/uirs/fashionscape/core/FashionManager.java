@@ -60,6 +60,7 @@ public class FashionManager
 	private final Exclusions exclusions;
 	private final ConfigHelper configHelper;
 	private final RemoteDataHandler remote;
+	private final CompositionHelper compositionHelper;
 
 	private boolean receivedDataAsync = false;
 	private String lastKnownRSProfileKey = null;
@@ -187,11 +188,7 @@ public class FashionManager
 
 	public void importPlayer(@Nullable Player player)
 	{
-		if (player == null)
-		{
-			return;
-		}
-		PlayerComposition composition = player.getPlayerComposition();
+		PlayerComposition composition = compositionHelper.get(player);
 		if (composition == null)
 		{
 			return;
@@ -204,12 +201,8 @@ public class FashionManager
 	public void refreshPlayer()
 	{
 		Player player = client.getLocalPlayer();
-		if (player == null)
-		{
-			return;
-		}
-		PlayerComposition composition = player.getPlayerComposition();
-		if (composition == null)
+		PlayerComposition composition = compositionHelper.getLocal();
+		if (player == null || composition == null)
 		{
 			return;
 		}
@@ -268,7 +261,7 @@ public class FashionManager
 		{
 			return;
 		}
-		PlayerComposition composition = player.getPlayerComposition();
+		PlayerComposition composition = compositionHelper.getLocal();
 		layers.deriveNonEquipment(composition, player.getIdlePoseAnimation());
 		String profileKey = configManager.getRSProfileKey();
 		if (!Objects.equals(lastKnownRSProfileKey, profileKey))

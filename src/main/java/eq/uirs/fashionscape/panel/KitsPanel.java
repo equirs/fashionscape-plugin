@@ -1,6 +1,7 @@
 package eq.uirs.fashionscape.panel;
 
 import eq.uirs.fashionscape.FashionscapeConfig;
+import eq.uirs.fashionscape.core.CompositionHelper;
 import eq.uirs.fashionscape.core.FashionManager;
 import eq.uirs.fashionscape.core.event.ColorChanged;
 import eq.uirs.fashionscape.core.event.ColorLockChanged;
@@ -26,7 +27,6 @@ import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
 import lombok.Value;
 import lombok.extern.slf4j.Slf4j;
-import net.runelite.api.Client;
 import net.runelite.api.Player;
 import net.runelite.api.PlayerComposition;
 import net.runelite.api.kit.KitType;
@@ -45,8 +45,8 @@ public class KitsPanel extends JPanel
 	private final FashionManager fashionManager;
 	private final ClientThread clientThread;
 	private final ItemManager itemManager;
-	private final Client client;
 	private final FashionscapeConfig config;
+	private final CompositionHelper compositionHelper;
 
 	private final JPanel resultsPanel = new JPanel();
 	private final JScrollPane scrollPane = new JScrollPane();
@@ -92,14 +92,14 @@ public class KitsPanel extends JPanel
 	}
 
 	@Inject
-	public KitsPanel(FashionManager fashionManager, ClientThread clientThread, Client client, FashionscapeConfig config,
-	                 ItemManager itemManager)
+	public KitsPanel(FashionManager fashionManager, ClientThread clientThread, FashionscapeConfig config,
+	                 ItemManager itemManager, CompositionHelper compositionHelper)
 	{
 		this.fashionManager = fashionManager;
 		this.clientThread = clientThread;
-		this.client = client;
 		this.config = config;
 		this.itemManager = itemManager;
+		this.compositionHelper = compositionHelper;
 
 		setLayout(new GridLayout(1, 1));
 		setBackground(ColorScheme.DARK_GRAY_COLOR);
@@ -204,17 +204,14 @@ public class KitsPanel extends JPanel
 
 	public void onPlayerChanged(Player player)
 	{
-		if (player != null)
+		PlayerComposition composition = compositionHelper.get(player);
+		if (composition != null)
 		{
-			PlayerComposition composition = player.getPlayerComposition();
-			if (composition != null)
+			int gender = composition.getGender();
+			if (this.gender == null || this.gender != gender)
 			{
-				int gender = composition.getGender();
-				if (this.gender == null || this.gender != gender)
-				{
-					this.gender = gender;
-					populateKitSlots();
-				}
+				this.gender = gender;
+				populateKitSlots();
 			}
 		}
 	}
@@ -258,14 +255,10 @@ public class KitsPanel extends JPanel
 	@Nullable
 	private Integer getGender()
 	{
-		Player player = client.getLocalPlayer();
-		if (player != null)
+		PlayerComposition composition = compositionHelper.getLocal();
+		if (composition != null)
 		{
-			PlayerComposition composition = player.getPlayerComposition();
-			if (composition != null)
-			{
-				return composition.getGender();
-			}
+			return composition.getGender();
 		}
 		return null;
 	}

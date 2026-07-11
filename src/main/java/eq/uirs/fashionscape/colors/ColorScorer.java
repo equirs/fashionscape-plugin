@@ -1,5 +1,6 @@
 package eq.uirs.fashionscape.colors;
 
+import eq.uirs.fashionscape.core.CompositionHelper;
 import eq.uirs.fashionscape.core.SlotInfo;
 import eq.uirs.fashionscape.core.layer.Layers;
 import eq.uirs.fashionscape.data.color.ColorType;
@@ -19,8 +20,6 @@ import javax.inject.Singleton;
 import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import lombok.extern.slf4j.Slf4j;
-import net.runelite.api.Client;
-import net.runelite.api.Player;
 import net.runelite.api.PlayerComposition;
 import net.runelite.api.kit.KitType;
 
@@ -29,8 +28,8 @@ import net.runelite.api.kit.KitType;
 @RequiredArgsConstructor(onConstructor_ = {@Inject})
 public class ColorScorer
 {
-	private final Client client;
 	private final Layers layers;
+	private final CompositionHelper compositionHelper;
 
 	private final Map<KitType, List<ItemColorInfo>> kitColors = new ConcurrentHashMap<>();
 	private final Map<ColorType, Colorable> playerColors = new ConcurrentHashMap<>();
@@ -50,12 +49,7 @@ public class ColorScorer
 	public void updatePlayerInfo()
 	{
 		kitColors.clear();
-		Player player = client.getLocalPlayer();
-		if (player == null)
-		{
-			return;
-		}
-		PlayerComposition composition = player.getPlayerComposition();
+		PlayerComposition composition = compositionHelper.getLocal();
 		if (composition == null)
 		{
 			return;
@@ -91,12 +85,7 @@ public class ColorScorer
 		{
 			kitColors.put(entry.getKey(), colorsFor(entry.getValue()));
 		}
-		Player player = client.getLocalPlayer();
-		if (player == null)
-		{
-			return;
-		}
-		PlayerComposition composition = player.getPlayerComposition();
+		PlayerComposition composition = compositionHelper.getLocal();
 		if (composition == null)
 		{
 			return;

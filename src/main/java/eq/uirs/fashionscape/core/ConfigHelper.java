@@ -202,6 +202,8 @@ public class ConfigHelper
 		HashMap<KitType, Integer> legacyEquipment = safeDeserialize(config.legacyEquipment(), KIT_IDS_TYPE, new HashMap<>());
 		if (legacyEquipment.isEmpty())
 		{
+			// force set legacy equipment in case the value can't be deserialized
+			config.setLegacyEquipment(configSerializer.serialize(new HashMap<KitType, Integer>()));
 			return;
 		}
 		HashMap<KitType, SlotInfo> newEquipment = new HashMap<>();
