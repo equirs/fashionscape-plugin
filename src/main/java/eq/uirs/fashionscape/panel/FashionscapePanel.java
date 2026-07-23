@@ -89,8 +89,8 @@ public class FashionscapePanel extends PluginPanel
 
 	@Inject
 	public FashionscapePanel(SearchPanel searchPanel, KitsPanel kitsPanel, DebugAnimationsPanel animsPanel,
-							 FashionManager fashionManager, ItemManager itemManager, ClientThread clientThread,
-							 RemoteDataHandler remote, @Named("developerMode") boolean developerMode)
+	                         FashionManager fashionManager, ItemManager itemManager, ClientThread clientThread,
+	                         RemoteDataHandler remote, @Named("developerMode") boolean developerMode)
 	{
 		super(false);
 		this.clientThread = clientThread;
@@ -250,6 +250,10 @@ public class FashionscapePanel extends PluginPanel
 		if (kitsPanel != null)
 		{
 			kitsPanel.onPlayerChanged(player);
+		}
+		if (itemsPanel != null)
+		{
+			itemsPanel.refreshWeaponWarnings();
 		}
 	}
 

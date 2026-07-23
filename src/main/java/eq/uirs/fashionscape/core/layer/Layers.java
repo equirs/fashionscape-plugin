@@ -10,6 +10,7 @@ import eq.uirs.fashionscape.core.Fallbacks;
 import eq.uirs.fashionscape.core.FashionManager;
 import eq.uirs.fashionscape.core.IdleAnimations;
 import eq.uirs.fashionscape.core.SlotInfo;
+import eq.uirs.fashionscape.core.WeaponAnimMismatch;
 import eq.uirs.fashionscape.core.event.KnownKitChanged;
 import eq.uirs.fashionscape.core.model.Items;
 import eq.uirs.fashionscape.core.model.Kits;
@@ -20,8 +21,10 @@ import eq.uirs.fashionscape.data.color.ColorType;
 import eq.uirs.fashionscape.data.kit.JawIcon;
 import eq.uirs.fashionscape.data.kit.JawKit;
 import eq.uirs.fashionscape.remote.RemoteData;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -64,6 +67,8 @@ public class Layers
 	private Integer gender = null;
 	private int[] lastEquipmentIds = null;
 	private Integer lastRealIdlePoseAnim = null;
+	// weapon item id -> observed idle pose anim (for real models only)
+	private final Map<Integer, Integer> realWeaponIdleAnims = new HashMap<>();
 
 	@Inject
 	public Layers(IdleAnimations idleAnimations, Fallbacks fallbacks, EventBus eventBus,
@@ -202,6 +207,12 @@ public class Layers
 				else
 				{
 					realModels.getItems().put(slot, SlotInfo.lookUp(equipId, slot));
+					// remember the real animation associated with this weapon
+					if (slot == KitType.WEAPON && lastRealIdlePoseAnim != null &&
+						!realWeaponIdleAnims.containsKey(itemId))
+					{
+						realWeaponIdleAnims.put(itemId, lastRealIdlePoseAnim);
+					}
 				}
 			}
 			else if (equipId >= FashionManager.KIT_OFFSET)
@@ -441,6 +452,20 @@ public class Layers
 		return misc.disableAnimWeaponOrShield;
 	}
 
+	public List<WeaponAnimMismatch> getWeaponAnimMismatches()
+	{
+		List<WeaponAnimMismatch> mismatches = new ArrayList<>();
+		realWeaponIdleAnims.forEach((itemId, observed) -> {
+			Integer idle = idleAnimations.get(itemId);
+			int expected = idle != null ? idle : IdleAnimations.DEFAULT;
+			if (expected != observed)
+			{
+				mismatches.add(new WeaponAnimMismatch(itemId, observed, expected));
+			}
+		});
+		return mismatches;
+	}
+
 	/**
 	 * Determines the player's idle pose anim, based on these criteria, ordered by descending importance:
 	 * Real items which temporarily change animations (e.g. magic carpet) > preview items > virtual items > real items.
@@ -485,6 +510,12 @@ public class Layers
 		// if we know for certain what the real weapon's anim id is, use that
 		if (weaponInfo != null)
 		{
+			// if we've observed this weapon's anim before, prefer using that
+			Integer observed = realWeaponIdleAnims.get(weaponInfo.getItemId());
+			if (observed != null)
+			{
+				return observed;
+			}
 			Integer idle = idleAnimations.get(weaponInfo.getItemId());
 			if (idle != null)
 			{

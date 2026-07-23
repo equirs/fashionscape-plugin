@@ -1,6 +1,7 @@
 package eq.uirs.fashionscape.panel;
 
 import eq.uirs.fashionscape.core.FashionManager;
+import eq.uirs.fashionscape.core.WeaponAnimMismatch;
 import eq.uirs.fashionscape.core.event.ItemChanged;
 import eq.uirs.fashionscape.core.event.KnownKitChanged;
 import eq.uirs.fashionscape.core.event.LockChanged;
@@ -10,11 +11,15 @@ import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
 import java.awt.image.BufferedImage;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
+import javax.swing.JButton;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
@@ -28,6 +33,7 @@ import net.runelite.client.callback.ClientThread;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.util.ImageUtil;
+import net.runelite.client.util.LinkBrowser;
 import net.runelite.client.util.Text;
 
 /**
@@ -42,8 +48,12 @@ class ItemsPanel extends JPanel
 	private final SearchOpener searchOpener;
 	private final boolean developerMode;
 
+	private static final String ISSUE_URL = "https://github.com/equirs/fashionscape-data/issues/new";
+
 	private final Set<KitType> unknownSlots = new HashSet<>();
 	private final List<ItemPanel> itemPanels = new ArrayList<>();
+	// resolved names for weapons whose observed idle anim disagrees with fashionscape's data
+	private final List<WeaponMismatch> weaponMismatches = new ArrayList<>();
 
 	private JPanel slotsPanel;
 	private JPanel warningsPanel;
@@ -55,8 +65,15 @@ class ItemsPanel extends JPanel
 		BufferedImage image;
 	}
 
+	@Value
+	private static class WeaponMismatch
+	{
+		String name;
+		WeaponAnimMismatch info;
+	}
+
 	public ItemsPanel(FashionManager fashionManager, ItemManager itemManager, SearchOpener searchOpener,
-					  ClientThread clientThread, boolean developerMode)
+	                  ClientThread clientThread, boolean developerMode)
 	{
 		this.fashionManager = fashionManager;
 		this.itemManager = itemManager;
@@ -189,20 +206,35 @@ class ItemsPanel extends JPanel
 		SwingUtilities.invokeLater(this::refreshWarnings);
 	}
 
+	// re-derives which real weapons have idle anims that disagree with fashionscape's internal data
+	void refreshWeaponWarnings()
+	{
+		clientThread.invokeLater(() -> {
+			List<WeaponMismatch> resolved = fashionManager.getWeaponAnimMismatches().stream()
+				.map(m -> new WeaponMismatch(itemManager.getItemComposition(m.getItemId()).getName(), m))
+				.collect(Collectors.toList());
+			SwingUtilities.invokeLater(() -> {
+				weaponMismatches.clear();
+				weaponMismatches.addAll(resolved);
+				refreshWarnings();
+			});
+		});
+	}
+
 	public void refreshWarnings()
 	{
 		warningsPanel.removeAll();
 
+		GridBagConstraints c = new GridBagConstraints();
+		c.fill = GridBagConstraints.HORIZONTAL;
+		c.anchor = GridBagConstraints.PAGE_START;
+		c.weightx = 1;
+		c.weighty = 0;
+		c.gridx = 0;
+		c.gridy = 0;
+
 		if (!unknownSlots.isEmpty())
 		{
-			GridBagConstraints c = new GridBagConstraints();
-			c.fill = GridBagConstraints.HORIZONTAL;
-			c.anchor = GridBagConstraints.PAGE_START;
-			c.weightx = 1;
-			c.weighty = 0;
-			c.gridx = 0;
-			c.gridy = 0;
-
 			JLabel label = new JLabel("<html>Some base models can't be determined. Remove " +
 				"some of your in-game equipment to detect them:</html>");
 			label.setPreferredSize(new Dimension(100, 60));
@@ -219,6 +251,50 @@ class ItemsPanel extends JPanel
 					c.gridy++;
 				});
 		}
+
+		if (!weaponMismatches.isEmpty())
+		{
+			JLabel label = new JLabel("<html>These weapons animate differently from fashionscape's data. " +
+				"Please report these so they can be fixed:</html>");
+			label.setPreferredSize(new Dimension(100, 60));
+			label.setForeground(ColorScheme.BRAND_ORANGE);
+			warningsPanel.add(label, c);
+			c.gridy++;
+
+			weaponMismatches.stream()
+				.sorted(Comparator.comparing(WeaponMismatch::getName))
+				.forEach(m -> {
+					JLabel itemLabel = new JLabel(String.format("id %d: anim %d",
+						m.getInfo().getItemId(), m.getInfo().getObservedAnimId()));
+					itemLabel.setForeground(ColorScheme.BRAND_ORANGE);
+					itemLabel.setToolTipText(m.getName());
+					warningsPanel.add(itemLabel, c);
+					c.gridy++;
+				});
+
+			JButton reportButton = new JButton("Report on GitHub");
+			reportButton.setFocusPainted(false);
+			reportButton.addActionListener(e -> LinkBrowser.open(buildIssueUrl()));
+			reportButton.addMouseListener(PanelUtil.hoverCursor(reportButton));
+			c.insets = new Insets(5, 0, 0, 0);
+			warningsPanel.add(reportButton, c);
+			c.gridy++;
+		}
+
 		revalidate();
+	}
+
+	private String buildIssueUrl()
+	{
+		String body = "The following weapons have mismatched idle animations:\n\n" +
+			weaponMismatches.stream()
+				.sorted(Comparator.comparing(WeaponMismatch::getName))
+				.map(m -> String.format("- %s (id %d): observed %d, expected %d",
+					m.getName(), m.getInfo().getItemId(), m.getInfo().getObservedAnimId(),
+					m.getInfo().getDataAnimId()))
+				.collect(Collectors.joining("\n"));
+		return ISSUE_URL +
+			"?title=" + URLEncoder.encode("Incorrect weapon idle animation(s)", StandardCharsets.UTF_8) +
+			"&body=" + URLEncoder.encode(body, StandardCharsets.UTF_8);
 	}
 }

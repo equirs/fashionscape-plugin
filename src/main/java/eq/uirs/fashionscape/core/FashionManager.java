@@ -294,6 +294,11 @@ public class FashionManager
 		return layers.getVirtualModels().getColors().get(type);
 	}
 
+	public List<WeaponAnimMismatch> getWeaponAnimMismatches()
+	{
+		return layers.getWeaponAnimMismatches();
+	}
+
 	@Nullable
 	public JawIcon virtualIcon()
 	{
