@@ -36,6 +36,7 @@ import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Singleton;
 import lombok.Getter;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Player;
 import net.runelite.api.PlayerComposition;
@@ -67,13 +68,15 @@ public class Layers
 	private Integer gender = null;
 	private int[] lastEquipmentIds = null;
 	private Integer lastRealIdlePoseAnim = null;
+	@Setter
+	private boolean isInF2p;
 	// weapon item id -> observed idle pose anim (for real models only)
 	private final Map<Integer, Integer> realWeaponIdleAnims = new HashMap<>();
 
 	@Inject
 	public Layers(IdleAnimations idleAnimations, Fallbacks fallbacks, EventBus eventBus,
-	              CompositionHelper compositionHelper, @Named("real") ModelInfo realModels,
-	              @Named("virtual") ModelInfo virtualModels, @Named("preview") ModelInfo previewModels)
+				  CompositionHelper compositionHelper, @Named("real") ModelInfo realModels,
+				  @Named("virtual") ModelInfo virtualModels, @Named("preview") ModelInfo previewModels)
 	{
 		this.idleAnimations = idleAnimations;
 		this.fallbacks = fallbacks;
@@ -208,7 +211,8 @@ public class Layers
 				{
 					realModels.getItems().put(slot, SlotInfo.lookUp(equipId, slot));
 					// remember the real animation associated with this weapon
-					if (slot == KitType.WEAPON && lastRealIdlePoseAnim != null &&
+					// (skip in f2p worlds: member's items may not animate correctly)
+					if (!isInF2p && slot == KitType.WEAPON && lastRealIdlePoseAnim != null &&
 						!realWeaponIdleAnims.containsKey(itemId))
 					{
 						realWeaponIdleAnims.put(itemId, lastRealIdlePoseAnim);

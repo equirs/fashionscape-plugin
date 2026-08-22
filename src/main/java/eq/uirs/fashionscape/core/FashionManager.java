@@ -19,6 +19,7 @@ import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.Player;
 import net.runelite.api.PlayerComposition;
+import net.runelite.api.WorldType;
 import net.runelite.api.kit.KitType;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
@@ -261,6 +262,7 @@ public class FashionManager
 		{
 			return;
 		}
+		layers.setInF2p(!client.getWorldType().contains(WorldType.MEMBERS));
 		PlayerComposition composition = compositionHelper.getLocal();
 		layers.deriveNonEquipment(composition, player.getIdlePoseAnimation());
 		String profileKey = configManager.getRSProfileKey();
