@@ -325,17 +325,11 @@ public class FashionscapePanel extends PluginPanel
 		buttonContainer.add(shuffle, c);
 		c.gridx++;
 
-		JPopupMenu openSavedFolderMenu = new JPopupMenu();
-		JMenuItem openAll = new JMenuItem("Open outfits folder");
-		openAll.addActionListener(e -> LinkBrowser.open(Exporter.OUTFITS_DIR.toString()));
-		openSavedFolderMenu.add(openAll);
-
 		save = new JButton(PanelUtil.icon("save"));
 		save.setToolTipText("Save");
 		save.addActionListener(e -> openSaveDialog());
 		save.setFocusPainted(false);
 		save.addMouseListener(PanelUtil.hoverCursor(this));
-		save.setComponentPopupMenu(openSavedFolderMenu);
 		checkButtonEnabled(save);
 		buttonContainer.add(save, c);
 		c.gridx++;
