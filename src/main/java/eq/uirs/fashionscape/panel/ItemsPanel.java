@@ -274,7 +274,7 @@ class ItemsPanel extends JPanel
 
 			JButton reportButton = new JButton("Report on GitHub");
 			reportButton.setFocusPainted(false);
-			reportButton.addActionListener(e -> LinkBrowser.open(buildIssueUrl()));
+			reportButton.addActionListener(e -> LinkBrowser.browse(buildIssueUrl()));
 			reportButton.addMouseListener(PanelUtil.hoverCursor(reportButton));
 			c.insets = new Insets(5, 0, 0, 0);
 			warningsPanel.add(reportButton, c);
