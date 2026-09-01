@@ -41,6 +41,11 @@ public class ModelInfo
 		return oldIcon;
 	}
 
+	public boolean isEmpty()
+	{
+		return items.isEmpty() && kits.isEmpty() && colors.isEmpty() && icon == null;
+	}
+
 	public boolean contains(KitType slot)
 	{
 		return items.containsKey(slot) || kits.containsKey(slot);

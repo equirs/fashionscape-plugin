@@ -61,6 +61,11 @@ public class Items
 		other.forEach(this::put);
 	}
 
+	public boolean isEmpty()
+	{
+		return value.isEmpty();
+	}
+
 	public void clear()
 	{
 		Set<KitType> removes = new HashSet<>(value.keySet());

@@ -65,6 +65,8 @@ public class FashionManager
 
 	private boolean receivedDataAsync = false;
 	private String lastKnownRSProfileKey = null;
+	// true while the plugin is overriding something in the player's appearance
+	private boolean hasModifiedPlayer = false;
 
 	public void startUp()
 	{
@@ -111,14 +113,25 @@ public class FashionManager
 
 	public void shutDown()
 	{
-		layers.revertToRealModels(client.getLocalPlayer());
+		revertToRealModels();
 	}
 
 	public void onPlayerChanged()
 	{
+		// the player's appearance has been reset by the client
+		hasModifiedPlayer = false;
 		doPreRefreshCheck();
-		configHelper.loadFromConfig();
+		if (hasFetchedRequiredData())
+		{
+			configHelper.loadFromConfig();
+		}
 		refreshPlayer();
+	}
+
+	public void onLogout()
+	{
+		layers.resetRealInfo();
+		hasModifiedPlayer = false;
 	}
 
 	public void loadRSProfile()
@@ -182,7 +195,7 @@ public class FashionManager
 	{
 		// first clear everything (without messing with layers) so that the imports derive from real models
 		clientThread.invokeLater(() -> {
-			layers.revertToRealModels(client.getLocalPlayer());
+			revertToRealModels();
 			importPlayer(client.getLocalPlayer());
 		});
 	}
@@ -207,6 +220,14 @@ public class FashionManager
 		{
 			return;
 		}
+		if (!layers.hasAnyVirtuals())
+		{
+			// if we fail to fetch data from github, players' models might screw up even with nothing set.
+			// therefore, we don't mess with idle anims / hashes unless we really have to.
+			revertToRealModels();
+			return;
+		}
+		hasModifiedPlayer = true;
 		int[] equipIds = layers.computeEquipment();
 		for (int i = 0; i < equipIds.length; i++)
 		{
@@ -223,6 +244,17 @@ public class FashionManager
 			composition.getColors()[i] = colors[i];
 		}
 		composition.setHash();
+	}
+
+	// this should only be called from the client thread
+	private void revertToRealModels()
+	{
+		if (!hasModifiedPlayer || compositionHelper.getLocal() == null)
+		{
+			return;
+		}
+		layers.revertToRealModels(client.getLocalPlayer());
+		hasModifiedPlayer = false;
 	}
 
 	/**

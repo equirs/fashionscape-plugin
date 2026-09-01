@@ -4,7 +4,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.inject.Provides;
 import eq.uirs.fashionscape.core.ConfigHelper;
 import eq.uirs.fashionscape.core.FashionManager;
-import eq.uirs.fashionscape.core.layer.Layers;
 import eq.uirs.fashionscape.core.layer.ModelType;
 import eq.uirs.fashionscape.core.model.ModelInfo;
 import eq.uirs.fashionscape.core.randomizer.Randomizer;
@@ -64,9 +63,6 @@ public class FashionscapePlugin extends Plugin
 
 	@Inject
 	private FashionManager fashionManager;
-
-	@Inject
-	private Layers layers;
 
 	@Inject
 	private Randomizer randomizer;
@@ -208,7 +204,7 @@ public class FashionscapePlugin extends Plugin
 		}
 		else if (hasLoggedIn && event.getGameState() == GameState.LOGIN_SCREEN)
 		{
-			layers.resetRealInfo();
+			fashionManager.onLogout();
 			hasLoggedIn = false;
 		}
 	}

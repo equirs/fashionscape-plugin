@@ -46,7 +46,6 @@ import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.ui.PluginPanel;
 import net.runelite.client.ui.components.materialtabs.MaterialTab;
 import net.runelite.client.ui.components.materialtabs.MaterialTabGroup;
-import net.runelite.client.util.LinkBrowser;
 
 @Slf4j
 public class FashionscapePanel extends PluginPanel
@@ -455,15 +454,7 @@ public class FashionscapePanel extends PluginPanel
 
 	private boolean hasVirtuals()
 	{
-		long numVirtualSlots = Arrays.stream(KitType.values())
-			.filter(slot -> fashionManager.getLayers().getVirtualModels().contains(slot))
-			.count();
-		long numVirtualColors = Arrays.stream(ColorType.values())
-			.map(fashionManager::virtualColorIdFor)
-			.filter(Objects::nonNull)
-			.count();
-		boolean hasIcon = fashionManager.virtualIcon() != null;
-		return numVirtualSlots + numVirtualColors > 0 || hasIcon;
+		return !fashionManager.getLayers().getVirtualModels().isEmpty();
 	}
 
 	private boolean hasUnlocked()

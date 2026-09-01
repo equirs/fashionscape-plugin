@@ -72,7 +72,8 @@ public class ConfigHelper
 	@Inject
 	private Locks locks;
 
-	// should only load once since config might be behind local state
+	// should only load once since config might be behind local state.
+	// saving is also blocked until this is set, otherwise unread config would get clobbered
 	private boolean hasLoadedConfig;
 
 	private Future<?> colorSaveFuture;
@@ -232,6 +233,10 @@ public class ConfigHelper
 
 	private void saveEquipmentConfigDebounced()
 	{
+		if (!hasLoadedConfig)
+		{
+			return;
+		}
 		equipSaveFuture = withDebounce(equipSaveFuture, () -> {
 			ModelInfo models = layers.getVirtualModels();
 			HashMap<KitType, SlotInfo> result = new HashMap<>(models.getItems().getAll());
@@ -244,6 +249,10 @@ public class ConfigHelper
 
 	private void saveIconDebounced()
 	{
+		if (!hasLoadedConfig)
+		{
+			return;
+		}
 		iconSaveFuture = withDebounce(iconSaveFuture, () -> {
 			JawIcon icon = layers.getVirtualModels().getIcon();
 			Integer iconId = icon != null ? icon.getId() : null;
@@ -253,6 +262,10 @@ public class ConfigHelper
 
 	private void saveColorConfigDebounced()
 	{
+		if (!hasLoadedConfig)
+		{
+			return;
+		}
 		colorSaveFuture = withDebounce(colorSaveFuture, () -> {
 			Map<Integer, Integer> rawColors = layers.getVirtualModels().getColors().getAll().entrySet().stream()
 				.collect(Collectors.toMap(e -> e.getKey().ordinal(), Map.Entry::getValue));
@@ -272,6 +285,10 @@ public class ConfigHelper
 
 	private void saveLocksDebounced()
 	{
+		if (!hasLoadedConfig)
+		{
+			return;
+		}
 		locksSaveFuture = withDebounce(locksSaveFuture, () -> {
 			//noinspection DataFlowIssue (filter ensures non-null)
 			Map<KitType, LockStatus> lockedSlots = Arrays.stream(KitType.values())

@@ -98,6 +98,14 @@ public class Layers
 	}
 
 	/**
+	 * Whether the plugin has anything of its own to display on the player.
+	 */
+	public boolean hasAnyVirtuals()
+	{
+		return !virtualModels.isEmpty() || !previewModels.isEmpty();
+	}
+
+	/**
 	 * Removes preview model layer. Usually, this means the player is no longer hovering over an item.
 	 */
 	public void resetPreview()
