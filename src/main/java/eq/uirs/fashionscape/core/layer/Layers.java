@@ -20,7 +20,9 @@ import eq.uirs.fashionscape.data.MiscData;
 import eq.uirs.fashionscape.data.color.ColorType;
 import eq.uirs.fashionscape.data.kit.JawIcon;
 import eq.uirs.fashionscape.data.kit.JawKit;
+import eq.uirs.fashionscape.remote.RemoteCategory;
 import eq.uirs.fashionscape.remote.RemoteData;
+import eq.uirs.fashionscape.remote.RemoteDataHandler;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -59,6 +61,7 @@ public class Layers
 	private final Fallbacks fallbacks;
 	private final EventBus eventBus;
 	private final CompositionHelper compositionHelper;
+	private final RemoteDataHandler remoteDataHandler;
 
 	private final ModelInfo realModels;
 	private final ModelInfo virtualModels;
@@ -76,7 +79,8 @@ public class Layers
 	@Inject
 	public Layers(IdleAnimations idleAnimations, Fallbacks fallbacks, EventBus eventBus,
 				  CompositionHelper compositionHelper, @Named("real") ModelInfo realModels,
-				  @Named("virtual") ModelInfo virtualModels, @Named("preview") ModelInfo previewModels)
+				  @Named("virtual") ModelInfo virtualModels, @Named("preview") ModelInfo previewModels,
+				  RemoteDataHandler remoteDataHandler)
 	{
 		this.idleAnimations = idleAnimations;
 		this.fallbacks = fallbacks;
@@ -85,6 +89,7 @@ public class Layers
 		this.realModels = realModels;
 		this.virtualModels = virtualModels;
 		this.previewModels = previewModels;
+		this.remoteDataHandler = remoteDataHandler;
 	}
 
 	/**
@@ -197,6 +202,7 @@ public class Layers
 			return;
 		}
 		lastEquipmentIds = equipIds;
+		boolean canRecordAnim = !isInF2p && !isIdleAnimForced();
 		// clear items but retain kits
 		realModels.getItems().clear();
 		for (KitType slot : KitType.values())
@@ -219,8 +225,7 @@ public class Layers
 				{
 					realModels.getItems().put(slot, SlotInfo.lookUp(equipId, slot));
 					// remember the real animation associated with this weapon
-					// (skip in f2p worlds: member's items may not animate correctly)
-					if (!isInF2p && slot == KitType.WEAPON && lastRealIdlePoseAnim != null &&
+					if (canRecordAnim && slot == KitType.WEAPON && lastRealIdlePoseAnim != null &&
 						!realWeaponIdleAnims.containsKey(itemId))
 					{
 						realWeaponIdleAnims.put(itemId, lastRealIdlePoseAnim);
@@ -464,8 +469,22 @@ public class Layers
 		return misc.disableAnimWeaponOrShield;
 	}
 
+	private boolean isIdleAnimForced()
+	{
+		MiscData misc = RemoteData.MISC_DATA;
+		if (misc == null || misc.forcedIdleAnims == null || lastRealIdlePoseAnim == null)
+		{
+			return false;
+		}
+		return misc.forcedIdleAnims.contains(lastRealIdlePoseAnim);
+	}
+
 	public List<WeaponAnimMismatch> getWeaponAnimMismatches()
 	{
+		if (!remoteDataHandler.hasSucceeded(RemoteCategory.ANIMATION))
+		{
+			return new ArrayList<>();
+		}
 		List<WeaponAnimMismatch> mismatches = new ArrayList<>();
 		realWeaponIdleAnims.forEach((itemId, observed) -> {
 			Integer idle = idleAnimations.get(itemId);
@@ -480,7 +499,8 @@ public class Layers
 
 	/**
 	 * Determines the player's idle pose anim, based on these criteria, ordered by descending importance:
-	 * Real items which temporarily change animations (e.g. magic carpet) > preview items > virtual items > real items.
+	 * Areas with their own animations (e.g. underwater) > real items which temporarily change animations
+	 * (e.g. magic carpet) > preview items > virtual items > real items.
 	 * Returns null if the animation cannot be determined and thus shouldn't be changed.
 	 */
 	@Nullable
@@ -493,6 +513,10 @@ public class Layers
 	@Nullable
 	private Integer computeIdlePoseAnimation(boolean realOnly)
 	{
+		if (isIdleAnimForced())
+		{
+			return null;
+		}
 		SlotInfo weaponInfo = realModels.getItems().get(KitType.WEAPON);
 		if (weaponInfo != null && getTempDisabledWeaponIds().contains(weaponInfo.getItemId()))
 		{

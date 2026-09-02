@@ -42,4 +42,7 @@ public class MiscData
 	// item ids of weapon/shield-slot equipment that, when detected in-game, overrides weapon and shield
 	@SerializedName("disable_anim_weapon_shield")
 	public Set<Integer> disableAnimWeaponOrShield;
+	// idle pose anims that an area forces on the player by default (underwater swimming, etc.)
+	@SerializedName("forced_idle_anims")
+	public Set<Integer> forcedIdleAnims;
 }

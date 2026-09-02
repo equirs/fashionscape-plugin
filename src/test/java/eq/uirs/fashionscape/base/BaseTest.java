@@ -91,6 +91,7 @@ public class BaseTest extends MockedTestBase
 			new HashSet<>(),
 			new HashSet<>(),
 			ImmutableSet.of(ItemID.MAGIC_CARPET),
+			new HashSet<>(),
 			new HashSet<>()
 		);
 	}
