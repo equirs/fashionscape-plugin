@@ -128,12 +128,40 @@ public class LoadoutStoreTest
 	}
 
 	@Test
+	void movedOrderLoads()
+	{
+		SavedLoadout a = store.add(loadout("a"));
+		SavedLoadout b = store.add(loadout("b"));
+		SavedLoadout c = store.add(loadout("c"));
+		store.move(c.getId(), -2);
+		store.move(a.getId(), 1);
+
+		LoadoutStore other = newStore();
+		other.load();
+		assertEquals(ImmutableList.of(c, b, a), other.getAll());
+	}
+
+	@Test
+	void moveStopsAtEnds()
+	{
+		SavedLoadout a = store.add(loadout("a"));
+		SavedLoadout b = store.add(loadout("b"));
+		clearInvocations(eventBus);
+		store.move(a.getId(), -1);
+		store.move(b.getId(), 5);
+		assertEquals(ImmutableList.of(a, b), store.getAll());
+		verify(eventBus, never()).post(any());
+	}
+
+	@Test
 	void eachChangePostsOneEvent()
 	{
 		SavedLoadout saved = store.add(loadout("a"));
-		store.update(saved.getId(), loadout("b"));
+		store.add(loadout("b"));
+		store.update(saved.getId(), loadout("c"));
+		store.move(saved.getId(), 1);
 		store.remove(saved.getId());
-		verify(eventBus, times(3)).post(any(LoadoutsChanged.class));
+		verify(eventBus, times(5)).post(any(LoadoutsChanged.class));
 	}
 
 	@Test

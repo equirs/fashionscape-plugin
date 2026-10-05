@@ -369,9 +369,6 @@ public class FashionscapePanel extends PluginPanel
 		JMenuItem loadFromFile = new JMenuItem("Load from file...");
 		loadFromFile.addActionListener(e -> openLoadDialog());
 		loadMenu.add(loadFromFile);
-		JMenuItem cloneSelf = new JMenuItem("Load current equipment");
-		cloneSelf.addActionListener(e -> fashionManager.importSelf());
-		loadMenu.add(cloneSelf);
 
 		JButton load = new JButton(PanelUtil.icon("load"));
 		load.setToolTipText("Loadouts");

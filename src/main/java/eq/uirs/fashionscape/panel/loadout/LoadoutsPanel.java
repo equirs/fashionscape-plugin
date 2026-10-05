@@ -17,8 +17,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.swing.JButton;
+import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
@@ -27,6 +29,7 @@ import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
 import lombok.Setter;
 import net.runelite.client.callback.ClientThread;
+import net.runelite.client.game.ItemManager;
 import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.ui.components.PluginErrorPanel;
 
@@ -40,6 +43,7 @@ public class LoadoutsPanel extends JPanel implements LoadoutRow.Actions
 	private final ClientThread clientThread;
 	private final FashionManager fashionManager;
 	private final LoadoutStore store;
+	private final ItemManager itemManager;
 
 	private final JPanel listPanel = new JPanel(new GridBagLayout());
 	private final PluginErrorPanel emptyPanel = new PluginErrorPanel();
@@ -51,11 +55,12 @@ public class LoadoutsPanel extends JPanel implements LoadoutRow.Actions
 	};
 
 	@Inject
-	LoadoutsPanel(ClientThread clientThread, FashionManager fashionManager, LoadoutStore store)
+	LoadoutsPanel(ClientThread clientThread, FashionManager fashionManager, LoadoutStore store, ItemManager itemManager)
 	{
 		this.clientThread = clientThread;
 		this.fashionManager = fashionManager;
 		this.store = store;
+		this.itemManager = itemManager;
 
 		setLayout(new BorderLayout());
 		setBackground(ColorScheme.DARK_GRAY_COLOR);
@@ -101,9 +106,12 @@ public class LoadoutsPanel extends JPanel implements LoadoutRow.Actions
 		{
 			listPanel.add(emptyPanel, c);
 		}
-		for (SavedLoadout saved : all)
+		for (int i = 0; i < all.size(); i++)
 		{
-			LoadoutRow row = new LoadoutRow(saved, this);
+			SavedLoadout saved = all.get(i);
+			LoadoutColorBar colorBar = new LoadoutColorBar(saved.getLoadout());
+			LoadoutRow row = new LoadoutRow(saved, summaryOf(saved.getLoadout()), colorBar, i == 0,
+				i == all.size() - 1, this);
 			rows.put(saved.getId(), row);
 			listPanel.add(row, c);
 			c.gridy++;
@@ -158,6 +166,12 @@ public class LoadoutsPanel extends JPanel implements LoadoutRow.Actions
 	}
 
 	@Override
+	public void move(SavedLoadout saved, int offset)
+	{
+		store.move(saved.getId(), offset);
+	}
+
+	@Override
 	public void delete(SavedLoadout saved)
 	{
 		if (confirm("Delete \"" + saved.getLoadout().getName() + "\"?"))
@@ -166,24 +180,47 @@ public class LoadoutsPanel extends JPanel implements LoadoutRow.Actions
 		}
 	}
 
+	// item icons if there are any, otherwise kit names
+	@Nullable
+	private JComponent summaryOf(Loadout loadout)
+	{
+		List<Integer> itemIds = LoadoutIconStrip.itemIdsOf(loadout);
+		if (!itemIds.isEmpty())
+		{
+			return new LoadoutIconStrip(itemIds, itemManager, clientThread);
+		}
+		List<String> kitNames = LoadoutKitNames.namesOf(loadout);
+		return kitNames.isEmpty() ? null : new LoadoutKitNames(kitNames);
+	}
+
 	private JPanel createHeader()
 	{
-		JPanel header = new JPanel(new BorderLayout());
-		header.setBackground(ColorScheme.DARK_GRAY_COLOR);
-		header.setBorder(new EmptyBorder(0, 0, 8, 0));
+		JPanel titleRow = new JPanel(new BorderLayout());
+		titleRow.setOpaque(false);
 
 		JButton back = iconButton("back", "Back");
 		back.addActionListener(e -> onClose.run());
-		header.add(back, BorderLayout.WEST);
+		titleRow.add(back, BorderLayout.WEST);
 
 		JLabel title = new JLabel("Loadouts");
 		title.setForeground(Color.WHITE);
 		title.setBorder(new EmptyBorder(0, 8, 0, 0));
-		header.add(title, BorderLayout.CENTER);
+		titleRow.add(title, BorderLayout.CENTER);
 
 		addButton = iconButton("add", "Save current look");
 		addButton.addActionListener(e -> saveCurrent());
-		header.add(addButton, BorderLayout.EAST);
+		titleRow.add(addButton, BorderLayout.EAST);
+
+		JButton loadEquipment = new JButton("Load current equipment");
+		loadEquipment.setFocusPainted(false);
+		loadEquipment.addMouseListener(PanelUtil.hoverCursor(this));
+		loadEquipment.addActionListener(e -> fashionManager.importSelf());
+
+		JPanel header = new JPanel(new BorderLayout(0, 5));
+		header.setBackground(ColorScheme.DARK_GRAY_COLOR);
+		header.setBorder(new EmptyBorder(0, 0, 8, 0));
+		header.add(titleRow, BorderLayout.NORTH);
+		header.add(loadEquipment, BorderLayout.SOUTH);
 		return header;
 	}
 

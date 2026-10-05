@@ -1,14 +1,19 @@
 package eq.uirs.fashionscape.panel.loadout;
 
 import eq.uirs.fashionscape.core.loadout.SavedLoadout;
+import eq.uirs.fashionscape.panel.PanelUtil;
 import java.awt.BorderLayout;
 import java.awt.Color;
+import java.awt.Dimension;
+import java.awt.FlowLayout;
 import java.awt.event.FocusAdapter;
 import java.awt.event.FocusEvent;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import javax.annotation.Nullable;
+import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JMenuItem;
 import javax.swing.JPanel;
@@ -28,28 +33,48 @@ class LoadoutRow extends JPanel
 
 		void rename(SavedLoadout saved, String name);
 
+		void move(SavedLoadout saved, int offset);
+
 		void delete(SavedLoadout saved);
 	}
 
 	private final SavedLoadout saved;
 	private final Actions actions;
 
+	private final JPanel titleRow = new JPanel(new BorderLayout());
 	private final JLabel nameLabel = new JLabel();
 	private final FlatTextField nameField = new FlatTextField();
 	private boolean renaming;
 
-	LoadoutRow(SavedLoadout saved, Actions actions)
+	LoadoutRow(SavedLoadout saved, @Nullable JComponent summary, JComponent colorBar, boolean first, boolean last,
+		Actions actions)
 	{
 		this.saved = saved;
 		this.actions = actions;
 
 		setLayout(new BorderLayout());
-		setBorder(new EmptyBorder(6, 8, 6, 8));
 		setBackground(ColorScheme.DARKER_GRAY_COLOR);
 
 		nameLabel.setText(saved.getLoadout().getName());
 		nameLabel.setForeground(Color.WHITE);
-		add(nameLabel, BorderLayout.NORTH);
+		// zero width lets long names truncate
+		nameLabel.setPreferredSize(new Dimension(0, nameLabel.getPreferredSize().height));
+		titleRow.setOpaque(false);
+		titleRow.add(nameLabel, BorderLayout.CENTER);
+		titleRow.add(createControls(first, last), BorderLayout.EAST);
+
+		// pad the inner panel so the color bar can span full row width
+		JPanel content = new JPanel(new BorderLayout());
+		content.setOpaque(false);
+		content.setBorder(new EmptyBorder(6, 8, 6, 8));
+		content.add(titleRow, BorderLayout.NORTH);
+		if (summary != null)
+		{
+			summary.setBorder(new EmptyBorder(4, 0, 0, 0));
+			content.add(summary, BorderLayout.CENTER);
+		}
+		add(content, BorderLayout.CENTER);
+		add(colorBar, BorderLayout.SOUTH);
 
 		setUpNameField();
 		setComponentPopupMenu(createMenu());
@@ -63,27 +88,16 @@ class LoadoutRow extends JPanel
 					actions.apply(saved);
 				}
 			}
-
-			@Override
-			public void mouseEntered(MouseEvent e)
-			{
-				setBackground(ColorScheme.DARKER_GRAY_HOVER_COLOR);
-			}
-
-			@Override
-			public void mouseExited(MouseEvent e)
-			{
-				setBackground(ColorScheme.DARKER_GRAY_COLOR);
-			}
 		});
+		addMouseListener(hoverListener());
 	}
 
 	void startRename()
 	{
 		renaming = true;
 		nameField.setText(saved.getLoadout().getName());
-		remove(nameLabel);
-		add(nameField, BorderLayout.NORTH);
+		titleRow.remove(nameLabel);
+		titleRow.add(nameField, BorderLayout.CENTER);
 		revalidate();
 		repaint();
 		nameField.getTextField().requestFocusInWindow();
@@ -98,8 +112,8 @@ class LoadoutRow extends JPanel
 		}
 		renaming = false;
 		String name = nameField.getText().trim();
-		remove(nameField);
-		add(nameLabel, BorderLayout.NORTH);
+		titleRow.remove(nameField);
+		titleRow.add(nameLabel, BorderLayout.CENTER);
 		revalidate();
 		repaint();
 		if (commit && !name.isEmpty() && !name.equals(saved.getLoadout().getName()))
@@ -109,10 +123,64 @@ class LoadoutRow extends JPanel
 		}
 	}
 
+	private JPanel createControls(boolean first, boolean last)
+	{
+		JPanel controls = new JPanel(new FlowLayout(FlowLayout.RIGHT, 2, 0));
+		controls.setOpaque(false);
+		controls.add(control("up", "Move up", !first, () -> actions.move(saved, -1)));
+		controls.add(control("down", "Move down", !last, () -> actions.move(saved, 1)));
+		controls.add(control("x", "Delete", true, () -> actions.delete(saved)));
+		return controls;
+	}
+
+	private JLabel control(String icon, String tooltip, boolean enabled, Runnable action)
+	{
+		JLabel label = new JLabel(PanelUtil.icon(icon));
+		label.setToolTipText(tooltip);
+		label.setEnabled(enabled);
+		label.addMouseListener(PanelUtil.hoverCursor(label));
+		label.addMouseListener(hoverListener());
+		label.addMouseListener(new MouseAdapter()
+		{
+			@Override
+			public void mouseClicked(MouseEvent e)
+			{
+				if (SwingUtilities.isLeftMouseButton(e) && label.isEnabled())
+				{
+					action.run();
+				}
+			}
+		});
+		return label;
+	}
+
+	// shared by the row and its controls, so moving between them keeps the highlight
+	private MouseAdapter hoverListener()
+	{
+		return new MouseAdapter()
+		{
+			@Override
+			public void mouseEntered(MouseEvent e)
+			{
+				setBackground(ColorScheme.DARKER_GRAY_HOVER_COLOR);
+			}
+
+			@Override
+			public void mouseExited(MouseEvent e)
+			{
+				if (getMousePosition(true) == null)
+				{
+					setBackground(ColorScheme.DARKER_GRAY_COLOR);
+				}
+			}
+		};
+	}
+
 	private void setUpNameField()
 	{
 		nameField.setBackground(ColorScheme.DARK_GRAY_COLOR);
 		nameField.setBorder(new EmptyBorder(0, 2, 0, 2));
+		nameField.setPreferredSize(new Dimension(0, nameField.getPreferredSize().height));
 		nameField.addKeyListener(new KeyAdapter()
 		{
 			@Override
@@ -143,8 +211,6 @@ class LoadoutRow extends JPanel
 		JPopupMenu menu = new JPopupMenu();
 		menu.add(menuItem("Update with current look", () -> actions.overwrite(saved)));
 		menu.add(menuItem("Rename", this::startRename));
-		menu.addSeparator();
-		menu.add(menuItem("Delete", () -> actions.delete(saved)));
 		return menu;
 	}
 

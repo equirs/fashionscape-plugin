@@ -139,6 +139,32 @@ public class LoadoutStore
 		eventBus.post(new LoadoutsChanged());
 	}
 
+	/**
+	 * Moves a loadout by offset (-1 for up one), stops at either end
+	 */
+	public void move(String id, int offset)
+	{
+		synchronized (this)
+		{
+			SavedLoadout saved = find(id);
+			if (saved == null)
+			{
+				return;
+			}
+			int from = loadouts.indexOf(saved);
+			int to = Math.max(0, Math.min(loadouts.size() - 1, from + offset));
+			if (from == to)
+			{
+				return;
+			}
+			List<SavedLoadout> reordered = new ArrayList<>(loadouts);
+			reordered.add(to, reordered.remove(from));
+			loadouts = reordered;
+			writeOrder();
+		}
+		eventBus.post(new LoadoutsChanged());
+	}
+
 	@Nullable
 	private SavedLoadout find(String id)
 	{
