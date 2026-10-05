@@ -48,7 +48,7 @@ public class FashionManager
 	private final ConfigManager configManager;
 
 	@Getter
-	private final Exporter exporter;
+	private final LoadoutManager loadoutManager;
 
 	@Getter
 	private final Layers layers;
@@ -207,7 +207,7 @@ public class FashionManager
 		{
 			return;
 		}
-		exporter.importPlayer(composition);
+		loadoutManager.importPlayer(composition);
 		clientThread.invokeLater(this::refreshPlayer);
 	}
 

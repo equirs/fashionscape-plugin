@@ -1,7 +1,7 @@
 package eq.uirs.fashionscape.panel;
 
-import eq.uirs.fashionscape.core.Exporter;
 import eq.uirs.fashionscape.core.FashionManager;
+import eq.uirs.fashionscape.core.LoadoutManager;
 import eq.uirs.fashionscape.core.event.ColorChanged;
 import eq.uirs.fashionscape.core.event.ColorLockChanged;
 import eq.uirs.fashionscape.core.event.HistoryChanged;
@@ -88,8 +88,8 @@ public class FashionscapePanel extends PluginPanel
 
 	@Inject
 	public FashionscapePanel(SearchPanel searchPanel, KitsPanel kitsPanel, DebugAnimationsPanel animsPanel,
-	                         FashionManager fashionManager, ItemManager itemManager, ClientThread clientThread,
-	                         RemoteDataHandler remote, @Named("developerMode") boolean developerMode)
+							 FashionManager fashionManager, ItemManager itemManager, ClientThread clientThread,
+							 RemoteDataHandler remote, @Named("developerMode") boolean developerMode)
 	{
 		super(false);
 		this.clientThread = clientThread;
@@ -374,7 +374,7 @@ public class FashionscapePanel extends PluginPanel
 	@SuppressWarnings("ResultOfMethodCallIgnored")
 	private void openSaveDialog()
 	{
-		File outputDir = Exporter.OUTFITS_DIR;
+		File outputDir = LoadoutManager.OUTFITS_DIR;
 		outputDir.mkdirs();
 
 		JFileChooser fileChooser = new JFileChooser(outputDir)
@@ -422,14 +422,14 @@ public class FashionscapePanel extends PluginPanel
 			{
 				selectedFile = new File(selectedFile.getPath() + ".txt");
 			}
-			fashionManager.getExporter().export(selectedFile);
+			fashionManager.getLoadoutManager().exportLegacy(selectedFile);
 		}
 	}
 
 	@SuppressWarnings("ResultOfMethodCallIgnored")
 	private void openLoadDialog()
 	{
-		File outputDir = Exporter.OUTFITS_DIR;
+		File outputDir = LoadoutManager.OUTFITS_DIR;
 		outputDir.mkdirs();
 
 		JFileChooser fileChooser = new JFileChooser(outputDir);
@@ -442,7 +442,7 @@ public class FashionscapePanel extends PluginPanel
 			try (BufferedReader reader = new BufferedReader(new FileReader(selectedFile)))
 			{
 				List<String> lines = reader.lines().collect(Collectors.toList());
-				fashionManager.getExporter().parseImports(lines);
+				fashionManager.getLoadoutManager().importLegacy(lines);
 				clientThread.invokeLater(fashionManager::refreshPlayer);
 			}
 			catch (IOException e)
