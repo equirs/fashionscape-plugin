@@ -78,8 +78,8 @@ class LoadoutSharing
 			try (BufferedReader reader = file.openBufferedReader())
 			{
 				String text = reader.lines().collect(Collectors.joining("\n"));
-				// legacy files have no name inside, so use the file name
-				importText(text, stripExtension(file.getFileName()), parent);
+				// legacy loadouts use file as name
+				importText(text, LoadoutCodec.nameFromFile(file.getFileName()), parent);
 			}
 			catch (IOException e)
 			{
@@ -136,12 +136,6 @@ class LoadoutSharing
 		{
 			showError(parent, e.getMessage());
 		}
-	}
-
-	private static String stripExtension(String fileName)
-	{
-		int dot = fileName.lastIndexOf('.');
-		return dot > 0 ? fileName.substring(0, dot) : fileName;
 	}
 
 	private static void showMessage(Component parent, String message)

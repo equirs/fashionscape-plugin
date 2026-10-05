@@ -95,6 +95,15 @@ public class LoadoutCodec
 		return result;
 	}
 
+	/**
+	 * Returns a default loadout name for a file (e.g. "void.txt" becomes "void").
+	 */
+	public static String nameFromFile(String fileName)
+	{
+		int dot = fileName.lastIndexOf('.');
+		return dot > 0 ? fileName.substring(0, dot) : fileName;
+	}
+
 	private JsonObject toTree(Loadout loadout)
 	{
 		JsonObject tree = gson.toJsonTree(loadout).getAsJsonObject();

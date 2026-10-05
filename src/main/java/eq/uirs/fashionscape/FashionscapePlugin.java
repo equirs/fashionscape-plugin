@@ -6,6 +6,7 @@ import eq.uirs.fashionscape.core.ConfigHelper;
 import eq.uirs.fashionscape.core.FashionManager;
 import eq.uirs.fashionscape.core.layer.ModelType;
 import eq.uirs.fashionscape.core.loadout.ActiveLoadouts;
+import eq.uirs.fashionscape.core.loadout.LegacyFileMigration;
 import eq.uirs.fashionscape.core.loadout.LoadoutStore;
 import eq.uirs.fashionscape.core.model.ModelInfo;
 import eq.uirs.fashionscape.core.randomizer.Randomizer;
@@ -13,7 +14,9 @@ import eq.uirs.fashionscape.overlay.DebugOverlay;
 import eq.uirs.fashionscape.panel.FashionscapePanel;
 import eq.uirs.fashionscape.remote.RemoteDataHandler;
 import java.awt.image.BufferedImage;
+import java.io.IOException;
 import java.util.List;
+import java.util.concurrent.ScheduledExecutorService;
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Provider;
@@ -41,7 +44,9 @@ import net.runelite.client.util.ImageUtil;
 
 @PluginDescriptor(
 	name = "Fashionscape",
-	description = "Previews combinations of equipment by changing the player's local appearance"
+	description = "Previews combinations of equipment by changing the player's local appearance",
+	internalName = "fashionscape",
+	legacyDataDirectory = "outfits"
 )
 @Slf4j
 public class FashionscapePlugin extends Plugin
@@ -86,6 +91,12 @@ public class FashionscapePlugin extends Plugin
 
 	@Inject
 	private ActiveLoadouts activeLoadouts;
+
+	@Inject
+	private LegacyFileMigration legacyFileMigration;
+
+	@Inject
+	private ScheduledExecutorService executor;
 
 	@Inject
 	private DebugOverlay debugOverlay;
@@ -141,6 +152,7 @@ public class FashionscapePlugin extends Plugin
 		refreshMenuEntries();
 		fashionManager.startUp();
 		loadoutStore.load();
+		executor.execute(this::migrateLegacyFiles);
 		if (developerMode)
 		{
 			overlayManager.add(debugOverlay);
@@ -242,6 +254,19 @@ public class FashionscapePlugin extends Plugin
 		else
 		{
 			menuManager.get().removePlayerMenuItem(COPY_PLAYER);
+		}
+	}
+
+	private void migrateLegacyFiles()
+	{
+		try
+		{
+			// moves the legacy folder into the plugin's data folder on first call
+			legacyFileMigration.migrate(getPluginDirectory());
+		}
+		catch (IOException e)
+		{
+			log.warn("Could not import legacy files", e);
 		}
 	}
 
