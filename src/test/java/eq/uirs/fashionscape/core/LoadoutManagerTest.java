@@ -1,6 +1,7 @@
 package eq.uirs.fashionscape.core;
 
 import com.google.common.collect.ImmutableMap;
+import eq.uirs.fashionscape.base.BaseTest;
 import eq.uirs.fashionscape.core.layer.Layers;
 import eq.uirs.fashionscape.core.layer.Locks;
 import eq.uirs.fashionscape.core.layer.ModelType;
@@ -11,10 +12,12 @@ import eq.uirs.fashionscape.data.kit.HairKit;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import net.runelite.api.gameval.ItemID;
 import net.runelite.api.kit.KitType;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.chat.ChatMessageManager;
 import net.runelite.client.eventbus.EventBus;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import static org.mockito.ArgumentMatchers.anyBoolean;
@@ -32,6 +35,12 @@ public class LoadoutManagerTest
 	private final Fallbacks fallbacks = mock(Fallbacks.class);
 	private final ModelInfo virtual = new ModelInfo(ModelType.VIRTUAL, mock(EventBus.class));
 	private LoadoutManager manager;
+
+	@BeforeAll
+	static void populateItems()
+	{
+		BaseTest.populate();
+	}
 
 	@BeforeEach
 	void setUp()
@@ -85,6 +94,27 @@ public class LoadoutManagerTest
 		virtual.getKits().put(KitType.HAIR, HairKit.BALD.getMascKitId());
 		virtual.getKits().put(KitType.JAW, 10);
 		assertFalse(manager.isApplied(kits(HairKit.BALD.getMascKitId())));
+	}
+
+	@Test
+	void skipsNothingHiddenByOwnItems()
+	{
+		Loadout loadout = new Loadout();
+		loadout.getItems().put(KitType.WEAPON, ItemID.WHITE_2H_SWORD);
+		loadout.getItems().put(KitType.SHIELD, Loadout.NOTHING);
+		loadout.getItems().put(KitType.HEAD, Loadout.NOTHING);
+		assertEquals(ImmutableMap.of(KitType.WEAPON, ItemID.WHITE_2H_SWORD, KitType.HEAD, Loadout.NOTHING),
+			manager.resolveItems(loadout));
+	}
+
+	@Test
+	void appliedWithNothingHiddenByOwnItems()
+	{
+		virtual.getItems().put(KitType.WEAPON, TestData.white2hSword);
+		Loadout loadout = new Loadout();
+		loadout.getItems().put(KitType.WEAPON, ItemID.WHITE_2H_SWORD);
+		loadout.getItems().put(KitType.SHIELD, Loadout.NOTHING);
+		assertTrue(manager.isApplied(loadout));
 	}
 
 	private static Loadout kits(int hairKitId)

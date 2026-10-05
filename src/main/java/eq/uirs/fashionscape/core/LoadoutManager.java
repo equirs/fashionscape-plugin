@@ -137,18 +137,13 @@ public class LoadoutManager
 	private Diff write(Loadout loadout, boolean isPreview)
 	{
 		Diff diff = Diff.empty();
-
-		// don't set to "nothing" if item already hides
-		Set<KitType> remainingNothingSlots = loadout.getItems().entrySet().stream()
-			.filter(e -> e.getValue() < 0)
-			.map(Map.Entry::getKey)
-			.collect(Collectors.toSet());
+		Map<KitType, Integer> items = resolveItems(loadout);
 
 		// track slots that haven't changed (will be unset later)
 		Set<KitType> unsetSlots = new HashSet<>(Arrays.asList(KitType.values()));
 
 		// import items onto player
-		for (Map.Entry<KitType, Integer> entry : loadout.getItems().entrySet())
+		for (Map.Entry<KitType, Integer> entry : items.entrySet())
 		{
 			if (entry.getValue() < 0)
 			{
@@ -157,10 +152,7 @@ public class LoadoutManager
 			SlotInfo item = SlotInfo.lookUp(entry.getValue() + FashionManager.ITEM_OFFSET, entry.getKey());
 			diff = Diff.merge(layers.set(item.getSlot(), item, isPreview), diff);
 			unsetSlots.remove(item.getSlot());
-			item.getHidden().forEach(s -> {
-				unsetSlots.remove(s);
-				remainingNothingSlots.remove(s);
-			});
+			item.getHidden().forEach(unsetSlots::remove);
 		}
 
 		// import icon
@@ -183,10 +175,14 @@ public class LoadoutManager
 		}
 
 		// set "nothing" where needed
-		for (KitType slot : remainingNothingSlots)
+		for (Map.Entry<KitType, Integer> entry : items.entrySet())
 		{
-			diff = Diff.merge(layers.set(slot, SlotInfo.nothing(slot), isPreview), diff);
-			unsetSlots.remove(slot);
+			if (entry.getValue() < 0)
+			{
+				KitType slot = entry.getKey();
+				diff = Diff.merge(layers.set(slot, SlotInfo.nothing(slot), isPreview), diff);
+				unsetSlots.remove(slot);
+			}
 		}
 
 		// unset any slot that hasn't been touched
@@ -210,10 +206,26 @@ public class LoadoutManager
 	public boolean isApplied(Loadout loadout)
 	{
 		Loadout look = capture();
-		return look.getItems().equals(loadout.getItems()) &&
+		return look.getItems().equals(resolveItems(loadout)) &&
 			look.getColors().equals(loadout.getColors()) &&
 			Objects.equals(look.getIcon(), loadout.getIcon()) &&
 			look.getKits().equals(resolveKits(loadout, layers.getGender()));
+	}
+
+	/**
+	 * Resolves loadout's item ids, skipping "nothing" in slots other items hide (e.g. nothing shield + 2h weapon).
+	 * Older versions saved loadouts like these.
+	 */
+	@VisibleForTesting
+	Map<KitType, Integer> resolveItems(Loadout loadout)
+	{
+		Set<KitType> hidden = loadout.getItems().entrySet().stream()
+			.filter(e -> e.getValue() >= 0)
+			.flatMap(e -> SlotInfo.lookUp(e.getValue() + FashionManager.ITEM_OFFSET, e.getKey()).getHidden().stream())
+			.collect(Collectors.toSet());
+		Map<KitType, Integer> result = new HashMap<>(loadout.getItems());
+		result.entrySet().removeIf(e -> e.getValue() < 0 && hidden.contains(e.getKey()));
+		return result;
 	}
 
 	/**
