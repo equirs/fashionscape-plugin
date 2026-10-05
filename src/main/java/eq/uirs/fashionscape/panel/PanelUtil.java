@@ -9,16 +9,16 @@ import javax.swing.JButton;
 import net.runelite.client.util.ImageUtil;
 
 // for reusing stuff in fashionscape panels
-class PanelUtil
+public class PanelUtil
 {
 	// returns image icon `name`.png from panel resources
-	static ImageIcon icon(String name)
+	public static ImageIcon icon(String name)
 	{
 		return new ImageIcon(ImageUtil.loadImageResource(PanelUtil.class, name + ".png"));
 	}
 
 	// show hand cursor while hovering, default cursor otherwise
-	static MouseAdapter hoverCursor(Component target)
+	public static MouseAdapter hoverCursor(Component target)
 	{
 		return new MouseAdapter()
 		{

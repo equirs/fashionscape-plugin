@@ -10,11 +10,14 @@ import eq.uirs.fashionscape.core.event.IconLockChanged;
 import eq.uirs.fashionscape.core.event.ItemChanged;
 import eq.uirs.fashionscape.core.event.KitChanged;
 import eq.uirs.fashionscape.core.event.KnownKitChanged;
+import eq.uirs.fashionscape.core.event.LoadoutsChanged;
 import eq.uirs.fashionscape.core.event.LockChanged;
 import eq.uirs.fashionscape.data.color.ColorType;
+import eq.uirs.fashionscape.panel.loadout.LoadoutsPanel;
 import eq.uirs.fashionscape.remote.RemoteCategory;
 import eq.uirs.fashionscape.remote.RemoteDataHandler;
 import java.awt.BorderLayout;
+import java.awt.CardLayout;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
@@ -34,6 +37,7 @@ import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
+import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -67,7 +71,13 @@ public class FashionscapePanel extends PluginPanel
 	private final SearchPanel searchPanel;
 	private final KitsPanel kitsPanel;
 	private final ItemsPanel itemsPanel;
+	private final LoadoutsPanel loadoutsPanel;
 	private final NetworkErrorPanel networkErrorPanel;
+
+	private static final String TABS_CARD = "tabs";
+	private static final String LOADOUTS_CARD = "loadouts";
+	private final JPanel cards = new JPanel(new CardLayout());
+	private boolean showingLoadouts;
 
 	@RequiredArgsConstructor
 	static class SearchClearingPanel extends JPanel
@@ -88,7 +98,8 @@ public class FashionscapePanel extends PluginPanel
 
 	@Inject
 	public FashionscapePanel(SearchPanel searchPanel, KitsPanel kitsPanel, DebugAnimationsPanel animsPanel,
-							 FashionManager fashionManager, ItemManager itemManager, ClientThread clientThread,
+							 LoadoutsPanel loadoutsPanel, FashionManager fashionManager,
+							 ItemManager itemManager, ClientThread clientThread,
 							 RemoteDataHandler remote, @Named("developerMode") boolean developerMode)
 	{
 		super(false);
@@ -120,6 +131,9 @@ public class FashionscapePanel extends PluginPanel
 		this.itemsPanel = itemsPanel;
 		this.searchPanel = searchPanel;
 		this.kitsPanel = kitsPanel;
+		this.loadoutsPanel = loadoutsPanel;
+		loadoutsPanel.setOnClose(this::closeLoadouts);
+		loadoutsPanel.setCanSave(hasVirtuals());
 
 		MaterialTab itemsTab = new MaterialTab("Items", tabGroup, itemsPanel);
 		MaterialTab kitsTab = new MaterialTab("Base", tabGroup, kitsPanel);
@@ -163,7 +177,9 @@ public class FashionscapePanel extends PluginPanel
 
 		tabPanel.add(tabGroup, BorderLayout.NORTH);
 		tabPanel.add(tabDisplayPanel, BorderLayout.CENTER);
-		add(tabPanel, BorderLayout.CENTER);
+		cards.add(tabPanel, TABS_CARD);
+		cards.add(loadoutsPanel, LOADOUTS_CARD);
+		add(cards, BorderLayout.CENTER);
 
 		if (remote.hasFailed())
 		{
@@ -237,11 +253,18 @@ public class FashionscapePanel extends PluginPanel
 		itemsPanel.onKnownKitChanged(e);
 	}
 
+	@Subscribe
+	public void onLoadoutsChanged(LoadoutsChanged e)
+	{
+		SwingUtilities.invokeLater(loadoutsPanel::rebuild);
+	}
+
 	private void refreshButtonsEnabled()
 	{
 		checkButtonEnabled(shuffle);
 		checkButtonEnabled(clear);
 		checkButtonEnabled(save);
+		loadoutsPanel.setCanSave(hasVirtuals());
 	}
 
 	public void onPlayerChanged(Player player)
@@ -324,25 +347,46 @@ public class FashionscapePanel extends PluginPanel
 		buttonContainer.add(shuffle, c);
 		c.gridx++;
 
+		JPopupMenu saveMenu = new JPopupMenu();
+		JMenuItem saveToFile = new JMenuItem("Save to file...");
+		saveToFile.addActionListener(e -> openSaveDialog());
+		saveMenu.add(saveToFile);
+
 		save = new JButton(PanelUtil.icon("save"));
-		save.setToolTipText("Save");
-		save.addActionListener(e -> openSaveDialog());
+		save.setToolTipText("Save as loadout");
+		save.addActionListener(e -> {
+			openLoadouts();
+			loadoutsPanel.saveCurrent();
+		});
 		save.setFocusPainted(false);
 		save.addMouseListener(PanelUtil.hoverCursor(this));
+		save.setComponentPopupMenu(saveMenu);
 		checkButtonEnabled(save);
 		buttonContainer.add(save, c);
 		c.gridx++;
 
-		JPopupMenu cloneSelfMenu = new JPopupMenu();
+		JPopupMenu loadMenu = new JPopupMenu();
+		JMenuItem loadFromFile = new JMenuItem("Load from file...");
+		loadFromFile.addActionListener(e -> openLoadDialog());
+		loadMenu.add(loadFromFile);
 		JMenuItem cloneSelf = new JMenuItem("Load current equipment");
 		cloneSelf.addActionListener(e -> fashionManager.importSelf());
-		cloneSelfMenu.add(cloneSelf);
+		loadMenu.add(cloneSelf);
 
 		JButton load = new JButton(PanelUtil.icon("load"));
-		load.setToolTipText("Load");
-		load.addActionListener(e -> openLoadDialog());
+		load.setToolTipText("Loadouts");
+		load.addActionListener(e -> {
+			if (showingLoadouts)
+			{
+				closeLoadouts();
+			}
+			else
+			{
+				openLoadouts();
+			}
+		});
 		load.setFocusPainted(false);
-		load.setComponentPopupMenu(cloneSelfMenu);
+		load.setComponentPopupMenu(loadMenu);
 		checkButtonEnabled(load);
 		load.addMouseListener(PanelUtil.hoverCursor(this));
 		buttonContainer.add(load, c);
@@ -369,6 +413,21 @@ public class FashionscapePanel extends PluginPanel
 		buttonContainer.add(clear, c);
 
 		return buttonContainer;
+	}
+
+	private void openLoadouts()
+	{
+		showingLoadouts = true;
+		loadoutsPanel.rebuild();
+		((CardLayout) cards.getLayout()).show(cards, LOADOUTS_CARD);
+	}
+
+	private void closeLoadouts()
+	{
+		showingLoadouts = false;
+		((CardLayout) cards.getLayout()).show(cards, TABS_CARD);
+		// results may be stale after applying a loadout
+		clientThread.invokeLater(this::reloadResults);
 	}
 
 	@SuppressWarnings("ResultOfMethodCallIgnored")

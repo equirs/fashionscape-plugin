@@ -3,6 +3,7 @@ package eq.uirs.fashionscape.core;
 import com.google.common.collect.ImmutableList;
 import eq.uirs.fashionscape.core.layer.Layers;
 import eq.uirs.fashionscape.core.layer.Locks;
+import eq.uirs.fashionscape.core.loadout.Loadout;
 import eq.uirs.fashionscape.core.randomizer.Randomizer;
 import eq.uirs.fashionscape.data.color.ColorType;
 import eq.uirs.fashionscape.data.kit.JawIcon;
@@ -198,6 +199,12 @@ public class FashionManager
 			revertToRealModels();
 			importPlayer(client.getLocalPlayer());
 		});
+	}
+
+	public void applyLoadout(Loadout loadout)
+	{
+		loadoutManager.apply(loadout);
+		clientThread.invokeLater(this::refreshPlayer);
 	}
 
 	public void importPlayer(@Nullable Player player)
