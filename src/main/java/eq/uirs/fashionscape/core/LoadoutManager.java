@@ -3,20 +3,15 @@ package eq.uirs.fashionscape.core;
 import com.google.common.annotations.VisibleForTesting;
 import eq.uirs.fashionscape.core.layer.Layers;
 import eq.uirs.fashionscape.core.layer.Locks;
-import eq.uirs.fashionscape.core.loadout.LegacyFormat;
 import eq.uirs.fashionscape.core.loadout.Loadout;
 import eq.uirs.fashionscape.core.model.ModelInfo;
 import eq.uirs.fashionscape.core.utils.KitUtil;
 import eq.uirs.fashionscape.data.color.ColorType;
 import eq.uirs.fashionscape.data.kit.JawKit;
 import eq.uirs.fashionscape.data.kit.Kit;
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.PrintWriter;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -25,31 +20,24 @@ import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.ChatMessageType;
 import net.runelite.api.PlayerComposition;
 import net.runelite.api.kit.KitType;
-import net.runelite.client.RuneLite;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.chat.ChatColorType;
 import net.runelite.client.chat.ChatMessageBuilder;
 import net.runelite.client.chat.ChatMessageManager;
 import net.runelite.client.chat.QueuedMessage;
-import net.runelite.client.game.ItemManager;
 
 /**
  * Converts between loadouts and the player's virtual models
  */
-@Slf4j
 @Singleton
 @RequiredArgsConstructor(onConstructor_ = {@Inject})
 public class LoadoutManager
 {
-	public static final File OUTFITS_DIR = new File(RuneLite.RUNELITE_DIR, "outfits");
-
 	private final ClientThread clientThread;
 	private final ChatMessageManager chatMessageManager;
-	private final ItemManager itemManager;
 
 	private final Layers layers;
 	private final Locks locks;
@@ -227,33 +215,6 @@ public class LoadoutManager
 			}
 		});
 		return result;
-	}
-
-	public void importLegacy(List<String> lines)
-	{
-		LegacyFormat.ParseResult result = LegacyFormat.parse(lines);
-		result.getSkippedLines().forEach(line -> sendHighlightedMessage("Could not import line: " + line));
-		if (!result.getLoadout().isEmpty())
-		{
-			apply(result.getLoadout());
-		}
-	}
-
-	public void exportLegacy(File selected)
-	{
-		clientThread.invokeLater(() -> {
-			try (PrintWriter out = new PrintWriter(selected))
-			{
-				List<String> lines = LegacyFormat.write(capture(),
-					itemId -> itemManager.getItemComposition(itemId).getMembersName());
-				lines.forEach(out::println);
-				sendHighlightedMessage("Saved fashionscape to " + selected.getName());
-			}
-			catch (FileNotFoundException e)
-			{
-				log.warn("Could not find selected file for fashionscape export", e);
-			}
-		});
 	}
 
 	private void sendHighlightedMessage(String message)

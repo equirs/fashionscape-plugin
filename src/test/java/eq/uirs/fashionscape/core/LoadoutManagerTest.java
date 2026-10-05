@@ -15,7 +15,6 @@ import net.runelite.api.kit.KitType;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.chat.ChatMessageManager;
 import net.runelite.client.eventbus.EventBus;
-import net.runelite.client.game.ItemManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import static org.mockito.ArgumentMatchers.anyBoolean;
@@ -38,8 +37,8 @@ public class LoadoutManagerTest
 	void setUp()
 	{
 		when(layers.getVirtualModels()).thenReturn(virtual);
-		manager = new LoadoutManager(mock(ClientThread.class), mock(ChatMessageManager.class), mock(ItemManager.class),
-			layers, mock(Locks.class), mock(History.class), fallbacks);
+		manager = new LoadoutManager(mock(ClientThread.class), mock(ChatMessageManager.class), layers,
+			mock(Locks.class), mock(History.class), fallbacks);
 	}
 
 	@Test

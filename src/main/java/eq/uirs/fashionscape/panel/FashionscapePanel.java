@@ -1,7 +1,6 @@
 package eq.uirs.fashionscape.panel;
 
 import eq.uirs.fashionscape.core.FashionManager;
-import eq.uirs.fashionscape.core.LoadoutManager;
 import eq.uirs.fashionscape.core.event.ActiveLoadoutsChanged;
 import eq.uirs.fashionscape.core.event.ColorChanged;
 import eq.uirs.fashionscape.core.event.ColorLockChanged;
@@ -22,20 +21,12 @@ import java.awt.CardLayout;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
-import java.io.IOException;
 import java.util.Arrays;
-import java.util.List;
 import java.util.Objects;
-import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.swing.JButton;
-import javax.swing.JFileChooser;
 import javax.swing.JMenuItem;
-import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
 import javax.swing.SwingUtilities;
@@ -354,11 +345,6 @@ public class FashionscapePanel extends PluginPanel
 		buttonContainer.add(shuffle, c);
 		c.gridx++;
 
-		JPopupMenu saveMenu = new JPopupMenu();
-		JMenuItem saveToFile = new JMenuItem("Save to file...");
-		saveToFile.addActionListener(e -> openSaveDialog());
-		saveMenu.add(saveToFile);
-
 		save = new JButton(PanelUtil.icon("save"));
 		save.setToolTipText("Save as loadout");
 		save.addActionListener(e -> {
@@ -367,15 +353,9 @@ public class FashionscapePanel extends PluginPanel
 		});
 		save.setFocusPainted(false);
 		save.addMouseListener(PanelUtil.hoverCursor(this));
-		save.setComponentPopupMenu(saveMenu);
 		checkButtonEnabled(save);
 		buttonContainer.add(save, c);
 		c.gridx++;
-
-		JPopupMenu loadMenu = new JPopupMenu();
-		JMenuItem loadFromFile = new JMenuItem("Load from file...");
-		loadFromFile.addActionListener(e -> openLoadDialog());
-		loadMenu.add(loadFromFile);
 
 		JButton load = new JButton(PanelUtil.icon("load"));
 		load.setToolTipText("Loadouts");
@@ -390,7 +370,6 @@ public class FashionscapePanel extends PluginPanel
 			}
 		});
 		load.setFocusPainted(false);
-		load.setComponentPopupMenu(loadMenu);
 		checkButtonEnabled(load);
 		load.addMouseListener(PanelUtil.hoverCursor(this));
 		buttonContainer.add(load, c);
@@ -432,87 +411,6 @@ public class FashionscapePanel extends PluginPanel
 		((CardLayout) cards.getLayout()).show(cards, TABS_CARD);
 		// results may be stale after applying a loadout
 		clientThread.invokeLater(this::reloadResults);
-	}
-
-	@SuppressWarnings("ResultOfMethodCallIgnored")
-	private void openSaveDialog()
-	{
-		File outputDir = LoadoutManager.OUTFITS_DIR;
-		outputDir.mkdirs();
-
-		JFileChooser fileChooser = new JFileChooser(outputDir)
-		{
-			@Override
-			public void approveSelection()
-			{
-				File f = getSelectedFile();
-				if (!f.getName().endsWith(".txt"))
-				{
-					f = new File(f.getPath() + ".txt");
-				}
-				if (f.exists() && getDialogType() == SAVE_DIALOG)
-				{
-					int result = JOptionPane.showConfirmDialog(
-						this,
-						"File already exists, overwrite?",
-						"Warning",
-						JOptionPane.YES_NO_CANCEL_OPTION
-					);
-					switch (result)
-					{
-						case JOptionPane.YES_OPTION:
-							super.approveSelection();
-							return;
-						case JOptionPane.NO_OPTION:
-						case JOptionPane.CLOSED_OPTION:
-							return;
-						case JOptionPane.CANCEL_OPTION:
-							cancelSelection();
-							return;
-					}
-				}
-				super.approveSelection();
-			}
-		};
-		fileChooser.setSelectedFile(new File("outfit.txt"));
-		fileChooser.setDialogTitle("Save current outfit");
-
-		int option = fileChooser.showSaveDialog(this);
-		if (option == JFileChooser.APPROVE_OPTION)
-		{
-			File selectedFile = fileChooser.getSelectedFile();
-			if (!selectedFile.getName().endsWith(".txt"))
-			{
-				selectedFile = new File(selectedFile.getPath() + ".txt");
-			}
-			fashionManager.getLoadoutManager().exportLegacy(selectedFile);
-		}
-	}
-
-	@SuppressWarnings("ResultOfMethodCallIgnored")
-	private void openLoadDialog()
-	{
-		File outputDir = LoadoutManager.OUTFITS_DIR;
-		outputDir.mkdirs();
-
-		JFileChooser fileChooser = new JFileChooser(outputDir);
-		fileChooser.setDialogTitle("Select an outfit to load");
-
-		int option = fileChooser.showOpenDialog(this);
-		if (option == JFileChooser.APPROVE_OPTION)
-		{
-			File selectedFile = fileChooser.getSelectedFile();
-			try (BufferedReader reader = new BufferedReader(new FileReader(selectedFile)))
-			{
-				List<String> lines = reader.lines().collect(Collectors.toList());
-				fashionManager.getLoadoutManager().importLegacy(lines);
-				clientThread.invokeLater(fashionManager::refreshPlayer);
-			}
-			catch (IOException e)
-			{
-				log.warn("Failed to import fashionscape from file", e);
-			}
-		}
 	}
 
 	private boolean hasVirtuals()

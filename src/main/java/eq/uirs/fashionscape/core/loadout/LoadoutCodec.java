@@ -76,7 +76,7 @@ public class LoadoutCodec
 		}
 		else
 		{
-			parsed.add(LegacyFormat.parse(Arrays.asList(trimmed.split("\\R"))).getLoadout());
+			parsed.add(LegacyFormat.parse(Arrays.asList(trimmed.split("\\R"))));
 		}
 
 		List<Loadout> result = new ArrayList<>();
