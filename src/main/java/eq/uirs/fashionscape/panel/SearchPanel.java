@@ -195,7 +195,6 @@ public class SearchPanel extends JPanel
 
 		resultsScrollPane = new JScrollPane(wrapper);
 		resultsScrollPane.setBackground(ColorScheme.DARK_GRAY_COLOR);
-		resultsScrollPane.getVerticalScrollBar().setPreferredSize(new Dimension(10, 0));
 		resultsScrollPane.setVisible(false);
 
 		JPanel infoWrapper = new JPanel(new BorderLayout());

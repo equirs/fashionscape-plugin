@@ -93,7 +93,6 @@ class ItemsPanel extends JPanel
 		JScrollPane scrollPane = new JScrollPane(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
 			JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
 		scrollPane.setBackground(ColorScheme.DARK_GRAY_COLOR);
-		scrollPane.getVerticalScrollBar().setPreferredSize(new Dimension(10, 0));
 		scrollPane.setViewportView(scrollWrapper);
 
 		add(scrollPane, BorderLayout.CENTER);

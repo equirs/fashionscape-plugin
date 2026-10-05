@@ -8,7 +8,6 @@ import eq.uirs.fashionscape.core.loadout.SavedLoadout;
 import eq.uirs.fashionscape.panel.PanelUtil;
 import java.awt.BorderLayout;
 import java.awt.Color;
-import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
@@ -73,19 +72,19 @@ public class LoadoutsPanel extends JPanel implements LoadoutRow.Actions
 
 		setLayout(new BorderLayout());
 		setBackground(ColorScheme.DARK_GRAY_COLOR);
-		setBorder(new EmptyBorder(5, 10, 5, 10));
+		setBorder(new EmptyBorder(5, 0, 0, 0));
 		add(createHeader(), BorderLayout.NORTH);
 
 		emptyPanel.setContent("No saved loadouts", "Press + to save your current look.");
 		listPanel.setBackground(ColorScheme.DARK_GRAY_COLOR);
 		JPanel scrollWrapper = new JPanel(new BorderLayout());
 		scrollWrapper.setBackground(ColorScheme.DARK_GRAY_COLOR);
+		scrollWrapper.setBorder(new EmptyBorder(0, 10, 5, 10));
 		scrollWrapper.add(listPanel, BorderLayout.NORTH);
 
 		JScrollPane scrollPane = new JScrollPane(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
 			JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
 		scrollPane.setBackground(ColorScheme.DARK_GRAY_COLOR);
-		scrollPane.getVerticalScrollBar().setPreferredSize(new Dimension(10, 0));
 		scrollPane.setViewportView(scrollWrapper);
 		add(scrollPane, BorderLayout.CENTER);
 	}
@@ -141,7 +140,7 @@ public class LoadoutsPanel extends JPanel implements LoadoutRow.Actions
 	/**
 	 * Saves the current look as a new loadout, then starts renaming it.
 	 */
-	public void saveCurrent()
+	private void saveCurrent()
 	{
 		clientThread.invokeLater(() -> {
 			Loadout loadout = fashionManager.getLoadoutManager().capture().withName(nextDefaultName());
@@ -249,7 +248,7 @@ public class LoadoutsPanel extends JPanel implements LoadoutRow.Actions
 
 		JPanel header = new JPanel(new BorderLayout(0, 5));
 		header.setBackground(ColorScheme.DARK_GRAY_COLOR);
-		header.setBorder(new EmptyBorder(0, 0, 8, 0));
+		header.setBorder(new EmptyBorder(0, 10, 8, 10));
 		header.add(titleRow, BorderLayout.NORTH);
 		header.add(loadEquipment, BorderLayout.SOUTH);
 		return header;

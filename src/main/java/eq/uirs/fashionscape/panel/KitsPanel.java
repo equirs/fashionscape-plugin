@@ -12,7 +12,6 @@ import eq.uirs.fashionscape.core.event.KitChanged;
 import eq.uirs.fashionscape.core.event.LockChanged;
 import eq.uirs.fashionscape.data.color.ColorType;
 import java.awt.BorderLayout;
-import java.awt.Dimension;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.GridLayout;
@@ -109,7 +108,6 @@ public class KitsPanel extends JPanel
 		resultsPanel.setBackground(ColorScheme.DARK_GRAY_COLOR);
 
 		scrollPane.setBackground(ColorScheme.DARK_GRAY_COLOR);
-		scrollPane.getVerticalScrollBar().setPreferredSize(new Dimension(10, 0));
 
 		JPanel resultsWrapper = new JPanel(new BorderLayout());
 		resultsWrapper.setBackground(ColorScheme.DARK_GRAY_COLOR);

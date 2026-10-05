@@ -29,6 +29,7 @@ import javax.swing.JButton;
 import javax.swing.JMenuItem;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
+import javax.swing.JToggleButton;
 import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
 import lombok.RequiredArgsConstructor;
@@ -53,7 +54,6 @@ public class FashionscapePanel extends PluginPanel
 	private JButton undo;
 	private JButton redo;
 	private JButton shuffle;
-	private JButton save;
 	private JButton clear;
 
 	private final SearchClearingPanel tabDisplayPanel;
@@ -69,7 +69,8 @@ public class FashionscapePanel extends PluginPanel
 	private static final String TABS_CARD = "tabs";
 	private static final String LOADOUTS_CARD = "loadouts";
 	private final JPanel cards = new JPanel(new CardLayout());
-	private boolean showingLoadouts;
+	// selected while the loadouts view is open
+	private JToggleButton loadoutsButton;
 
 	@RequiredArgsConstructor
 	static class SearchClearingPanel extends JPanel
@@ -261,7 +262,6 @@ public class FashionscapePanel extends PluginPanel
 	{
 		checkButtonEnabled(shuffle);
 		checkButtonEnabled(clear);
-		checkButtonEnabled(save);
 		loadoutsPanel.setCanSave(hasVirtuals());
 	}
 
@@ -345,34 +345,22 @@ public class FashionscapePanel extends PluginPanel
 		buttonContainer.add(shuffle, c);
 		c.gridx++;
 
-		save = new JButton(PanelUtil.icon("save"));
-		save.setToolTipText("Save as loadout");
-		save.addActionListener(e -> {
-			openLoadouts();
-			loadoutsPanel.saveCurrent();
-		});
-		save.setFocusPainted(false);
-		save.addMouseListener(PanelUtil.hoverCursor(this));
-		checkButtonEnabled(save);
-		buttonContainer.add(save, c);
-		c.gridx++;
-
-		JButton load = new JButton(PanelUtil.icon("load"));
-		load.setToolTipText("Loadouts");
-		load.addActionListener(e -> {
-			if (showingLoadouts)
-			{
-				closeLoadouts();
-			}
-			else
+		loadoutsButton = new JToggleButton(PanelUtil.icon("load"));
+		loadoutsButton.setToolTipText("Loadouts");
+		// the click has already toggled the selection
+		loadoutsButton.addActionListener(e -> {
+			if (loadoutsButton.isSelected())
 			{
 				openLoadouts();
 			}
+			else
+			{
+				closeLoadouts();
+			}
 		});
-		load.setFocusPainted(false);
-		checkButtonEnabled(load);
-		load.addMouseListener(PanelUtil.hoverCursor(this));
-		buttonContainer.add(load, c);
+		loadoutsButton.setFocusPainted(false);
+		loadoutsButton.addMouseListener(PanelUtil.hoverCursor(this));
+		buttonContainer.add(loadoutsButton, c);
 		c.gridx++;
 
 		JPopupMenu softClearMenu = new JPopupMenu();
@@ -400,14 +388,14 @@ public class FashionscapePanel extends PluginPanel
 
 	private void openLoadouts()
 	{
-		showingLoadouts = true;
+		loadoutsButton.setSelected(true);
 		loadoutsPanel.rebuild();
 		((CardLayout) cards.getLayout()).show(cards, LOADOUTS_CARD);
 	}
 
 	private void closeLoadouts()
 	{
-		showingLoadouts = false;
+		loadoutsButton.setSelected(false);
 		((CardLayout) cards.getLayout()).show(cards, TABS_CARD);
 		// results may be stale after applying a loadout
 		clientThread.invokeLater(this::reloadResults);
@@ -452,10 +440,6 @@ public class FashionscapePanel extends PluginPanel
 		else if (button == shuffle)
 		{
 			enabled = hasUnlocked();
-		}
-		else if (button == save)
-		{
-			enabled = hasVirtuals();
 		}
 		// other buttons are always enabled
 		button.setEnabled(enabled);

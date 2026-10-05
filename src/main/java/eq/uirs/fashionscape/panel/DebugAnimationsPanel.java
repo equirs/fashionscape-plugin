@@ -7,7 +7,6 @@ import eq.uirs.fashionscape.remote.RemoteDataHandler;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Cursor;
-import java.awt.Dimension;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.GridLayout;
@@ -55,7 +54,6 @@ public class DebugAnimationsPanel extends JPanel
 
 		JScrollPane scrollPane = new JScrollPane();
 		scrollPane.setBackground(ColorScheme.DARK_GRAY_COLOR);
-		scrollPane.getVerticalScrollBar().setPreferredSize(new Dimension(10, 0));
 
 		JPanel resultsWrapper = new JPanel(new BorderLayout());
 		resultsWrapper.setBackground(ColorScheme.DARK_GRAY_COLOR);
