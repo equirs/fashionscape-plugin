@@ -5,6 +5,7 @@ import com.google.inject.Provides;
 import eq.uirs.fashionscape.core.ConfigHelper;
 import eq.uirs.fashionscape.core.FashionManager;
 import eq.uirs.fashionscape.core.layer.ModelType;
+import eq.uirs.fashionscape.core.loadout.LoadoutStore;
 import eq.uirs.fashionscape.core.model.ModelInfo;
 import eq.uirs.fashionscape.core.randomizer.Randomizer;
 import eq.uirs.fashionscape.overlay.DebugOverlay;
@@ -80,6 +81,9 @@ public class FashionscapePlugin extends Plugin
 	private ConfigHelper configHelper;
 
 	@Inject
+	private LoadoutStore loadoutStore;
+
+	@Inject
 	private DebugOverlay debugOverlay;
 
 	@Inject
@@ -132,6 +136,7 @@ public class FashionscapePlugin extends Plugin
 		clientToolbar.addNavigation(navButton);
 		refreshMenuEntries();
 		fashionManager.startUp();
+		loadoutStore.load();
 		if (developerMode)
 		{
 			overlayManager.add(debugOverlay);
@@ -239,7 +244,7 @@ public class FashionscapePlugin extends Plugin
 	// registers/unregisters these at startup/shutdown
 	private List<Object> getEventSubscribers()
 	{
-		return ImmutableList.of(configHelper, panel);
+		return ImmutableList.of(configHelper, loadoutStore, panel);
 	}
 
 }
