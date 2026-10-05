@@ -1,6 +1,7 @@
 package eq.uirs.fashionscape.panel.loadout;
 
 import eq.uirs.fashionscape.core.FashionManager;
+import eq.uirs.fashionscape.core.loadout.ActiveLoadouts;
 import eq.uirs.fashionscape.core.loadout.Loadout;
 import eq.uirs.fashionscape.core.loadout.LoadoutStore;
 import eq.uirs.fashionscape.core.loadout.SavedLoadout;
@@ -44,6 +45,7 @@ public class LoadoutsPanel extends JPanel implements LoadoutRow.Actions
 	private final FashionManager fashionManager;
 	private final LoadoutStore store;
 	private final ItemManager itemManager;
+	private final ActiveLoadouts activeLoadouts;
 
 	private final JPanel listPanel = new JPanel(new GridBagLayout());
 	private final PluginErrorPanel emptyPanel = new PluginErrorPanel();
@@ -55,12 +57,14 @@ public class LoadoutsPanel extends JPanel implements LoadoutRow.Actions
 	};
 
 	@Inject
-	LoadoutsPanel(ClientThread clientThread, FashionManager fashionManager, LoadoutStore store, ItemManager itemManager)
+	LoadoutsPanel(ClientThread clientThread, FashionManager fashionManager, LoadoutStore store, ItemManager itemManager,
+		ActiveLoadouts activeLoadouts)
 	{
 		this.clientThread = clientThread;
 		this.fashionManager = fashionManager;
 		this.store = store;
 		this.itemManager = itemManager;
+		this.activeLoadouts = activeLoadouts;
 
 		setLayout(new BorderLayout());
 		setBackground(ColorScheme.DARK_GRAY_COLOR);
@@ -112,12 +116,21 @@ public class LoadoutsPanel extends JPanel implements LoadoutRow.Actions
 			LoadoutColorBar colorBar = new LoadoutColorBar(saved.getLoadout());
 			LoadoutRow row = new LoadoutRow(saved, summaryOf(saved.getLoadout()), colorBar, i == 0,
 				i == all.size() - 1, this);
+			row.setActive(activeLoadouts.getActiveIds().contains(saved.getId()));
 			rows.put(saved.getId(), row);
 			listPanel.add(row, c);
 			c.gridy++;
 		}
 		listPanel.revalidate();
 		listPanel.repaint();
+	}
+
+	/**
+	 * Marks rows with these ids as active and all others as inactive. Call on the EDT.
+	 */
+	public void setActive(Set<String> ids)
+	{
+		rows.forEach((id, row) -> row.setActive(ids.contains(id)));
 	}
 
 	/**

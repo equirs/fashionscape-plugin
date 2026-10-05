@@ -6,6 +6,7 @@ import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
+import java.awt.Graphics;
 import java.awt.event.FocusAdapter;
 import java.awt.event.FocusEvent;
 import java.awt.event.KeyAdapter;
@@ -25,6 +26,8 @@ import net.runelite.client.ui.components.FlatTextField;
 
 class LoadoutRow extends JPanel
 {
+	private static final int ACTIVE_BAR_WIDTH = 2;
+
 	interface Actions
 	{
 		void apply(SavedLoadout saved);
@@ -45,6 +48,7 @@ class LoadoutRow extends JPanel
 	private final JLabel nameLabel = new JLabel();
 	private final FlatTextField nameField = new FlatTextField();
 	private boolean renaming;
+	private boolean active;
 
 	LoadoutRow(SavedLoadout saved, @Nullable JComponent summary, JComponent colorBar, boolean first, boolean last,
 		Actions actions)
@@ -90,6 +94,27 @@ class LoadoutRow extends JPanel
 			}
 		});
 		addMouseListener(hoverListener());
+	}
+
+	void setActive(boolean active)
+	{
+		if (this.active != active)
+		{
+			this.active = active;
+			repaint();
+		}
+	}
+
+	// paints over the children so the bar doesn't take layout space or shift the content
+	@Override
+	protected void paintChildren(Graphics g)
+	{
+		super.paintChildren(g);
+		if (active)
+		{
+			g.setColor(ColorScheme.PROGRESS_COMPLETE_COLOR);
+			g.fillRect(0, 0, ACTIVE_BAR_WIDTH, getHeight());
+		}
 	}
 
 	void startRename()

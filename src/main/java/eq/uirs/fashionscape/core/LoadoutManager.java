@@ -1,5 +1,6 @@
 package eq.uirs.fashionscape.core;
 
+import com.google.common.annotations.VisibleForTesting;
 import eq.uirs.fashionscape.core.layer.Layers;
 import eq.uirs.fashionscape.core.layer.Locks;
 import eq.uirs.fashionscape.core.loadout.LegacyFormat;
@@ -13,11 +14,14 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.PrintWriter;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import lombok.RequiredArgsConstructor;
@@ -151,21 +155,11 @@ public class LoadoutManager
 			Integer gender = layers.getGender();
 			if (gender != null)
 			{
-				for (Map.Entry<KitType, Integer> entry : loadout.getKits().entrySet())
+				for (Map.Entry<KitType, Integer> entry : resolveKits(loadout, gender).entrySet())
 				{
 					KitType slot = entry.getKey();
-					Kit kit = KitUtil.KIT_ID_TO_KIT.get(entry.getValue());
-					// if no analog exists, use a fallback (don't notify UI that the player's slot is unknown)
-					if (kit == null)
-					{
-						kit = KitUtil.KIT_ID_TO_KIT.get(fallbacks.getKit(slot, gender, false));
-					}
-					if (kit != null)
-					{
-						SlotInfo info = SlotInfo.kit(kit, gender);
-						diff = Diff.merge(layers.set(info.getSlot(), info, false), diff);
-						unsetSlots.remove(info.getSlot());
-					}
+					diff = Diff.merge(layers.set(slot, SlotInfo.kit(entry.getValue(), slot), false), diff);
+					unsetSlots.remove(slot);
 				}
 			}
 			else if (!loadout.getKits().isEmpty())
@@ -194,6 +188,45 @@ public class LoadoutManager
 
 			history.append(diff);
 		});
+	}
+
+	/**
+	 * Returns whether applying the loadout would leave the current look unchanged. Call on the client thread.
+	 */
+	public boolean isApplied(Loadout loadout)
+	{
+		Loadout look = capture();
+		return look.getItems().equals(loadout.getItems()) &&
+			look.getColors().equals(loadout.getColors()) &&
+			Objects.equals(look.getIcon(), loadout.getIcon()) &&
+			look.getKits().equals(resolveKits(loadout, layers.getGender()));
+	}
+
+	/**
+	 * Resolves loadout's kit ids for the current gender, empty if gender is unknown.
+	 */
+	@VisibleForTesting
+	Map<KitType, Integer> resolveKits(Loadout loadout, @Nullable Integer gender)
+	{
+		Map<KitType, Integer> result = new HashMap<>();
+		if (gender == null)
+		{
+			return result;
+		}
+		loadout.getKits().forEach((slot, kitId) -> {
+			Kit kit = KitUtil.KIT_ID_TO_KIT.get(kitId);
+			// if no analog exists, use a fallback (don't notify UI that the player's slot is unknown)
+			if (kit == null)
+			{
+				kit = KitUtil.KIT_ID_TO_KIT.get(fallbacks.getKit(slot, gender, false));
+			}
+			Integer genderedId = kit != null ? kit.getKitId(gender) : null;
+			if (genderedId != null)
+			{
+				result.put(kit.getKitType(), genderedId);
+			}
+		});
+		return result;
 	}
 
 	public void importLegacy(List<String> lines)

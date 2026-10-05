@@ -2,6 +2,7 @@ package eq.uirs.fashionscape.panel;
 
 import eq.uirs.fashionscape.core.FashionManager;
 import eq.uirs.fashionscape.core.LoadoutManager;
+import eq.uirs.fashionscape.core.event.ActiveLoadoutsChanged;
 import eq.uirs.fashionscape.core.event.ColorChanged;
 import eq.uirs.fashionscape.core.event.ColorLockChanged;
 import eq.uirs.fashionscape.core.event.HistoryChanged;
@@ -257,6 +258,12 @@ public class FashionscapePanel extends PluginPanel
 	public void onLoadoutsChanged(LoadoutsChanged e)
 	{
 		SwingUtilities.invokeLater(loadoutsPanel::rebuild);
+	}
+
+	@Subscribe
+	public void onActiveLoadoutsChanged(ActiveLoadoutsChanged e)
+	{
+		SwingUtilities.invokeLater(() -> loadoutsPanel.setActive(e.getIds()));
 	}
 
 	private void refreshButtonsEnabled()
