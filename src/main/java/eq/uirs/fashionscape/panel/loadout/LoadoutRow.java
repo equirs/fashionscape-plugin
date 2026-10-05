@@ -34,6 +34,8 @@ class LoadoutRow extends JPanel
 
 		void overwrite(SavedLoadout saved);
 
+		void copy(SavedLoadout saved);
+
 		void rename(SavedLoadout saved, String name);
 
 		void move(SavedLoadout saved, int offset);
@@ -236,6 +238,7 @@ class LoadoutRow extends JPanel
 		JPopupMenu menu = new JPopupMenu();
 		menu.add(menuItem("Update with current look", () -> actions.overwrite(saved)));
 		menu.add(menuItem("Rename", this::startRename));
+		menu.add(menuItem("Copy to clipboard", () -> actions.copy(saved)));
 		return menu;
 	}
 

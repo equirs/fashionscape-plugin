@@ -9,6 +9,7 @@ import eq.uirs.fashionscape.panel.PanelUtil;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Dimension;
+import java.awt.FlowLayout;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
@@ -23,8 +24,10 @@ import javax.inject.Inject;
 import javax.swing.JButton;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
+import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
+import javax.swing.JPopupMenu;
 import javax.swing.JScrollPane;
 import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
@@ -46,6 +49,7 @@ public class LoadoutsPanel extends JPanel implements LoadoutRow.Actions
 	private final LoadoutStore store;
 	private final ItemManager itemManager;
 	private final ActiveLoadouts activeLoadouts;
+	private final LoadoutSharing sharing;
 
 	private final JPanel listPanel = new JPanel(new GridBagLayout());
 	private final PluginErrorPanel emptyPanel = new PluginErrorPanel();
@@ -58,13 +62,14 @@ public class LoadoutsPanel extends JPanel implements LoadoutRow.Actions
 
 	@Inject
 	LoadoutsPanel(ClientThread clientThread, FashionManager fashionManager, LoadoutStore store, ItemManager itemManager,
-		ActiveLoadouts activeLoadouts)
+				  ActiveLoadouts activeLoadouts, LoadoutSharing sharing)
 	{
 		this.clientThread = clientThread;
 		this.fashionManager = fashionManager;
 		this.store = store;
 		this.itemManager = itemManager;
 		this.activeLoadouts = activeLoadouts;
+		this.sharing = sharing;
 
 		setLayout(new BorderLayout());
 		setBackground(ColorScheme.DARK_GRAY_COLOR);
@@ -173,6 +178,12 @@ public class LoadoutsPanel extends JPanel implements LoadoutRow.Actions
 	}
 
 	@Override
+	public void copy(SavedLoadout saved)
+	{
+		sharing.copy(saved, this);
+	}
+
+	@Override
 	public void rename(SavedLoadout saved, String name)
 	{
 		store.update(saved.getId(), saved.getLoadout().withName(name));
@@ -222,7 +233,14 @@ public class LoadoutsPanel extends JPanel implements LoadoutRow.Actions
 
 		addButton = iconButton("add", "Save current look");
 		addButton.addActionListener(e -> saveCurrent());
-		titleRow.add(addButton, BorderLayout.EAST);
+		JButton moreButton = iconButton("more", "Import and export");
+		JPopupMenu moreMenu = createMoreMenu();
+		moreButton.addActionListener(e -> moreMenu.show(moreButton, 0, moreButton.getHeight()));
+		JPanel buttons = new JPanel(new FlowLayout(FlowLayout.RIGHT, 2, 0));
+		buttons.setOpaque(false);
+		buttons.add(addButton);
+		buttons.add(moreButton);
+		titleRow.add(buttons, BorderLayout.EAST);
 
 		JButton loadEquipment = new JButton("Load current equipment");
 		loadEquipment.setFocusPainted(false);
@@ -235,6 +253,22 @@ public class LoadoutsPanel extends JPanel implements LoadoutRow.Actions
 		header.add(titleRow, BorderLayout.NORTH);
 		header.add(loadEquipment, BorderLayout.SOUTH);
 		return header;
+	}
+
+	private JPopupMenu createMoreMenu()
+	{
+		JPopupMenu menu = new JPopupMenu();
+		JMenuItem importClipboard = new JMenuItem("Import from clipboard");
+		importClipboard.addActionListener(e -> sharing.importClipboard(this));
+		menu.add(importClipboard);
+		JMenuItem importFiles = new JMenuItem("Import from file...");
+		importFiles.addActionListener(e -> sharing.importFiles(this));
+		menu.add(importFiles);
+		menu.addSeparator();
+		JMenuItem exportAll = new JMenuItem("Export all to file...");
+		exportAll.addActionListener(e -> sharing.exportAll(this));
+		menu.add(exportAll);
+		return menu;
 	}
 
 	private JButton iconButton(String icon, String tooltip)
