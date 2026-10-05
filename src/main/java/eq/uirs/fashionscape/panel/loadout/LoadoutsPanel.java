@@ -53,6 +53,7 @@ public class LoadoutsPanel extends JPanel implements LoadoutRow.Actions
 	private final JPanel listPanel = new JPanel(new GridBagLayout());
 	private final PluginErrorPanel emptyPanel = new PluginErrorPanel();
 	private final Map<String, LoadoutRow> rows = new HashMap<>();
+	private boolean previewing;
 	private JButton addButton;
 
 	@Setter
@@ -99,6 +100,8 @@ public class LoadoutsPanel extends JPanel implements LoadoutRow.Actions
 	 */
 	public void rebuild()
 	{
+		// removed rows may never get a mouse exit event
+		endPreview();
 		listPanel.removeAll();
 		rows.clear();
 
@@ -162,7 +165,25 @@ public class LoadoutsPanel extends JPanel implements LoadoutRow.Actions
 	@Override
 	public void apply(SavedLoadout saved)
 	{
+		previewing = false;
 		fashionManager.applyLoadout(saved.getLoadout());
+	}
+
+	@Override
+	public void preview(SavedLoadout saved)
+	{
+		previewing = true;
+		fashionManager.previewLoadout(saved.getLoadout());
+	}
+
+	@Override
+	public void endPreview()
+	{
+		if (previewing)
+		{
+			previewing = false;
+			fashionManager.endLoadoutPreview();
+		}
 	}
 
 	@Override

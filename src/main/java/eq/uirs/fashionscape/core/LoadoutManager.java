@@ -107,76 +107,102 @@ public class LoadoutManager
 	public void apply(Loadout loadout)
 	{
 		clientThread.invokeLater(() -> {
+			layers.resetPreview();
 			locks.clear();
-
-			Diff diff = Diff.empty();
-
-			// don't set to "nothing" if item already hides
-			Set<KitType> remainingNothingSlots = loadout.getItems().entrySet().stream()
-				.filter(e -> e.getValue() < 0)
-				.map(Map.Entry::getKey)
-				.collect(Collectors.toSet());
-
-			// track slots that haven't changed (will be unset later)
-			Set<KitType> unsetSlots = new HashSet<>(Arrays.asList(KitType.values()));
-
-			// import items onto player
-			for (Map.Entry<KitType, Integer> entry : loadout.getItems().entrySet())
-			{
-				if (entry.getValue() < 0)
-				{
-					continue;
-				}
-				SlotInfo item = SlotInfo.lookUp(entry.getValue() + FashionManager.ITEM_OFFSET, entry.getKey());
-				diff = Diff.merge(layers.set(item.getSlot(), item, false), diff);
-				unsetSlots.remove(item.getSlot());
-				item.getHidden().forEach(s -> {
-					unsetSlots.remove(s);
-					remainingNothingSlots.remove(s);
-				});
-			}
-
-			// import icon
-			diff = Diff.merge(layers.setIcon(loadout.getIcon(), false), diff);
-
-			// import kits (requires known gender)
-			Integer gender = layers.getGender();
-			if (gender != null)
-			{
-				for (Map.Entry<KitType, Integer> entry : resolveKits(loadout, gender).entrySet())
-				{
-					KitType slot = entry.getKey();
-					diff = Diff.merge(layers.set(slot, SlotInfo.kit(entry.getValue(), slot), false), diff);
-					unsetSlots.remove(slot);
-				}
-			}
-			else if (!loadout.getKits().isEmpty())
-			{
-				sendHighlightedMessage("Not all imports could be loaded: can't determine your character's gender");
-			}
-
-			// set "nothing" where needed
-			for (KitType slot : remainingNothingSlots)
-			{
-				diff = Diff.merge(layers.set(slot, SlotInfo.nothing(slot), false), diff);
-				unsetSlots.remove(slot);
-			}
-
-			// unset any slot that hasn't been touched
-			for (KitType slot : unsetSlots)
-			{
-				diff = Diff.merge(layers.set(slot, null, false), diff);
-			}
-
-			// finally, set/unset color ids
-			for (ColorType type : ColorType.values())
-			{
-				diff = Diff.merge(layers.setColor(type, loadout.getColors().get(type), false), diff);
-			}
-
-			history.append(diff);
+			history.append(write(loadout, false));
 		});
 	}
+
+	/**
+	 * Shows the loadout in place of the virtual models until the preview is reset. Ignores locks, like applying does.
+	 */
+	public void preview(Loadout loadout)
+	{
+		clientThread.invokeLater(() -> {
+			layers.resetPreview();
+			layers.setPreviewReplacesVirtual(true);
+			write(loadout, true);
+		});
+	}
+
+	/**
+	 * Ends a preview. Queued like {@link #preview}, so it can't run before a preview that's still pending.
+	 */
+	public void endPreview()
+	{
+		clientThread.invokeLater(layers::resetPreview);
+	}
+
+	// sets every slot, so slots the loadout doesn't mention are unset
+	private Diff write(Loadout loadout, boolean isPreview)
+	{
+		Diff diff = Diff.empty();
+
+		// don't set to "nothing" if item already hides
+		Set<KitType> remainingNothingSlots = loadout.getItems().entrySet().stream()
+			.filter(e -> e.getValue() < 0)
+			.map(Map.Entry::getKey)
+			.collect(Collectors.toSet());
+
+		// track slots that haven't changed (will be unset later)
+		Set<KitType> unsetSlots = new HashSet<>(Arrays.asList(KitType.values()));
+
+		// import items onto player
+		for (Map.Entry<KitType, Integer> entry : loadout.getItems().entrySet())
+		{
+			if (entry.getValue() < 0)
+			{
+				continue;
+			}
+			SlotInfo item = SlotInfo.lookUp(entry.getValue() + FashionManager.ITEM_OFFSET, entry.getKey());
+			diff = Diff.merge(layers.set(item.getSlot(), item, isPreview), diff);
+			unsetSlots.remove(item.getSlot());
+			item.getHidden().forEach(s -> {
+				unsetSlots.remove(s);
+				remainingNothingSlots.remove(s);
+			});
+		}
+
+		// import icon
+		diff = Diff.merge(layers.setIcon(loadout.getIcon(), isPreview), diff);
+
+		// import kits (requires known gender)
+		Integer gender = layers.getGender();
+		if (gender != null)
+		{
+			for (Map.Entry<KitType, Integer> entry : resolveKits(loadout, gender).entrySet())
+			{
+				KitType slot = entry.getKey();
+				diff = Diff.merge(layers.set(slot, SlotInfo.kit(entry.getValue(), slot), isPreview), diff);
+				unsetSlots.remove(slot);
+			}
+		}
+		else if (!loadout.getKits().isEmpty() && !isPreview)
+		{
+			sendHighlightedMessage("Not all imports could be loaded: can't determine your character's gender");
+		}
+
+		// set "nothing" where needed
+		for (KitType slot : remainingNothingSlots)
+		{
+			diff = Diff.merge(layers.set(slot, SlotInfo.nothing(slot), isPreview), diff);
+			unsetSlots.remove(slot);
+		}
+
+		// unset any slot that hasn't been touched
+		for (KitType slot : unsetSlots)
+		{
+			diff = Diff.merge(layers.set(slot, null, isPreview), diff);
+		}
+
+		// finally, set/unset color ids
+		for (ColorType type : ColorType.values())
+		{
+			diff = Diff.merge(layers.setColor(type, loadout.getColors().get(type), isPreview), diff);
+		}
+		return diff;
+	}
+
 
 	/**
 	 * Returns whether applying the loadout would leave the current look unchanged. Call on the client thread.

@@ -207,6 +207,18 @@ public class FashionManager
 		clientThread.invokeLater(this::refreshPlayer);
 	}
 
+	public void previewLoadout(Loadout loadout)
+	{
+		loadoutManager.preview(loadout);
+		clientThread.invokeLater(this::refreshPlayer);
+	}
+
+	public void endLoadoutPreview()
+	{
+		loadoutManager.endPreview();
+		clientThread.invokeLater(this::refreshPlayer);
+	}
+
 	public void importPlayer(@Nullable Player player)
 	{
 		PlayerComposition composition = compositionHelper.get(player);

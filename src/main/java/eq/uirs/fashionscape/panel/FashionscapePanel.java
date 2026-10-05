@@ -396,6 +396,7 @@ public class FashionscapePanel extends PluginPanel
 	private void closeLoadouts()
 	{
 		loadoutsButton.setSelected(false);
+		loadoutsPanel.endPreview();
 		((CardLayout) cards.getLayout()).show(cards, TABS_CARD);
 		// results may be stale after applying a loadout
 		clientThread.invokeLater(this::reloadResults);

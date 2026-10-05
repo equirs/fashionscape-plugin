@@ -32,6 +32,10 @@ class LoadoutRow extends JPanel
 	{
 		void apply(SavedLoadout saved);
 
+		void preview(SavedLoadout saved);
+
+		void endPreview();
+
 		void overwrite(SavedLoadout saved);
 
 		void copy(SavedLoadout saved);
@@ -50,6 +54,7 @@ class LoadoutRow extends JPanel
 	private final JLabel nameLabel = new JLabel();
 	private final FlatTextField nameField = new FlatTextField();
 	private boolean renaming;
+	private boolean hovered;
 	private boolean active;
 
 	LoadoutRow(SavedLoadout saved, @Nullable JComponent summary, JComponent colorBar, boolean first, boolean last,
@@ -181,7 +186,7 @@ class LoadoutRow extends JPanel
 		return label;
 	}
 
-	// shared by the row and its controls, so moving between them keeps the highlight
+	// shared by the row and its controls, so moving between them keeps the highlight and preview
 	private MouseAdapter hoverListener()
 	{
 		return new MouseAdapter()
@@ -189,15 +194,22 @@ class LoadoutRow extends JPanel
 			@Override
 			public void mouseEntered(MouseEvent e)
 			{
-				setBackground(ColorScheme.DARKER_GRAY_HOVER_COLOR);
+				if (!hovered)
+				{
+					hovered = true;
+					setBackground(ColorScheme.DARKER_GRAY_HOVER_COLOR);
+					actions.preview(saved);
+				}
 			}
 
 			@Override
 			public void mouseExited(MouseEvent e)
 			{
-				if (getMousePosition(true) == null)
+				if (hovered && getMousePosition(true) == null)
 				{
+					hovered = false;
 					setBackground(ColorScheme.DARKER_GRAY_COLOR);
+					actions.endPreview();
 				}
 			}
 		};

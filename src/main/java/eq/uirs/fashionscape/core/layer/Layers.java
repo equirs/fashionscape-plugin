@@ -67,6 +67,9 @@ public class Layers
 	private final ModelInfo virtualModels;
 	// "preview" is a layer on top of (taking precedence over) virtual models
 	private final ModelInfo previewModels;
+	// while true, the preview holds a complete look (a loadout) and virtual models aren't displayed
+	@Setter
+	private boolean previewReplacesVirtual;
 
 	private Integer gender = null;
 	private int[] lastEquipmentIds = null;
@@ -116,6 +119,7 @@ public class Layers
 	public void resetPreview()
 	{
 		resetModels(previewModels);
+		previewReplacesVirtual = false;
 	}
 
 	@VisibleForTesting
@@ -385,7 +389,10 @@ public class Layers
 			// 2. preview items > preview models
 			computeFromModels(previewModels, slotToId, false);
 			// 3. virtual items > virtual models
-			computeFromModels(virtualModels, slotToId, false);
+			if (!previewReplacesVirtual)
+			{
+				computeFromModels(virtualModels, slotToId, false);
+			}
 		}
 		// 4. real items > real models
 		computeFromModels(realModels, slotToId, realOnly);
@@ -442,7 +449,7 @@ public class Layers
 		{
 			return previewModels.getIcon();
 		}
-		if (!realOnly && virtualModels.getIcon() != null)
+		if (!realOnly && !previewReplacesVirtual && virtualModels.getIcon() != null)
 		{
 			return virtualModels.getIcon();
 		}
@@ -526,7 +533,10 @@ public class Layers
 		{
 			// see if preview/virtual weapon changes anim
 			weaponInfo = previewModels.getItems().get(KitType.WEAPON);
-			weaponInfo = weaponInfo != null ? weaponInfo : virtualModels.getItems().get(KitType.WEAPON);
+			if (weaponInfo == null && !previewReplacesVirtual)
+			{
+				weaponInfo = virtualModels.getItems().get(KitType.WEAPON);
+			}
 			if (weaponInfo != null)
 			{
 				Integer idle = idleAnimations.get(weaponInfo.getItemId());
@@ -536,11 +546,16 @@ public class Layers
 		weaponInfo = realModels.getItems().get(KitType.WEAPON);
 		if (!realOnly)
 		{
-			// edge case: if other virtual slots (e.g., shields) hide the real weapon, use the default anim
-			if (weaponInfo != null && weaponInfo.getHidden().stream()
-				.anyMatch(slot -> virtualModels.contains(slot) || previewModels.contains(slot)))
+			// edge case: if other virtual / preview slots (e.g., shields) hide the real weapon, use the default anim
+			if (weaponInfo != null)
 			{
-				return IdleAnimations.DEFAULT;
+				Set<KitType> hidden = weaponInfo.getHidden();
+				boolean hiddenByPreview = hidden.stream().anyMatch(previewModels::contains);
+				boolean hiddenByVirtual = !previewReplacesVirtual && hidden.stream().anyMatch(virtualModels::contains);
+				if (hiddenByPreview || hiddenByVirtual)
+				{
+					return IdleAnimations.DEFAULT;
+				}
 			}
 		}
 		// if we know for certain what the real weapon's anim id is, use that
@@ -585,7 +600,7 @@ public class Layers
 			if (!realOnly)
 			{
 				value = previewModels.getColors().get(type);
-				value = value == null ? virtualModels.getColors().get(type) : value;
+				value = value == null && !previewReplacesVirtual ? virtualModels.getColors().get(type) : value;
 			}
 			value = value == null ? realModels.getColors().get(type) : value;
 			if (value != null)
