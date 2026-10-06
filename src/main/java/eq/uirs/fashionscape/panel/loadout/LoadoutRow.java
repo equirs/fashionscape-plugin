@@ -4,6 +4,7 @@ import eq.uirs.fashionscape.core.loadout.SavedLoadout;
 import eq.uirs.fashionscape.panel.PanelUtil;
 import java.awt.BorderLayout;
 import java.awt.Color;
+import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Graphics;
@@ -20,6 +21,7 @@ import javax.swing.JMenuItem;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
 import javax.swing.SwingUtilities;
+import javax.swing.ToolTipManager;
 import javax.swing.border.EmptyBorder;
 import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.ui.components.FlatTextField;
@@ -27,6 +29,8 @@ import net.runelite.client.ui.components.FlatTextField;
 class LoadoutRow extends JPanel
 {
 	private static final int ACTIVE_BAR_WIDTH = 2;
+	// client property holding a child's tooltip text, which the row shows on the child's behalf
+	static final String TOOLTIP_KEY = "loadoutTooltip";
 
 	interface Actions
 	{
@@ -90,6 +94,7 @@ class LoadoutRow extends JPanel
 
 		setUpNameField();
 		setComponentPopupMenu(createMenu());
+		ToolTipManager.sharedInstance().registerComponent(this);
 		addMouseListener(new MouseAdapter()
 		{
 			@Override
@@ -102,6 +107,14 @@ class LoadoutRow extends JPanel
 			}
 		});
 		addMouseListener(hoverListener());
+	}
+
+	// a child with its own tooltip swallows the row's clicks and hover, so the row shows it instead
+	@Override
+	public String getToolTipText(MouseEvent e)
+	{
+		Component child = SwingUtilities.getDeepestComponentAt(this, e.getX(), e.getY());
+		return child instanceof JComponent ? (String) ((JComponent) child).getClientProperty(TOOLTIP_KEY) : null;
 	}
 
 	void setActive(boolean active)

@@ -37,7 +37,7 @@ dependencies {
 }
 
 group = "eq.uirs.fashionscape"
-version = "2.0.4"
+version = "2.1.0"
 
 tasks.withType<JavaCompile> {
     options.encoding = "UTF-8"

@@ -4,6 +4,7 @@ import com.google.common.collect.ImmutableList;
 import eq.uirs.fashionscape.core.layer.Layers;
 import eq.uirs.fashionscape.core.layer.Locks;
 import eq.uirs.fashionscape.core.loadout.Loadout;
+import eq.uirs.fashionscape.core.loadout.LoadoutManager;
 import eq.uirs.fashionscape.core.randomizer.Randomizer;
 import eq.uirs.fashionscape.data.color.ColorType;
 import eq.uirs.fashionscape.data.kit.JawIcon;

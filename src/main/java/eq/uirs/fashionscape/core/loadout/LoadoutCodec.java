@@ -60,19 +60,7 @@ public class LoadoutCodec
 		List<Loadout> parsed = new ArrayList<>();
 		if (trimmed.startsWith("{") || trimmed.startsWith("["))
 		{
-			try
-			{
-				JsonElement json = gson.fromJson(trimmed, JsonElement.class);
-				Iterable<JsonElement> elements = json.isJsonArray() ? json.getAsJsonArray() : Collections.singletonList(json);
-				for (JsonElement element : elements)
-				{
-					parsed.add(fromTree(element.getAsJsonObject()));
-				}
-			}
-			catch (JsonParseException | IllegalStateException | UnsupportedOperationException | NumberFormatException e)
-			{
-				throw new IllegalArgumentException("The loadout data is not valid.", e);
-			}
+			parsed.addAll(readJson(trimmed));
 		}
 		else
 		{
@@ -102,6 +90,45 @@ public class LoadoutCodec
 	{
 		int dot = fileName.lastIndexOf('.');
 		return dot > 0 ? fileName.substring(0, dot) : fileName;
+	}
+
+	/**
+	 * Returns the loadout written by {@link #toJson(Loadout)}. Unlike {@link #parse}, nothing is cleaned up.
+	 *
+	 * @throws IllegalArgumentException if the JSON isn't one loadout or is from a newer version
+	 */
+	public Loadout fromJson(String json)
+	{
+		List<Loadout> loadouts = readJson(json);
+		if (loadouts.size() != 1)
+		{
+			throw new IllegalArgumentException("Expected one loadout.");
+		}
+		return loadouts.get(0);
+	}
+
+	// reads one JSON loadout, or an array of loadouts
+	private List<Loadout> readJson(String json)
+	{
+		List<Loadout> result = new ArrayList<>();
+		try
+		{
+			JsonElement tree = gson.fromJson(json, JsonElement.class);
+			if (tree == null)
+			{
+				throw new IllegalArgumentException("The loadout data is empty.");
+			}
+			Iterable<JsonElement> elements = tree.isJsonArray() ? tree.getAsJsonArray() : Collections.singletonList(tree);
+			for (JsonElement element : elements)
+			{
+				result.add(fromTree(element.getAsJsonObject()));
+			}
+		}
+		catch (JsonParseException | IllegalStateException | UnsupportedOperationException | NumberFormatException e)
+		{
+			throw new IllegalArgumentException("The loadout data is not valid.", e);
+		}
+		return result;
 	}
 
 	private JsonObject toTree(Loadout loadout)

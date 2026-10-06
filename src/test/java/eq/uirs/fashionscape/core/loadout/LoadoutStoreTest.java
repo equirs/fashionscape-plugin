@@ -74,12 +74,22 @@ public class LoadoutStoreTest
 	}
 
 	@Test
-	void savesEnumsByName()
+	void savesEnumsByNameWithVersion()
 	{
 		SavedLoadout saved = store.add(loadout("named"));
 		String json = config.get("loadout_" + saved.getId());
 		assertTrue(json.contains("\"HEAD\""));
 		assertTrue(json.contains("\"BA_ATTACKER\""));
+		assertTrue(json.contains("\"version\":1"));
+	}
+
+	@Test
+	void skipsNewerVersionButKeepsIt()
+	{
+		config.put("loadout_future", "{\"version\":2,\"name\":\"future\",\"items\":{\"HEAD\":1163}}");
+		store.load();
+		assertTrue(store.getAll().isEmpty());
+		assertTrue(config.containsKey("loadout_future"));
 	}
 
 	@Test
@@ -175,7 +185,8 @@ public class LoadoutStoreTest
 
 	private LoadoutStore newStore()
 	{
-		return new LoadoutStore(configManager, eventBus, new Gson());
+		Gson gson = new Gson();
+		return new LoadoutStore(configManager, eventBus, gson, new LoadoutCodec(gson));
 	}
 
 	private static Loadout loadout(String name)

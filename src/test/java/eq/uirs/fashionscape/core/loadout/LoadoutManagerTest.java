@@ -1,11 +1,14 @@
-package eq.uirs.fashionscape.core;
+package eq.uirs.fashionscape.core.loadout;
 
 import com.google.common.collect.ImmutableMap;
 import eq.uirs.fashionscape.base.BaseTest;
+import eq.uirs.fashionscape.core.Fallbacks;
+import eq.uirs.fashionscape.core.History;
+import eq.uirs.fashionscape.core.SlotInfo;
+import eq.uirs.fashionscape.core.TestData;
 import eq.uirs.fashionscape.core.layer.Layers;
 import eq.uirs.fashionscape.core.layer.Locks;
 import eq.uirs.fashionscape.core.layer.ModelType;
-import eq.uirs.fashionscape.core.loadout.Loadout;
 import eq.uirs.fashionscape.core.model.ModelInfo;
 import eq.uirs.fashionscape.data.color.ColorType;
 import eq.uirs.fashionscape.data.kit.HairKit;

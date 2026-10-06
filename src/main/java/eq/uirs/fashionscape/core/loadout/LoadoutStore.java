@@ -40,15 +40,17 @@ public class LoadoutStore
 	private final ConfigManager configManager;
 	private final EventBus eventBus;
 	private final Gson gson;
+	private final LoadoutCodec codec;
 
 	private List<SavedLoadout> loadouts = ImmutableList.of();
 
 	@Inject
-	LoadoutStore(ConfigManager configManager, EventBus eventBus, Gson gson)
+	LoadoutStore(ConfigManager configManager, EventBus eventBus, Gson gson, LoadoutCodec codec)
 	{
 		this.configManager = configManager;
 		this.eventBus = eventBus;
 		this.gson = gson;
+		this.codec = codec;
 	}
 
 	@Subscribe
@@ -174,7 +176,7 @@ public class LoadoutStore
 	private void writeLoadout(SavedLoadout saved)
 	{
 		configManager.setConfiguration(FashionscapeConfig.GROUP, KEY_PREFIX + saved.getId(),
-			gson.toJson(saved.getLoadout()));
+			codec.toJson(saved.getLoadout()));
 	}
 
 	private void writeOrder()
@@ -228,11 +230,11 @@ public class LoadoutStore
 		String json = configManager.getConfiguration(FashionscapeConfig.GROUP, KEY_PREFIX + id);
 		try
 		{
-			return gson.fromJson(json, Loadout.class);
+			return codec.fromJson(json);
 		}
-		catch (JsonParseException e)
+		catch (IllegalArgumentException e)
 		{
-			// unreadable loadouts are skipped but left in config
+			// unreadable loadouts (e.g. saved by a newer version on another device) are skipped but left in config
 			log.warn("Could not read loadout {}", id, e);
 			return null;
 		}

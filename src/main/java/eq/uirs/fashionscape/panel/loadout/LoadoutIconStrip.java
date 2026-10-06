@@ -46,7 +46,10 @@ class LoadoutIconStrip extends JPanel
 				for (int i = 0; i < itemIds.size(); i++)
 				{
 					JLabel cell = itemCells.get(i);
-					AsyncBufferedImage image = itemManager.getImage(itemIds.get(i));
+					int itemId = itemIds.get(i);
+					String name = itemManager.getItemComposition(itemId).getMembersName();
+					SwingUtilities.invokeLater(() -> cell.putClientProperty(LoadoutRow.TOOLTIP_KEY, name));
+					AsyncBufferedImage image = itemManager.getImage(itemId);
 					image.onLoaded(() -> SwingUtilities.invokeLater(() ->
 						cell.setIcon(new ImageIcon(ImageUtil.resizeImage(image, ICON_WIDTH, ICON_HEIGHT)))));
 				}

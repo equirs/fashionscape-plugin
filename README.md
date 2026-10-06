@@ -10,13 +10,26 @@ different combinations of models look like on them.
 ***Disclaimer:*** This plugin isn't intended to be on all the time. Use at your own risk in dangerous areas of the game.
 Your animations may only be correct while your character is idle.
 
+## Update 2026 October
+
+Saved outfits have finally been migrated to **loadouts**. You can manage these directly in the plugin panel instead of 
+working with clunky plaintext files that were only stored locally.
+
+* Loadouts are now saved in your RuneLite config, so they can sync to other devices.
+* The first time you run version 2.1.0+, files in your old `outfits` folder are imported as loadouts, named after each
+  file. RuneLite will move the old folder to `.runelite/plugin-data/fashionscape`. This is where your old setups will
+  be. Assuming they import correctly, feel free to delete the old files. 
+* You can copy loadouts to the clipboard or export them to a file to share them. Old .txt files can still be imported.
+* "Load current equipment" was moved from the load button's right-click menu to the top of the loadouts view.
+
 ## Update 2026 June
 
 Fashionscape v2 reworks almost all the logic behind the plugin. The UI changes are minimal, and things should mostly
 behave as they did in v1. Here are some new inclusions:
 
 * You can now "copy" your own fashionscape much like you can for other players, only you can't right-click yourself.
-  Instead, **right-click the "load" button** in the side panel to clone your items and other models.
+  ~~Instead, **right-click the "load" button** in the side panel to clone your items and other models.~~ There's now
+  a button in the "loadouts" panel to load your models into the plugin.
 * The search panel now allows you to directly search for items by
   [item ID](https://oldschool.runescape.wiki/w/Item_IDs). Even items that don't normally display in search results may
   be equipped this way (as long as they have models/equipment slots).
@@ -49,7 +62,7 @@ notes). Look for the dress form:
 
 ![Panel icon](icon.png)
 
-The panel has a row of button controls, and below it, three tabs: outfit, base, and search.
+The panel has a row of button controls, and below it, three tabs: items, base, and search.
 
 ![Top buttons](github-res/top_buttons.png)
 
@@ -61,9 +74,8 @@ The buttons are, in order from left to right:
 * A randomizer button that randomly assigns models to all your unlocked slots. The randomizer has an
   "intelligence" setting in the plugin config, which, when set to anything other than `NONE`, will utilize the colour
   matching algorithm to promote a more cohesive look.
-* Save and load buttons, which work with .txt files placed in the RuneLite folder, under `/outfits/`. Note that you
-  can't save empty outfits, and anything you're actually wearing in-game isn't saved. Also, if you right-click the load
-  button, you can import whatever you're wearing in-game into the plugin.
+* A loadouts button, which opens your saved loadouts over the tabs (see "Loadouts" below). It stays
+  highlighted while the view is open.
 * Clear button, which undoes everything you're wearing with the plugin, **including** locked slots. If you want to erase
   everything *except* locked slots, there's a right-click option to soft clear.
 
@@ -115,6 +127,22 @@ There are three sorting options:
   result compared to the colours of all the items currently worn (excluding the slot you're currently browsing). With
   this option selected, you can also see the colour-coded percent match for that item.
 
+#### Loadouts
+
+Changes you make within the plugin can be stored as loadouts. These are saved to your RuneLite config.
+
+* "+" saves your current look as a new loadout.
+* Click a loadout to apply it. Applying clears your locks. Like other changes, you can undo applying a loadout.
+* The arrows and "x" in the top right reorder and delete loadouts. Reordering is only an option in "Custom"
+  sort.
+* **Right-click** a loadout to update it with your current look, rename it, or copy it to the clipboard.
+* "Load current equipment" imports whatever you're wearing in-game.
+* The "..." menu imports loadouts from the clipboard or from files, and can export all of them to one file. Imports
+  accept both the new format and the legacy .txt format.
+
+Each loadout shows some item icons, or base model names if it contains no items. A bar along the bottom shows any
+colours you've set. Base models saved on a differently-gendered character are converted when they're applied.
+
 #### Lock mechanics
 
 You can "lock" individual slots with the lock icon next to the x button for each slot in the "items" and "base" panels
@@ -144,7 +172,7 @@ The randomizer has a few **"intelligence"** settings. Higher intelligence means 
 that are similar in colour. Lower intelligence settings are computationally faster. "Cursed" attempts to create the most
 mismatched results in terms of colour scoring.
 
-There is a right-click option to **"copy-outfit"** on other players, which imports their entire look on your character,
+There is a right-click option to **"copy-fashion"** on other players, which imports their entire look on your character,
 including items, colours, and (if your genders match) base models. Since many other plugins provide player menu entries,
 this feature can be toggled off.
 

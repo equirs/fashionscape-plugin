@@ -2,7 +2,6 @@ package eq.uirs.fashionscape.core.loadout;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
-import eq.uirs.fashionscape.core.LoadoutManager;
 import eq.uirs.fashionscape.core.event.ActiveLoadoutsChanged;
 import eq.uirs.fashionscape.core.event.ItemChanged;
 import eq.uirs.fashionscape.core.event.LoadoutsChanged;

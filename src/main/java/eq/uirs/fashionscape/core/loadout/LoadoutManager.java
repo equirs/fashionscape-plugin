@@ -1,9 +1,13 @@
-package eq.uirs.fashionscape.core;
+package eq.uirs.fashionscape.core.loadout;
 
 import com.google.common.annotations.VisibleForTesting;
+import eq.uirs.fashionscape.core.Diff;
+import eq.uirs.fashionscape.core.Fallbacks;
+import eq.uirs.fashionscape.core.FashionManager;
+import eq.uirs.fashionscape.core.History;
+import eq.uirs.fashionscape.core.SlotInfo;
 import eq.uirs.fashionscape.core.layer.Layers;
 import eq.uirs.fashionscape.core.layer.Locks;
-import eq.uirs.fashionscape.core.loadout.Loadout;
 import eq.uirs.fashionscape.core.model.ModelInfo;
 import eq.uirs.fashionscape.core.utils.KitUtil;
 import eq.uirs.fashionscape.data.color.ColorType;

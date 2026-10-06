@@ -20,7 +20,7 @@ import net.runelite.client.eventbus.EventBus;
 @RequiredArgsConstructor(onConstructor_ = {@Inject})
 @Singleton
 @Slf4j
-class History
+public class History
 {
 	private static final int MAX_LIST_SIZE = 10;
 
@@ -55,7 +55,7 @@ class History
 		addUndoDiff(restore);
 	}
 
-	void append(Diff diff)
+	public void append(Diff diff)
 	{
 		if (diff.isEmpty())
 		{
