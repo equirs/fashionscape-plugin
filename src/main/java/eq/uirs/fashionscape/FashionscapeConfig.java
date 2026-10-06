@@ -2,6 +2,7 @@ package eq.uirs.fashionscape;
 
 import eq.uirs.fashionscape.core.randomizer.RandomizerIntelligence;
 import eq.uirs.fashionscape.panel.SortBy;
+import eq.uirs.fashionscape.panel.loadout.LoadoutSort;
 import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
@@ -88,6 +89,25 @@ public interface FashionscapeConfig extends Config
 		hidden = true
 	)
 	void setPreferredSort(SortBy sort);
+
+	@ConfigItem(
+		keyName = "loadoutSort",
+		name = "Loadout sort order",
+		description = "Last used loadout sort order (hidden)",
+		hidden = true
+	)
+	default LoadoutSort loadoutSort()
+	{
+		return LoadoutSort.CUSTOM;
+	}
+
+	@ConfigItem(
+		keyName = "loadoutSort",
+		name = "Loadout sort order",
+		description = "Last used loadout sort order (hidden)",
+		hidden = true
+	)
+	void setLoadoutSort(LoadoutSort sort);
 
 	// replaces older currentEquipment key
 	@ConfigItem(

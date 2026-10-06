@@ -1,5 +1,6 @@
 package eq.uirs.fashionscape.panel.loadout;
 
+import eq.uirs.fashionscape.FashionscapeConfig;
 import eq.uirs.fashionscape.core.FashionManager;
 import eq.uirs.fashionscape.core.loadout.ActiveLoadouts;
 import eq.uirs.fashionscape.core.loadout.Loadout;
@@ -8,11 +9,15 @@ import eq.uirs.fashionscape.core.loadout.SavedLoadout;
 import eq.uirs.fashionscape.panel.PanelUtil;
 import java.awt.BorderLayout;
 import java.awt.Color;
+import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
 import java.awt.Rectangle;
+import java.awt.event.ItemEvent;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -21,6 +26,7 @@ import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.swing.JButton;
+import javax.swing.JComboBox;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JMenuItem;
@@ -49,11 +55,13 @@ public class LoadoutsPanel extends JPanel implements LoadoutRow.Actions
 	private final ItemManager itemManager;
 	private final ActiveLoadouts activeLoadouts;
 	private final LoadoutSharing sharing;
+	private final FashionscapeConfig config;
 
 	private final JPanel listPanel = new JPanel(new GridBagLayout());
 	private final PluginErrorPanel emptyPanel = new PluginErrorPanel();
 	private final Map<String, LoadoutRow> rows = new HashMap<>();
 	private boolean previewing;
+	private LoadoutSort sort;
 	private JButton addButton;
 
 	@Setter
@@ -62,8 +70,10 @@ public class LoadoutsPanel extends JPanel implements LoadoutRow.Actions
 
 	@Inject
 	LoadoutsPanel(ClientThread clientThread, FashionManager fashionManager, LoadoutStore store, ItemManager itemManager,
-				  ActiveLoadouts activeLoadouts, LoadoutSharing sharing)
+				  ActiveLoadouts activeLoadouts, LoadoutSharing sharing, FashionscapeConfig config)
 	{
+		this.config = config;
+		this.sort = config.loadoutSort();
 		this.clientThread = clientThread;
 		this.fashionManager = fashionManager;
 		this.store = store;
@@ -112,7 +122,12 @@ public class LoadoutsPanel extends JPanel implements LoadoutRow.Actions
 		c.gridy = 0;
 		c.insets = new Insets(0, 0, 5, 0);
 
-		List<SavedLoadout> all = store.getAll();
+		List<SavedLoadout> all = new ArrayList<>(store.getAll());
+		if (sort == LoadoutSort.NAME)
+		{
+			// stable, so equal names keep their custom order
+			all.sort(Comparator.comparing(s -> s.getLoadout().getName(), String.CASE_INSENSITIVE_ORDER));
+		}
 		if (all.isEmpty())
 		{
 			listPanel.add(emptyPanel, c);
@@ -121,8 +136,8 @@ public class LoadoutsPanel extends JPanel implements LoadoutRow.Actions
 		{
 			SavedLoadout saved = all.get(i);
 			LoadoutColorBar colorBar = new LoadoutColorBar(saved.getLoadout());
-			LoadoutRow row = new LoadoutRow(saved, summaryOf(saved.getLoadout()), colorBar, i == 0,
-				i == all.size() - 1, this);
+			LoadoutRow row = new LoadoutRow(saved, summaryOf(saved.getLoadout()), colorBar, sort == LoadoutSort.CUSTOM,
+				i == 0, i == all.size() - 1, this);
 			row.setActive(activeLoadouts.getActiveIds().contains(saved.getId()));
 			rows.put(saved.getId(), row);
 			listPanel.add(row, c);
@@ -271,8 +286,35 @@ public class LoadoutsPanel extends JPanel implements LoadoutRow.Actions
 		header.setBackground(ColorScheme.DARK_GRAY_COLOR);
 		header.setBorder(new EmptyBorder(0, 10, 8, 10));
 		header.add(titleRow, BorderLayout.NORTH);
-		header.add(loadEquipment, BorderLayout.SOUTH);
+		header.add(loadEquipment, BorderLayout.CENTER);
+		header.add(createSortBar(), BorderLayout.SOUTH);
 		return header;
+	}
+
+	private JPanel createSortBar()
+	{
+		JComboBox<LoadoutSort> sortBox = new JComboBox<>(LoadoutSort.values());
+		sortBox.setSelectedItem(sort);
+		sortBox.setPreferredSize(new Dimension(sortBox.getPreferredSize().width, 25));
+		sortBox.setForeground(Color.WHITE);
+		sortBox.setFocusable(false);
+		sortBox.addItemListener(e -> {
+			if (e.getStateChange() == ItemEvent.SELECTED)
+			{
+				sort = (LoadoutSort) sortBox.getSelectedItem();
+				config.setLoadoutSort(sort);
+				rebuild();
+			}
+		});
+
+		JLabel sortLabel = new JLabel("Sort by");
+		sortLabel.setForeground(Color.WHITE);
+
+		JPanel sortBar = new JPanel(new BorderLayout(5, 0));
+		sortBar.setOpaque(false);
+		sortBar.add(sortLabel, BorderLayout.WEST);
+		sortBar.add(sortBox, BorderLayout.CENTER);
+		return sortBar;
 	}
 
 	private JPopupMenu createMoreMenu()

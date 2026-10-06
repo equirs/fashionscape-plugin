@@ -57,8 +57,9 @@ class LoadoutRow extends JPanel
 	private boolean hovered;
 	private boolean active;
 
-	LoadoutRow(SavedLoadout saved, @Nullable JComponent summary, JComponent colorBar, boolean first, boolean last,
-		Actions actions)
+	// move controls are only shown if `movable`, and are disabled at either end of the list
+	LoadoutRow(SavedLoadout saved, @Nullable JComponent summary, JComponent colorBar, boolean movable, boolean first,
+		boolean last, Actions actions)
 	{
 		this.saved = saved;
 		this.actions = actions;
@@ -72,7 +73,7 @@ class LoadoutRow extends JPanel
 		nameLabel.setPreferredSize(new Dimension(0, nameLabel.getPreferredSize().height));
 		titleRow.setOpaque(false);
 		titleRow.add(nameLabel, BorderLayout.CENTER);
-		titleRow.add(createControls(first, last), BorderLayout.EAST);
+		titleRow.add(createControls(movable, first, last), BorderLayout.EAST);
 
 		// pad the inner panel so the color bar can span full row width
 		JPanel content = new JPanel(new BorderLayout());
@@ -155,12 +156,15 @@ class LoadoutRow extends JPanel
 		}
 	}
 
-	private JPanel createControls(boolean first, boolean last)
+	private JPanel createControls(boolean movable, boolean first, boolean last)
 	{
 		JPanel controls = new JPanel(new FlowLayout(FlowLayout.RIGHT, 2, 0));
 		controls.setOpaque(false);
-		controls.add(control("up", "Move up", !first, () -> actions.move(saved, -1)));
-		controls.add(control("down", "Move down", !last, () -> actions.move(saved, 1)));
+		if (movable)
+		{
+			controls.add(control("up", "Move up", !first, () -> actions.move(saved, -1)));
+			controls.add(control("down", "Move down", !last, () -> actions.move(saved, 1)));
+		}
 		controls.add(control("x", "Delete", true, () -> actions.delete(saved)));
 		return controls;
 	}
