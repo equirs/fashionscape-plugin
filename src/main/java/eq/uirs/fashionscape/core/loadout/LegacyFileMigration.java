@@ -57,7 +57,7 @@ public class LegacyFileMigration
 			imported += importFile(file);
 		}
 		marker.write("");
-		log.info("Imported {} loadouts from {} legacy files", imported, files.size());
+		log.debug("Imported {} loadouts from {} legacy files", imported, files.size());
 	}
 
 	private int importFile(Filepath file)
