@@ -26,6 +26,7 @@ import net.runelite.api.GameState;
 import net.runelite.api.MenuAction;
 import net.runelite.api.Player;
 import net.runelite.api.events.GameStateChanged;
+import net.runelite.api.events.GameTick;
 import net.runelite.api.events.MenuOptionClicked;
 import net.runelite.api.events.PlayerChanged;
 import net.runelite.client.callback.ClientThread;
@@ -108,6 +109,7 @@ public class FashionscapePlugin extends Plugin
 	private FashionscapePanel panel;
 	private NavigationButton navButton;
 	private boolean hasLoggedIn;
+	private boolean awaitingLocalPlayer;
 
 	@Provides
 	FashionscapeConfig getConfig(ConfigManager configManager)
@@ -178,13 +180,35 @@ public class FashionscapePlugin extends Plugin
 	public void onPlayerChanged(PlayerChanged event)
 	{
 		Player player = event.getPlayer();
-		if (player != null && player == client.getLocalPlayer())
+		Player local = client.getLocalPlayer();
+		if (local == null)
 		{
-			fashionManager.onPlayerChanged();
-			if (panel != null)
-			{
-				panel.onPlayerChanged(player);
-			}
+			// may happen while sailing / after world hop, just wait for next game tick where local player is nonnull
+			awaitingLocalPlayer = true;
+		}
+		else if (player == local)
+		{
+			onLocalPlayerChanged(local);
+		}
+	}
+
+	@Subscribe
+	public void onGameTick(GameTick event)
+	{
+		Player local = client.getLocalPlayer();
+		if (awaitingLocalPlayer && local != null)
+		{
+			awaitingLocalPlayer = false;
+			onLocalPlayerChanged(local);
+		}
+	}
+
+	private void onLocalPlayerChanged(Player player)
+	{
+		fashionManager.onPlayerChanged();
+		if (panel != null)
+		{
+			panel.onPlayerChanged(player);
 		}
 	}
 
