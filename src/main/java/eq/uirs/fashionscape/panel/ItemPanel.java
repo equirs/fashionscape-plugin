@@ -40,10 +40,10 @@ class ItemPanel extends AbsItemPanel
 	private MouseAdapter hoverAdapter = null;
 
 	public ItemPanel(BufferedImage image, ItemManager itemManager,
-	                 ClientThread clientThread, FashionManager fashionManager, KitType slot,
-	                 SearchOpener searchOpener, boolean developerMode)
+					 ClientThread clientThread, FashionManager fashionManager, KitType slot,
+					 SearchOpener searchOpener, boolean developerMode)
 	{
-		super(image, itemManager, clientThread, developerMode);
+		super(image, itemManager, clientThread, developerMode, new TruncatedTooltipLabel());
 		this.slot = slot;
 		this.fashionManager = fashionManager;
 		this.searchOpener = searchOpener;

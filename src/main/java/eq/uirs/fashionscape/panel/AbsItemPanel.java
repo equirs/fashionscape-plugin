@@ -1,6 +1,7 @@
 package eq.uirs.fashionscape.panel;
 
 import java.awt.image.BufferedImage;
+import javax.swing.JLabel;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.ItemComposition;
 import net.runelite.client.callback.ClientThread;
@@ -12,10 +13,15 @@ abstract class AbsItemPanel extends AbsIconLabelPanel
 	protected final ItemManager itemManager;
 	private final boolean developerMode;
 
-	AbsItemPanel(BufferedImage image, ItemManager itemManager,
-	             ClientThread clientThread, boolean developerMode)
+	AbsItemPanel(BufferedImage image, ItemManager itemManager, ClientThread clientThread, boolean developerMode)
 	{
-		super(image, clientThread);
+		this(image, itemManager, clientThread, developerMode, new JLabel());
+	}
+
+	AbsItemPanel(BufferedImage image, ItemManager itemManager, ClientThread clientThread, boolean developerMode,
+				 JLabel label)
+	{
+		super(image, clientThread, label);
 		this.itemManager = itemManager;
 		this.developerMode = developerMode;
 	}
@@ -45,10 +51,7 @@ abstract class AbsItemPanel extends AbsIconLabelPanel
 				}
 			}
 			label.setText(itemName);
-			if (itemId != null && developerMode)
-			{
-				label.setToolTipText("item id " + itemId);
-			}
+			label.setToolTipText(itemId != null && developerMode ? "item id " + itemId : null);
 			return true;
 		});
 	}

@@ -29,6 +29,11 @@ abstract class AbsIconLabelPanel extends JPanel
 
 	AbsIconLabelPanel(BufferedImage image, ClientThread clientThread)
 	{
+		this(image, clientThread, new JLabel());
+	}
+
+	AbsIconLabelPanel(BufferedImage image, ClientThread clientThread, JLabel label)
+	{
 		this.clientThread = clientThread;
 
 		BorderLayout layout = new BorderLayout();
@@ -48,7 +53,7 @@ abstract class AbsIconLabelPanel extends JPanel
 		setIcon(icon, image);
 		add(icon, BorderLayout.LINE_START);
 
-		label = new JLabel();
+		this.label = label;
 		label.setForeground(Color.WHITE);
 		label.setMaximumSize(new Dimension(0, 0));
 		label.setPreferredSize(new Dimension(0, 0));
