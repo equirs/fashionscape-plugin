@@ -16,6 +16,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
+import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.kit.KitType;
@@ -76,7 +77,7 @@ class SearchItemPanel extends AbsItemPanel
 			@Override
 			public void mouseReleased(MouseEvent e)
 			{
-				if (!fashionManager.getLocks().isAllowed(slot, slotInfo))
+				if (!SwingUtilities.isLeftMouseButton(e) || !fashionManager.getLocks().isAllowed(slot, slotInfo))
 				{
 					return;
 				}
@@ -96,12 +97,14 @@ class SearchItemPanel extends AbsItemPanel
 		};
 
 		addMouseListener(itemPanelMouseListener);
+		setWikiMenu(itemId);
 
 		// Item details panel
 		int rows = score == null ? 1 : 2;
 		JPanel rightPanel = new JPanel(new GridLayout(rows, 1));
 		rightPanel.setBorder(new EmptyBorder(0, 5, 0, 5));
 		highlightPanels.add(rightPanel);
+		rightPanel.setInheritsPopupMenu(true);
 		rightPanel.add(label);
 
 		if (score != null)

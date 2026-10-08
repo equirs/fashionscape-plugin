@@ -13,6 +13,7 @@ import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
 import javax.swing.JButton;
 import javax.swing.JPanel;
+import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.ItemComposition;
@@ -53,6 +54,7 @@ class ItemPanel extends AbsItemPanel
 		rightPanel.setBackground(nonHighlightColor);
 		rightPanel.setBorder(new EmptyBorder(0, 5, 0, 0));
 		highlightPanels.add(rightPanel);
+		rightPanel.setInheritsPopupMenu(true);
 		rightPanel.add(label, BorderLayout.CENTER);
 		JPanel buttons = new JPanel(new GridLayout(1, 2, 2, 0));
 		buttons.setBackground(ColorScheme.DARKER_GRAY_COLOR);
@@ -69,6 +71,7 @@ class ItemPanel extends AbsItemPanel
 		buttons.add(xButton);
 
 		icon.setToolTipText("Open " + slot.name().toLowerCase() + " slot search");
+		icon.setInheritsPopupMenu(true);
 
 		rightPanel.add(buttons, BorderLayout.EAST);
 
@@ -106,6 +109,7 @@ class ItemPanel extends AbsItemPanel
 		Integer newId = slotInfo != null ? slotInfo.getItemId() : null;
 		setItemName(newId);
 		setItemIcon(newId);
+		setWikiMenu(newId);
 		resetMouseListeners();
 	}
 
@@ -167,7 +171,10 @@ class ItemPanel extends AbsItemPanel
 			@Override
 			public void mouseReleased(MouseEvent e)
 			{
-				searchOpener.openSearchFor(slot);
+				if (SwingUtilities.isLeftMouseButton(e))
+				{
+					searchOpener.openSearchFor(slot);
+				}
 			}
 		};
 	}
