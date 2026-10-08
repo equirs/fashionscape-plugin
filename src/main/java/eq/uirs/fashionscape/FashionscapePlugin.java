@@ -35,12 +35,14 @@ import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.events.RuneScapeProfileChanged;
+import net.runelite.client.input.KeyManager;
 import net.runelite.client.menus.MenuManager;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.ClientToolbar;
 import net.runelite.client.ui.NavigationButton;
 import net.runelite.client.ui.overlay.OverlayManager;
+import net.runelite.client.util.HotkeyListener;
 import net.runelite.client.util.ImageUtil;
 
 @PluginDescriptor(
@@ -68,6 +70,9 @@ public class FashionscapePlugin extends Plugin
 
 	@Inject
 	private EventBus eventBus;
+
+	@Inject
+	private KeyManager keyManager;
 
 	@Inject
 	private FashionManager fashionManager;
@@ -110,6 +115,21 @@ public class FashionscapePlugin extends Plugin
 	private NavigationButton navButton;
 	private boolean hasLoggedIn;
 	private boolean awaitingLocalPlayer;
+
+	private final HotkeyListener peekListener = new HotkeyListener(() -> config.peekKey())
+	{
+		@Override
+		public void hotkeyPressed()
+		{
+			fashionManager.setPeeking(true);
+		}
+
+		@Override
+		public void hotkeyReleased()
+		{
+			fashionManager.setPeeking(false);
+		}
+	};
 
 	@Provides
 	FashionscapeConfig getConfig(ConfigManager configManager)
@@ -160,11 +180,13 @@ public class FashionscapePlugin extends Plugin
 			overlayManager.add(debugOverlay);
 		}
 		getEventSubscribers().forEach(eventBus::register);
+		keyManager.registerKeyListener(peekListener);
 	}
 
 	@Override
 	protected void shutDown()
 	{
+		keyManager.unregisterKeyListener(peekListener);
 		remote.removeListeners();
 		menuManager.get().removePlayerMenuItem(COPY_PLAYER);
 		clientThread.invokeLater(() -> fashionManager.shutDown());

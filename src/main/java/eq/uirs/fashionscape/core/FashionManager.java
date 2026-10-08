@@ -69,6 +69,8 @@ public class FashionManager
 	private String lastKnownRSProfileKey = null;
 	// true while the plugin is overriding something in the player's appearance
 	private boolean hasModifiedPlayer = false;
+	// true while the peek hotkey is held
+	private boolean peeking = false;
 
 	public void startUp()
 	{
@@ -115,7 +117,16 @@ public class FashionManager
 
 	public void shutDown()
 	{
+		peeking = false;
 		revertToRealModels();
+	}
+
+	public void setPeeking(boolean peeking)
+	{
+		clientThread.invokeLater(() -> {
+			this.peeking = peeking;
+			refreshPlayer();
+		});
 	}
 
 	public void onPlayerChanged()
@@ -240,7 +251,7 @@ public class FashionManager
 		{
 			return;
 		}
-		if (!layers.hasAnyVirtuals())
+		if (peeking || !layers.hasAnyVirtuals())
 		{
 			// if we fail to fetch data from github, players' models might screw up even with nothing set.
 			// therefore, we don't mess with idle anims / hashes unless we really have to.

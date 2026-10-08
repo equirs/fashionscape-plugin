@@ -7,6 +7,7 @@ import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
 import net.runelite.client.config.ConfigSection;
+import net.runelite.client.config.Keybind;
 
 @ConfigGroup(FashionscapeConfig.GROUP)
 public interface FashionscapeConfig extends Config
@@ -38,10 +39,21 @@ public interface FashionscapeConfig extends Config
 		return true;
 	}
 
+	@ConfigItem(
+		position = 3,
+		keyName = "peekKey",
+		name = "Peek hotkey",
+		description = "Shows your real appearance while held"
+	)
+	default Keybind peekKey()
+	{
+		return Keybind.CTRL;
+	}
+
 	@ConfigSection(
 		name = "Randomizer",
 		description = "Settings relating to the outfit randomizer",
-		position = 3
+		position = 4
 	)
 	String randomizerSettings = "randomizerSettings";
 
