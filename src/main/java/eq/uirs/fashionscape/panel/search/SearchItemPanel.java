@@ -1,7 +1,8 @@
-package eq.uirs.fashionscape.panel;
+package eq.uirs.fashionscape.panel.search;
 
 import eq.uirs.fashionscape.core.FashionManager;
 import eq.uirs.fashionscape.core.SlotInfo;
+import eq.uirs.fashionscape.panel.AbsItemPanel;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Cursor;

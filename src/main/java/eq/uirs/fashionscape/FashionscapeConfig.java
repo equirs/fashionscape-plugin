@@ -1,7 +1,7 @@
 package eq.uirs.fashionscape;
 
 import eq.uirs.fashionscape.core.randomizer.RandomizerIntelligence;
-import eq.uirs.fashionscape.panel.SortBy;
+import eq.uirs.fashionscape.panel.search.SortBy;
 import eq.uirs.fashionscape.panel.loadout.LoadoutSort;
 import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;

@@ -14,6 +14,7 @@ import eq.uirs.fashionscape.core.event.LoadoutsChanged;
 import eq.uirs.fashionscape.core.event.LockChanged;
 import eq.uirs.fashionscape.data.color.ColorType;
 import eq.uirs.fashionscape.panel.loadout.LoadoutsPanel;
+import eq.uirs.fashionscape.panel.search.SearchPanel;
 import eq.uirs.fashionscape.remote.RemoteCategory;
 import eq.uirs.fashionscape.remote.RemoteDataHandler;
 import java.awt.BorderLayout;

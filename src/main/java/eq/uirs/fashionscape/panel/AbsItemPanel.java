@@ -13,19 +13,19 @@ import net.runelite.client.util.Text;
 import okhttp3.HttpUrl;
 
 @Slf4j
-abstract class AbsItemPanel extends AbsIconLabelPanel
+public abstract class AbsItemPanel extends AbsIconLabelPanel
 {
 	private static final HttpUrl WIKI_LOOKUP = HttpUrl.get("https://oldschool.runescape.wiki/w/Special:Lookup");
 
 	protected final ItemManager itemManager;
 	private final boolean developerMode;
 
-	AbsItemPanel(BufferedImage image, ItemManager itemManager, ClientThread clientThread, boolean developerMode)
+	protected AbsItemPanel(BufferedImage image, ItemManager itemManager, ClientThread clientThread, boolean developerMode)
 	{
 		this(image, itemManager, clientThread, developerMode, new JLabel());
 	}
 
-	AbsItemPanel(BufferedImage image, ItemManager itemManager, ClientThread clientThread, boolean developerMode,
+	protected AbsItemPanel(BufferedImage image, ItemManager itemManager, ClientThread clientThread, boolean developerMode,
 				 JLabel label)
 	{
 		super(image, clientThread, label);

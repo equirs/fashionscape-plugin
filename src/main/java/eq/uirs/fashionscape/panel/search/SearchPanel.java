@@ -1,4 +1,4 @@
-package eq.uirs.fashionscape.panel;
+package eq.uirs.fashionscape.panel.search;
 
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableMap;
@@ -10,6 +10,9 @@ import eq.uirs.fashionscape.core.FashionManager;
 import eq.uirs.fashionscape.core.LockStatus;
 import eq.uirs.fashionscape.core.event.LockChanged;
 import eq.uirs.fashionscape.core.utils.ItemSlotUtil;
+import eq.uirs.fashionscape.panel.NothingItemComposition;
+import eq.uirs.fashionscape.panel.PanelEquipSlot;
+import eq.uirs.fashionscape.panel.PanelUtil;
 import java.awt.BorderLayout;
 import java.awt.CardLayout;
 import java.awt.Color;
