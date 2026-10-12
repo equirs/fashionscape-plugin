@@ -35,6 +35,7 @@ import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
+import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.kit.KitType;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.game.ItemManager;
@@ -48,6 +49,7 @@ import net.runelite.client.util.SwingUtil;
 /**
  * Tab panel that houses the search UI: bar, filters, sort, results, etc.
  */
+@Slf4j
 public class SearchPanel extends JPanel
 {
 	private static final int DEBOUNCE_DELAY_MS = 200;
@@ -161,7 +163,8 @@ public class SearchPanel extends JPanel
 		cardLayout.show(centerPanel, ERROR_PANEL);
 
 		// selects the "all" slot initially, which runs the first search
-		filterPanel = new FilterPanel(fashionManager, filters, this::onSlotChanged, this::onFiltersChanged);
+		filterPanel = new FilterPanel(fashionManager, filterStore, filters, this::onSlotChanged,
+			this::onFiltersChanged);
 		infoWrapper.add(createResetFiltersRow(), BorderLayout.CENTER);
 
 		JPanel filterBar = new JPanel(new GridLayout(1, 2, 5, 0));
@@ -357,6 +360,12 @@ public class SearchPanel extends JPanel
 		{
 			return false;
 		}
+		guardSearch(() -> startSearch(postExec));
+		return true;
+	}
+
+	private void startSearch(Runnable postExec)
+	{
 		String query = searchBar.getText().toLowerCase();
 		KitType searchSlot = slot;
 		ItemFilters searchFilters = filters;
@@ -365,21 +374,34 @@ public class SearchPanel extends JPanel
 		if (searchSlot == null && found.size() > itemSearch.largestSlotSize())
 		{
 			showTooManyResults(found.size());
-			return true;
+			return;
 		}
 		SortBy searchSort = sort;
 		boolean inverted = sortInverted;
 		boolean filtered = searchFilters.activeCount() > 0;
 		if (searchSort == SortBy.COLOR_MATCH)
 		{
-			executor.submit(() ->
-				showResults(itemSearch.sort(found, searchSort, inverted), searchSlot, filtered, postExec));
+			executor.submit(() -> guardSearch(() ->
+				showResults(itemSearch.sort(found, searchSort, inverted), searchSlot, filtered, postExec)));
 		}
 		else
 		{
 			showResults(itemSearch.sort(found, searchSort, inverted), searchSlot, filtered, postExec);
 		}
-		return true;
+	}
+
+	// later searches wait on the in-progress flag, so a failed search should still clear it.
+	private void guardSearch(Runnable step)
+	{
+		try
+		{
+			step.run();
+		}
+		catch (RuntimeException | AssertionError e)
+		{
+			log.warn("item search failed", e);
+			searchInProgress.set(false);
+		}
 	}
 
 	private void showTooManyResults(int count)

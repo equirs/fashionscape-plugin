@@ -62,7 +62,7 @@ class FilterPanel extends JPanel
 	// true while controls are updated programmatically, so listeners don't report changes
 	private boolean syncing;
 
-	FilterPanel(FashionManager fashionManager, ItemFilters initialFilters,
+	FilterPanel(FashionManager fashionManager, FilterStore filterStore, ItemFilters initialFilters,
 				Consumer<KitType> onSlotChange, Consumer<ItemFilters> onFiltersChange)
 	{
 		this.filters = initialFilters;
@@ -87,8 +87,8 @@ class FilterPanel extends JPanel
 		filterSection.add(rows, BorderLayout.CENTER);
 		filterSection.add(createResetButton(), BorderLayout.SOUTH);
 
-		setUpToggle(slotToggle);
-		setUpToggle(filtersToggle);
+		setUpToggle(slotToggle, filterStore.isSlotsExpanded(), filterStore::setSlotsExpanded);
+		setUpToggle(filtersToggle, filterStore.isFiltersExpanded(), filterStore::setFiltersExpanded);
 		refreshExpanded();
 
 		sync(initialFilters);
@@ -118,10 +118,10 @@ class FilterPanel extends JPanel
 		rowConstraints.gridy = 0;
 		addRow("Members", createComboBox(Membership.values(),
 			ItemFilters::getMembership, ItemFilters::withMembership));
-		addRow("Tradeable", createComboBox(TriState.values(),
-			ItemFilters::getTradeable, ItemFilters::withTradeable));
 		addRow("Has stats", createComboBox(TriState.values(),
 			ItemFilters::getCombatStats, ItemFilters::withCombatStats));
+		addRow("Tradeable", createComboBox(TriState.values(),
+			ItemFilters::getTradeable, ItemFilters::withTradeable));
 		addRow("Value", createComboBox(ValueSource.values(),
 			ItemFilters::getValueSource, ItemFilters::withValueSource));
 
@@ -206,12 +206,16 @@ class FilterPanel extends JPanel
 		onSlotChange.accept(newSlot);
 	}
 
-	private void setUpToggle(JToggleButton toggle)
+	private void setUpToggle(JToggleButton toggle, boolean expanded, Consumer<Boolean> saveExpanded)
 	{
+		toggle.setSelected(expanded);
 		toggle.setFocusPainted(false);
 		toggle.setHorizontalTextPosition(SwingConstants.LEADING);
 		toggle.addMouseListener(PanelUtil.hoverCursor(toggle));
-		toggle.addActionListener(e -> refreshExpanded());
+		toggle.addActionListener(e -> {
+			saveExpanded.accept(toggle.isSelected());
+			refreshExpanded();
+		});
 	}
 
 	private void refreshExpanded()

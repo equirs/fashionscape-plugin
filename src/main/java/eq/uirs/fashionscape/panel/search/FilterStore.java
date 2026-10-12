@@ -12,7 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 import net.runelite.client.config.ConfigManager;
 
 /**
- * Persists item filters in config, one key per filter
+ * Persists item filters and which filter panel sections are open in config, one key per setting
  */
 @Slf4j
 @RequiredArgsConstructor(onConstructor_ = {@Inject})
@@ -24,6 +24,8 @@ class FilterStore
 	private static final String KEY_VALUE_SOURCE = "searchValueSource";
 	private static final String KEY_MIN_VALUE = "searchMinValue";
 	private static final String KEY_MAX_VALUE = "searchMaxValue";
+	private static final String KEY_SLOTS_EXPANDED = "searchSlotsExpanded";
+	private static final String KEY_FILTERS_EXPANDED = "searchFiltersExpanded";
 
 	private final ConfigManager configManager;
 	private final FashionscapeConfig config;
@@ -61,6 +63,27 @@ class FilterStore
 		set(KEY_VALUE_SOURCE, filters.getValueSource());
 		set(KEY_MIN_VALUE, filters.getMinValue());
 		set(KEY_MAX_VALUE, filters.getMaxValue());
+	}
+
+	// the slots section starts open. slots used to be always visible
+	boolean isSlotsExpanded()
+	{
+		return getOrDefault(KEY_SLOTS_EXPANDED, Boolean.class, true);
+	}
+
+	void setSlotsExpanded(boolean expanded)
+	{
+		set(KEY_SLOTS_EXPANDED, expanded);
+	}
+
+	boolean isFiltersExpanded()
+	{
+		return getOrDefault(KEY_FILTERS_EXPANDED, Boolean.class, false);
+	}
+
+	void setFiltersExpanded(boolean expanded)
+	{
+		set(KEY_FILTERS_EXPANDED, expanded);
 	}
 
 	private <T> T getOrDefault(String key, Class<T> type, T fallback)
