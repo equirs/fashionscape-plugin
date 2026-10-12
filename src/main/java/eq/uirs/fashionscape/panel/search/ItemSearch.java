@@ -4,21 +4,23 @@ import com.google.common.primitives.Ints;
 import eq.uirs.fashionscape.colors.ColorScorer;
 import eq.uirs.fashionscape.core.Exclusions;
 import eq.uirs.fashionscape.core.FashionManager;
+import eq.uirs.fashionscape.core.filter.ItemFilters;
+import eq.uirs.fashionscape.core.filter.ItemProperties;
 import eq.uirs.fashionscape.core.utils.ItemSlotUtil;
 import eq.uirs.fashionscape.panel.NothingItemComposition;
 import eq.uirs.fashionscape.panel.PanelEquipSlot;
-import eq.uirs.fashionscape.panel.PanelUtil;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.ItemComposition;
 import net.runelite.api.kit.KitType;
@@ -27,7 +29,6 @@ import net.runelite.client.game.ItemManager;
 /**
  * Finds and sorts items for the search panel
  */
-@Slf4j
 @RequiredArgsConstructor(onConstructor_ = {@Inject})
 class ItemSearch
 {
@@ -46,14 +47,19 @@ class ItemSearch
 	private final Exclusions exclusions;
 	private final ColorScorer colorScorer;
 
+	private int largestSlotSize = 0;
+
 	/**
-	 * Returns valid items for the case-insensitive query in the given slot (null for any).
-	 * Exact item id match skips filters and exclusions. Call on the client thread.
+	 * Returns valid items for the case-insensitive query in the given slot (null for any) that pass the filters.
+	 * Exact item id match skips the slot, filters and exclusions. Call on the client thread.
 	 */
-	List<SearchResult> find(String query, @Nullable KitType slot)
+	List<SearchResult> find(String query, @Nullable KitType slot, ItemFilters filters)
 	{
 		List<SearchResult> results = new ArrayList<>();
-		addNothingResult(results, query, slot);
+		if (filters.matches(ItemProperties.NOTHING))
+		{
+			addNothingResult(results, query, slot);
+		}
 		Integer queryId = Ints.tryParse(query);
 		Set<Integer> skips = exclusions.getAll();
 		for (int i = 0; i < client.getItemCount(); i++)
@@ -70,12 +76,45 @@ class ItemSearch
 				continue;
 			}
 			KitType itemSlot = ItemSlotUtil.getSlot(i, itemManager);
-			if (itemSlot != null && (idMatch || matchesSlot(slot, itemSlot)))
+			if (itemSlot != null && (idMatch || (matchesSlot(slot, itemSlot) && matchesFilters(filters, item))))
 			{
-				addResult(results, item, itemSlot);
+				results.add(new SearchResult(item, itemSlot, null));
 			}
 		}
 		return results;
+	}
+
+	/**
+	 * Returns the item count of the slot with the most items, with no query or filters. Call on the client thread.
+	 */
+	int largestSlotSize()
+	{
+		if (largestSlotSize > 0)
+		{
+			return largestSlotSize;
+		}
+		Map<KitType, Integer> counts = new EnumMap<>(KitType.class);
+		Set<Integer> skips = exclusions.getAll();
+		for (int i = 0; i < client.getItemCount(); i++)
+		{
+			ItemComposition item = canonicalComposition(i);
+			if (item == null || skips.contains(i) || !nameMatches(item, ""))
+			{
+				continue;
+			}
+			KitType itemSlot = ItemSlotUtil.getSlot(i, itemManager);
+			if (itemSlot != null && VALID_SLOTS.contains(itemSlot))
+			{
+				counts.merge(itemSlot, 1, Integer::sum);
+			}
+		}
+		int size = counts.values().stream().max(Integer::compare).orElse(0);
+		// counts change until exclusions and the remote slot data they depend on have loaded
+		if (exclusions.isLoaded())
+		{
+			largestSlotSize = size;
+		}
+		return size;
 	}
 
 	/**
@@ -119,24 +158,18 @@ class ItemSearch
 		return slot == null ? VALID_SLOTS.contains(itemSlot) : slot == itemSlot;
 	}
 
+	private boolean matchesFilters(ItemFilters filters, ItemComposition item)
+	{
+		// skips the stat and price lookups when nothing is filtered
+		return filters.activeCount() == 0 || filters.matches(ItemProperties.of(item, itemManager));
+	}
+
 	private void addNothingResult(List<SearchResult> results, String query, @Nullable KitType slot)
 	{
 		if (slot != null && FashionManager.ALLOWS_NOTHING_ITEMS.contains(slot) &&
 			NothingItemComposition.NAME.toLowerCase().contains(query))
 		{
-			results.add(new SearchResult(null, PanelUtil.image(slot.name().toLowerCase()), slot, null));
-		}
-	}
-
-	private void addResult(List<SearchResult> results, ItemComposition item, KitType slot)
-	{
-		try
-		{
-			results.add(new SearchResult(item, itemManager.getImage(item.getId()), slot, null));
-		}
-		catch (Exception e)
-		{
-			log.debug("could not get image for item id {}", item.getId());
+			results.add(new SearchResult(null, slot, null));
 		}
 	}
 

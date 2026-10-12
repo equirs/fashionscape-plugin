@@ -1,7 +1,6 @@
 package eq.uirs.fashionscape.panel.search;
 
 import eq.uirs.fashionscape.panel.NothingItemComposition;
-import java.awt.image.BufferedImage;
 import javax.annotation.Nullable;
 import lombok.Value;
 import lombok.With;
@@ -14,7 +13,6 @@ class SearchResult
 	// null for the "Nothing" result
 	@Nullable
 	ItemComposition itemComposition;
-	BufferedImage icon;
 	KitType slot;
 	// color match score, only set for color sort
 	@With

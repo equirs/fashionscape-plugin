@@ -4,6 +4,7 @@ import com.google.common.base.Strings;
 import eq.uirs.fashionscape.FashionscapeConfig;
 import eq.uirs.fashionscape.core.FashionManager;
 import eq.uirs.fashionscape.core.event.LockChanged;
+import eq.uirs.fashionscape.core.filter.ItemFilters;
 import eq.uirs.fashionscape.panel.PanelUtil;
 import java.awt.BorderLayout;
 import java.awt.CardLayout;
@@ -12,6 +13,7 @@ import java.awt.Dimension;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.event.ItemEvent;
+import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -31,19 +33,19 @@ import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
-import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.kit.KitType;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.ui.ColorScheme;
+import net.runelite.client.ui.FontManager;
 import net.runelite.client.ui.components.IconTextField;
 import net.runelite.client.ui.components.PluginErrorPanel;
+import net.runelite.client.util.QuantityFormatter;
 import net.runelite.client.util.SwingUtil;
 
 /**
  * Tab panel that houses the search UI: bar, filters, sort, results, etc.
  */
-@Slf4j
 public class SearchPanel extends JPanel
 {
 	private static final int DEBOUNCE_DELAY_MS = 200;
@@ -55,6 +57,7 @@ public class SearchPanel extends JPanel
 	private final ClientThread clientThread;
 	private final ScheduledExecutorService executor;
 	private final ItemSearch itemSearch;
+	private final FilterStore filterStore;
 	private final boolean developerMode;
 
 	// constrain items in the list of results
@@ -65,6 +68,7 @@ public class SearchPanel extends JPanel
 	private final JScrollPane resultsScrollPane;
 	private final JPanel centerPanel = new JPanel(cardLayout);
 	private final PluginErrorPanel errorPanel = new PluginErrorPanel();
+	private final JLabel resultCount = new JLabel();
 	private final FilterPanel filterPanel;
 	private final List<SearchItemPanel> searchPanels = new ArrayList<>();
 
@@ -86,23 +90,25 @@ public class SearchPanel extends JPanel
 	};
 
 	private Future<?> searchFuture = null;
-	// null -> any slot. Set on the EDT, read by searches on the client thread
+	// set on the EDT, read by searches on the client thread. null -> any slot
 	@Nullable
 	private volatile KitType slot = null;
+	private volatile ItemFilters filters;
 	private SortBy sort;
 	private boolean sortInverted;
-	private boolean hasSearched = false;
 
 	@Inject
 	public SearchPanel(FashionManager fashionManager, ClientThread clientThread, ItemManager itemManager,
-					   ScheduledExecutorService executor, ItemSearch itemSearch, FashionscapeConfig config,
-					   @Named("developerMode") boolean developerMode)
+					   ScheduledExecutorService executor, ItemSearch itemSearch, FilterStore filterStore,
+					   FashionscapeConfig config, @Named("developerMode") boolean developerMode)
 	{
 		this.fashionManager = fashionManager;
 		this.itemManager = itemManager;
 		this.clientThread = clientThread;
 		this.executor = executor;
 		this.itemSearch = itemSearch;
+		this.filterStore = filterStore;
+		this.filters = filterStore.load();
 		this.developerMode = developerMode;
 		this.sort = config.preferredSort();
 
@@ -152,7 +158,7 @@ public class SearchPanel extends JPanel
 		cardLayout.show(centerPanel, ERROR_PANEL);
 
 		// selects the "all" slot initially, which runs the first search
-		filterPanel = new FilterPanel(fashionManager, this::onSlotChanged);
+		filterPanel = new FilterPanel(fashionManager, filters, this::onSlotChanged, this::onFiltersChanged);
 
 		JPanel filterBar = new JPanel(new BorderLayout());
 		filterBar.setBorder(new EmptyBorder(5, 0, 0, 0));
@@ -177,6 +183,13 @@ public class SearchPanel extends JPanel
 		container.add(filterPanel, groupConstraints);
 		groupConstraints.gridy++;
 		container.add(sortBar, groupConstraints);
+		groupConstraints.gridy++;
+
+		resultCount.setFont(FontManager.getRunescapeSmallFont());
+		resultCount.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
+		resultCount.setBorder(new EmptyBorder(5, 0, 0, 0));
+		resultCount.setVisible(false);
+		container.add(resultCount, groupConstraints);
 		groupConstraints.gridy++;
 
 		add(container, BorderLayout.NORTH);
@@ -264,7 +277,18 @@ public class SearchPanel extends JPanel
 	private void onSlotChanged(@Nullable KitType newSlot)
 	{
 		slot = newSlot;
-		// reset scroll position
+		updateSearchFromTop();
+	}
+
+	private void onFiltersChanged(ItemFilters newFilters)
+	{
+		filters = newFilters;
+		filterStore.save(newFilters);
+		updateSearchFromTop();
+	}
+
+	private void updateSearchFromTop()
+	{
 		updateSearchDebounced(() -> resultsScrollPane.getVerticalScrollBar().setValue(0));
 	}
 
@@ -281,21 +305,18 @@ public class SearchPanel extends JPanel
 			@Override
 			public void insertUpdate(DocumentEvent e)
 			{
-				hasSearched = true;
 				updateSearchDebounced();
 			}
 
 			@Override
 			public void removeUpdate(DocumentEvent e)
 			{
-				hasSearched = true;
 				updateSearchDebounced();
 			}
 
 			@Override
 			public void changedUpdate(DocumentEvent e)
 			{
-				hasSearched = true;
 				updateSearchDebounced();
 			}
 		});
@@ -333,29 +354,29 @@ public class SearchPanel extends JPanel
 		}
 		String query = searchBar.getText().toLowerCase();
 		KitType searchSlot = slot;
-		// a single slot narrows the results enough to list every item
-		if (searchSlot == null && query.length() < 2)
+		ItemFilters searchFilters = filters;
+		List<SearchResult> found = itemSearch.find(query, searchSlot, searchFilters);
+		// "any slot" can show as many results as the largest slot tab, but no more
+		if (searchSlot == null && found.size() > itemSearch.largestSlotSize())
 		{
-			showQueryTooShort();
+			showTooManyResults(found.size());
 			return true;
 		}
-		List<SearchResult> found = itemSearch.find(query, searchSlot);
 		SortBy searchSort = sort;
 		boolean inverted = sortInverted;
 		executor.submit(() -> showResults(itemSearch.sort(found, searchSort, inverted), searchSlot, postExec));
 		return true;
 	}
 
-	private void showQueryTooShort()
+	private void showTooManyResults(int count)
 	{
 		SwingUtilities.invokeLater(() -> {
 			searchPanels.clear();
 			SwingUtil.fastRemoveAll(resultsPanel);
 			resultsPanel.updateUI();
-			if (hasSearched)
-			{
-				errorPanel.setContent("Search too short", "Type a longer search for results");
-			}
+			resultCount.setVisible(false);
+			errorPanel.setContent("Too many results", QuantityFormatter.formatNumber(count) +
+				" items match. Pick a slot, add filters or try a longer search.");
 			cardLayout.show(centerPanel, ERROR_PANEL);
 			searchInProgress.set(false);
 		});
@@ -365,37 +386,57 @@ public class SearchPanel extends JPanel
 	private void showResults(List<SearchResult> results, @Nullable KitType searchSlot, Runnable postExec)
 	{
 		SwingUtilities.invokeLater(() -> {
-			searchPanels.clear();
-			SwingUtil.fastRemoveAll(resultsPanel);
-			if (results.isEmpty())
+			try
 			{
-				String slotName = searchSlot != null ? searchSlot.name().toLowerCase() : "any";
-				errorPanel.setContent("No results",
-					"No items match \"" + searchBar.getText() + "\" in " + slotName + " slot");
-				cardLayout.show(centerPanel, ERROR_PANEL);
+				displayResults(results, searchSlot);
+				postExec.run();
 			}
-			else
+			finally
 			{
-				boolean firstItem = true;
-				for (SearchResult result : results)
-				{
-					SearchItemPanel panel = new SearchItemPanel(result.getId(), result.getIcon(), result.getSlot(),
-						itemManager, fashionManager, clientThread, listener, result.getScore(), developerMode);
-					searchPanels.add(panel);
-					int topPadding = firstItem ? 0 : 5;
-					firstItem = false;
-					JPanel marginWrapper = new JPanel(new BorderLayout());
-					marginWrapper.setBackground(ColorScheme.DARK_GRAY_COLOR);
-					marginWrapper.setBorder(new EmptyBorder(topPadding, 10, 0, 10));
-					marginWrapper.add(panel, BorderLayout.NORTH);
-					resultsPanel.add(marginWrapper, itemConstraints);
-					itemConstraints.gridy++;
-				}
-				cardLayout.show(centerPanel, RESULTS_PANEL);
-				resultsPanel.updateUI();
+				searchInProgress.set(false);
 			}
-			searchInProgress.set(false);
-			postExec.run();
 		});
+	}
+
+	private void displayResults(List<SearchResult> results, @Nullable KitType searchSlot)
+	{
+		searchPanels.clear();
+		SwingUtil.fastRemoveAll(resultsPanel);
+		resultCount.setVisible(!results.isEmpty());
+		resultCount.setText(QuantityFormatter.formatNumber(results.size()) +
+			(results.size() == 1 ? " result" : " results"));
+		if (results.isEmpty())
+		{
+			String slotName = searchSlot != null ? searchSlot.name().toLowerCase() : "any";
+			errorPanel.setContent("No results",
+				"No items match \"" + searchBar.getText() + "\" in " + slotName + " slot");
+			cardLayout.show(centerPanel, ERROR_PANEL);
+		}
+		else
+		{
+			boolean firstItem = true;
+			for (SearchResult result : results)
+			{
+				SearchItemPanel panel = new SearchItemPanel(result.getId(), iconFor(result), result.getSlot(),
+					itemManager, fashionManager, clientThread, listener, result.getScore(), developerMode);
+				searchPanels.add(panel);
+				int topPadding = firstItem ? 0 : 5;
+				firstItem = false;
+				JPanel marginWrapper = new JPanel(new BorderLayout());
+				marginWrapper.setBackground(ColorScheme.DARK_GRAY_COLOR);
+				marginWrapper.setBorder(new EmptyBorder(topPadding, 10, 0, 10));
+				marginWrapper.add(panel, BorderLayout.NORTH);
+				resultsPanel.add(marginWrapper, itemConstraints);
+				itemConstraints.gridy++;
+			}
+			cardLayout.show(centerPanel, RESULTS_PANEL);
+			resultsPanel.updateUI();
+		}
+	}
+
+	private BufferedImage iconFor(SearchResult result)
+	{
+		return result.getItemComposition() != null ? itemManager.getImage(result.getId()) :
+			PanelUtil.image(result.getSlot().name().toLowerCase());
 	}
 }
