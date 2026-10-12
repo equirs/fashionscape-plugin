@@ -26,6 +26,7 @@ import eq.uirs.fashionscape.remote.RemoteDataHandler;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -536,6 +537,11 @@ public class Layers
 			if (weaponInfo == null && !previewReplacesVirtual)
 			{
 				weaponInfo = virtualModels.getItems().get(KitType.WEAPON);
+				// e.g. a previewed shield displaces a virtual 2h weapon
+				if (weaponInfo != null && isDisplacedBy(weaponInfo, previewModels))
+				{
+					weaponInfo = null;
+				}
 			}
 			if (weaponInfo != null)
 			{
@@ -580,6 +586,14 @@ public class Layers
 		}
 		// otherwise, just fall back on what the last real idle anim was
 		return lastRealIdlePoseAnim;
+	}
+
+	// mirrors computeFromModels: an item only shows if none of its slots are taken by higher-prio models
+	private static boolean isDisplacedBy(SlotInfo info, ModelInfo higher)
+	{
+		Set<KitType> taken = new HashSet<>();
+		higher.getItems().getAll().values().forEach(i -> taken.addAll(i.computeEquipment().keySet()));
+		return info.computeEquipment().keySet().stream().anyMatch(s -> taken.contains(s) || higher.contains(s));
 	}
 
 	/**
