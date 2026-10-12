@@ -2,15 +2,10 @@ package eq.uirs.fashionscape.panel.search;
 
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.primitives.Ints;
 import eq.uirs.fashionscape.FashionscapeConfig;
-import eq.uirs.fashionscape.colors.ColorScorer;
-import eq.uirs.fashionscape.core.Exclusions;
 import eq.uirs.fashionscape.core.FashionManager;
 import eq.uirs.fashionscape.core.LockStatus;
 import eq.uirs.fashionscape.core.event.LockChanged;
-import eq.uirs.fashionscape.core.utils.ItemSlotUtil;
-import eq.uirs.fashionscape.panel.NothingItemComposition;
 import eq.uirs.fashionscape.panel.PanelEquipSlot;
 import eq.uirs.fashionscape.panel.PanelUtil;
 import java.awt.BorderLayout;
@@ -21,21 +16,15 @@ import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.GridLayout;
 import java.awt.event.ItemEvent;
-import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Named;
@@ -49,10 +38,7 @@ import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
-import lombok.Value;
 import lombok.extern.slf4j.Slf4j;
-import net.runelite.api.Client;
-import net.runelite.api.ItemComposition;
 import net.runelite.api.kit.KitType;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.game.ItemManager;
@@ -61,7 +47,6 @@ import net.runelite.client.ui.components.IconTextField;
 import net.runelite.client.ui.components.PluginErrorPanel;
 import net.runelite.client.ui.components.materialtabs.MaterialTab;
 import net.runelite.client.ui.components.materialtabs.MaterialTabGroup;
-import net.runelite.client.util.AsyncBufferedImage;
 import net.runelite.client.util.SwingUtil;
 
 /**
@@ -73,18 +58,12 @@ public class SearchPanel extends JPanel
 	private static final int DEBOUNCE_DELAY_MS = 200;
 	private static final String ERROR_PANEL = "ERROR_PANEL";
 	private static final String RESULTS_PANEL = "RESULTS_PANEL";
-	private static final Set<KitType> VALID_SLOTS = Arrays.stream(PanelEquipSlot.values())
-		.map(PanelEquipSlot::getKitType)
-		.filter(Objects::nonNull)
-		.collect(Collectors.toSet());
 
-	private final Client client;
 	private final FashionManager fashionManager;
 	private final ItemManager itemManager;
 	private final ClientThread clientThread;
 	private final ScheduledExecutorService executor;
-	private final ColorScorer colorScorer;
-	private final Exclusions exclusions;
+	private final ItemSearch itemSearch;
 	private final boolean developerMode;
 
 	// constrain items in the list of results
@@ -99,7 +78,6 @@ public class SearchPanel extends JPanel
 	private final Map<PanelEquipSlot, MaterialTab> tabMap;
 	private final List<SearchItemPanel> searchPanels = new ArrayList<>();
 
-	private final List<Result> results = new ArrayList<>();
 	private final AtomicBoolean searchInProgress = new AtomicBoolean();
 	private final OnSelectionChangingListener listener = new OnSelectionChangingListener()
 	{
@@ -118,48 +96,23 @@ public class SearchPanel extends JPanel
 	};
 
 	private Future<?> searchFuture = null;
-	private Function<ItemComposition, Boolean> filter;
-	private boolean allowShortQueries = false;
+	// null -> any slot. Set on the EDT, read by searches on the client thread
+	@Nullable
+	private volatile KitType slot = null;
 	private SortBy sort;
 	private boolean sortInverted;
-	private KitType selectedSlot = null;
 	private boolean hasSearched = false;
-	private final Map<Integer, Double> scores = new HashMap<>();
-
-	private final Comparator<Result> itemAlphaComparator = Comparator.comparing(Result::getName);
-
-	@Value
-	private static class Result
-	{
-		@Nullable
-		ItemComposition itemComposition;
-		BufferedImage icon;
-		KitType slot;
-
-		int getId()
-		{
-			return itemComposition != null ? itemComposition.getId() : NothingItemComposition.ID;
-		}
-
-		String getName()
-		{
-			return itemComposition != null ? itemComposition.getMembersName() : NothingItemComposition.NAME;
-		}
-	}
 
 	@Inject
-	public SearchPanel(Client client, FashionManager fashionManager, ClientThread clientThread,
-	                   ItemManager itemManager, ScheduledExecutorService executor,
-	                   FashionscapeConfig config, ColorScorer colorScorer, Exclusions exclusions,
-	                   @Named("developerMode") boolean developerMode)
+	public SearchPanel(FashionManager fashionManager, ClientThread clientThread, ItemManager itemManager,
+					   ScheduledExecutorService executor, ItemSearch itemSearch, FashionscapeConfig config,
+					   @Named("developerMode") boolean developerMode)
 	{
-		this.client = client;
 		this.fashionManager = fashionManager;
 		this.itemManager = itemManager;
 		this.clientThread = clientThread;
 		this.executor = executor;
-		this.colorScorer = colorScorer;
-		this.exclusions = exclusions;
+		this.itemSearch = itemSearch;
 		this.developerMode = developerMode;
 		this.sort = config.preferredSort();
 
@@ -309,7 +262,6 @@ public class SearchPanel extends JPanel
 		{
 			searchBar.setText("");
 		}
-		results.clear();
 		searchPanels.clear();
 		SwingUtilities.invokeLater(() -> {
 			SwingUtil.fastRemoveAll(resultsPanel);
@@ -342,22 +294,7 @@ public class SearchPanel extends JPanel
 			tab.setToolTipText(filterSlot.getDisplayName());
 			tab.addMouseListener(PanelUtil.hoverCursor(this));
 			tab.setOnSelectEvent(() -> {
-				filter = itemComposition -> {
-					KitType kitType = filterSlot.getKitType();
-					selectedSlot = kitType;
-					KitType slot = ItemSlotUtil.getSlot(itemComposition.getId(), itemManager);
-					if (kitType == null)
-					{
-						// allow any equipment slot that is also a KitType (so no ammo, etc.)
-						return slot != null && VALID_SLOTS.contains(slot);
-					}
-					else
-					{
-						return Objects.equals(slot, kitType);
-					}
-				};
-				// individual slots will show all results all the time
-				allowShortQueries = filterSlot.getKitType() != null;
+				slot = filterSlot.getKitType();
 				// reset scroll position
 				updateSearchDebounced(() -> resultsScrollPane.getVerticalScrollBar().setValue(0));
 				return true;
@@ -430,137 +367,60 @@ public class SearchPanel extends JPanel
 	// should only be called from debouncer and on client thread
 	private boolean updateSearch(Runnable postExec)
 	{
-		boolean willUpdate = searchInProgress.compareAndSet(false, true);
-		if (willUpdate)
+		if (!searchInProgress.compareAndSet(false, true))
 		{
-			results.clear();
+			return false;
+		}
+		String query = searchBar.getText().toLowerCase();
+		KitType searchSlot = slot;
+		// a single slot narrows the results enough to list every item
+		if (searchSlot == null && query.length() < 2)
+		{
+			showQueryTooShort();
+			return true;
+		}
+		List<SearchResult> found = itemSearch.find(query, searchSlot);
+		SortBy searchSort = sort;
+		boolean inverted = sortInverted;
+		executor.submit(() -> showResults(itemSearch.sort(found, searchSort, inverted), searchSlot, postExec));
+		return true;
+	}
 
-			String search = searchBar.getText().toLowerCase();
-			if (!allowShortQueries && search.length() < 2)
-			{
-				searchPanels.clear();
-				SwingUtilities.invokeLater(() -> {
-					SwingUtil.fastRemoveAll(resultsPanel);
-					resultsPanel.updateUI();
-					if (hasSearched)
-					{
-						errorPanel.setContent("Search too short", "Type a longer search for results");
-					}
-					cardLayout.show(centerPanel, ERROR_PANEL);
-					searchInProgress.set(false);
-				});
-				return true;
-			}
-			boolean isSearchForId = Ints.tryParse(search) != null;
-			Set<Integer> skips = exclusions.getAll();
-			for (int i = 0; i < client.getItemCount(); i++)
-			{
-				ItemComposition itemComposition = null;
-				try
-				{
-					int canonical = itemManager.canonicalize(i);
-					// only consider canonical ids
-					if (canonical != i || (!isSearchForId && skips.contains(canonical)))
-					{
-						continue;
-					}
-					itemComposition = itemManager.getItemComposition(canonical);
-				}
-				catch (Exception ignored)
-				{
-				}
-				KitType slot = ItemSlotUtil.getSlot(i, itemManager);
-				if (itemComposition != null && slot != null && shouldDisplayResult(itemComposition, search))
-				{
-					try
-					{
-						AsyncBufferedImage image = itemManager.getImage(itemComposition.getId());
-						results.add(new Result(itemComposition, image, slot));
-					}
-					catch (Exception ignored)
-					{
-						if (log.isDebugEnabled())
-						{
-							log.debug("could not get image for item id {}", i);
-						}
-					}
-				}
-			}
-			if (selectedSlot != null && FashionManager.ALLOWS_NOTHING_ITEMS.contains(selectedSlot) &&
-				NothingItemComposition.NAME.toLowerCase().contains(search))
-			{
-				BufferedImage image = PanelUtil.image(selectedSlot.name().toLowerCase());
-				results.add(0, new Result(null, image, selectedSlot));
-			}
-
+	private void showQueryTooShort()
+	{
+		SwingUtilities.invokeLater(() -> {
 			searchPanels.clear();
-			scores.clear();
-			switch (this.sort)
+			SwingUtil.fastRemoveAll(resultsPanel);
+			resultsPanel.updateUI();
+			if (hasSearched)
 			{
-				case ITEM_ID:
-					results.sort(directed(Comparator.comparingInt(Result::getId)));
-					addPendingResults(postExec);
-					break;
-				case ALPHABETICAL:
-					executor.submit(() -> {
-						results.sort(directed(itemAlphaComparator));
-						addPendingResults(postExec);
-					});
-					break;
-				case COLOR_MATCH:
-					executor.submit(() -> {
-						performSuggestedSort();
-						addPendingResults(postExec);
-					});
-					break;
+				errorPanel.setContent("Search too short", "Type a longer search for results");
 			}
-		}
-		return willUpdate;
-	}
-
-	private void performSuggestedSort()
-	{
-		colorScorer.updatePlayerInfo();
-		for (Result result : results)
-		{
-			int itemId = result.getId();
-			scores.put(itemId, colorScorer.score(itemId, selectedSlot));
-		}
-		results.sort(directed(Comparator.comparingDouble(r ->
-			-scores.getOrDefault(r.getId(), 0.0))));
-	}
-
-	private Comparator<Result> directed(Comparator<Result> comparator)
-	{
-		return sortInverted ? comparator.reversed() : comparator;
+			cardLayout.show(centerPanel, ERROR_PANEL);
+			searchInProgress.set(false);
+		});
 	}
 
 	// only to be called from updateSearch
-	private void addPendingResults(Runnable postExec)
+	private void showResults(List<SearchResult> results, @Nullable KitType searchSlot, Runnable postExec)
 	{
 		SwingUtilities.invokeLater(() -> {
+			searchPanels.clear();
 			SwingUtil.fastRemoveAll(resultsPanel);
 			if (results.isEmpty())
 			{
-				String slotName = "any";
-				if (selectedSlot != null)
-				{
-					slotName = selectedSlot.name().toLowerCase();
-				}
+				String slotName = searchSlot != null ? searchSlot.name().toLowerCase() : "any";
 				errorPanel.setContent("No results",
 					"No items match \"" + searchBar.getText() + "\" in " + slotName + " slot");
 				cardLayout.show(centerPanel, ERROR_PANEL);
 			}
 			else
 			{
-				boolean showScores = scores.values().stream().anyMatch(s -> s != null && s != 0.0);
 				boolean firstItem = true;
-				for (Result result : results)
+				for (SearchResult result : results)
 				{
-					int itemId = result.getId();
-					Double score = showScores ? scores.get(itemId) : null;
-					SearchItemPanel panel = new SearchItemPanel(itemId, result.getIcon(),
-						result.getSlot(), itemManager, fashionManager, clientThread, listener, score, developerMode);
+					SearchItemPanel panel = new SearchItemPanel(result.getId(), result.getIcon(), result.getSlot(),
+						itemManager, fashionManager, clientThread, listener, result.getScore(), developerMode);
 					searchPanels.add(panel);
 					int topPadding = firstItem ? 0 : 5;
 					firstItem = false;
@@ -577,20 +437,6 @@ public class SearchPanel extends JPanel
 			searchInProgress.set(false);
 			postExec.run();
 		});
-	}
-
-	private boolean shouldDisplayResult(ItemComposition itemComposition, String query)
-	{
-		String name = itemComposition.getMembersName().toLowerCase();
-		Integer itemId = Ints.tryParse(query);
-		// Check if query is exactly this itemId.
-		// If not, the name of the item (can't be "null") must match the input string
-		if (!Objects.equals(itemId, itemComposition.getId()) &&
-			(name.equals("null") || !name.contains(query)))
-		{
-			return false;
-		}
-		return filter == null || filter.apply(itemComposition);
 	}
 
 	private void updateTabIcon(KitType slot, @Nullable LockStatus status)
