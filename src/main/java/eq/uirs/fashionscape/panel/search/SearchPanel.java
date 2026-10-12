@@ -1,12 +1,9 @@
 package eq.uirs.fashionscape.panel.search;
 
 import com.google.common.base.Strings;
-import com.google.common.collect.ImmutableMap;
 import eq.uirs.fashionscape.FashionscapeConfig;
 import eq.uirs.fashionscape.core.FashionManager;
-import eq.uirs.fashionscape.core.LockStatus;
 import eq.uirs.fashionscape.core.event.LockChanged;
-import eq.uirs.fashionscape.panel.PanelEquipSlot;
 import eq.uirs.fashionscape.panel.PanelUtil;
 import java.awt.BorderLayout;
 import java.awt.CardLayout;
@@ -14,12 +11,9 @@ import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
-import java.awt.GridLayout;
 import java.awt.event.ItemEvent;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
@@ -28,7 +22,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Named;
-import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
 import javax.swing.JLabel;
@@ -45,8 +38,6 @@ import net.runelite.client.game.ItemManager;
 import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.ui.components.IconTextField;
 import net.runelite.client.ui.components.PluginErrorPanel;
-import net.runelite.client.ui.components.materialtabs.MaterialTab;
-import net.runelite.client.ui.components.materialtabs.MaterialTabGroup;
 import net.runelite.client.util.SwingUtil;
 
 /**
@@ -70,12 +61,11 @@ public class SearchPanel extends JPanel
 	private final GridBagConstraints itemConstraints = new GridBagConstraints();
 	private final CardLayout cardLayout = new CardLayout();
 	private final IconTextField searchBar = new IconTextField();
-	private final MaterialTabGroup slotFilter = new MaterialTabGroup();
 	private final JPanel resultsPanel = new JPanel();
 	private final JScrollPane resultsScrollPane;
 	private final JPanel centerPanel = new JPanel(cardLayout);
 	private final PluginErrorPanel errorPanel = new PluginErrorPanel();
-	private final Map<PanelEquipSlot, MaterialTab> tabMap;
+	private final FilterPanel filterPanel;
 	private final List<SearchItemPanel> searchPanels = new ArrayList<>();
 
 	private final AtomicBoolean searchInProgress = new AtomicBoolean();
@@ -138,7 +128,6 @@ public class SearchPanel extends JPanel
 		container.setBorder(new EmptyBorder(10, 10, 10, 10));
 		container.setBackground(ColorScheme.DARK_GRAY_COLOR);
 
-		this.tabMap = setUpSlotFilters();
 		setUpSearchBar();
 
 		resultsPanel.setLayout(new GridBagLayout());
@@ -162,7 +151,15 @@ public class SearchPanel extends JPanel
 
 		cardLayout.show(centerPanel, ERROR_PANEL);
 
-		// label takes its natural width, combo box fills the rest, direction button is fixed-width
+		// selects the "all" slot initially, which runs the first search
+		filterPanel = new FilterPanel(fashionManager, this::onSlotChanged);
+
+		JPanel filterBar = new JPanel(new BorderLayout());
+		filterBar.setBorder(new EmptyBorder(5, 0, 0, 0));
+		filterBar.setBackground(ColorScheme.DARK_GRAY_COLOR);
+		filterBar.add(filterPanel.getToggle(), BorderLayout.CENTER);
+
+		// label takes up natural width, combo box fills, direction button is fixed-width
 		JPanel sortBar = new JPanel(new BorderLayout(5, 0));
 		sortBar.setBorder(new EmptyBorder(5, 0, 0, 0));
 		sortBar.setBackground(ColorScheme.DARK_GRAY_COLOR);
@@ -173,9 +170,11 @@ public class SearchPanel extends JPanel
 		sortBar.add(createSortBox(config), BorderLayout.CENTER);
 		sortBar.add(createSortDirectionButton(), BorderLayout.EAST);
 
-		container.add(slotFilter, groupConstraints);
-		groupConstraints.gridy++;
 		container.add(searchBar, groupConstraints);
+		groupConstraints.gridy++;
+		container.add(filterBar, groupConstraints);
+		groupConstraints.gridy++;
+		container.add(filterPanel, groupConstraints);
 		groupConstraints.gridy++;
 		container.add(sortBar, groupConstraints);
 		groupConstraints.gridy++;
@@ -188,7 +187,7 @@ public class SearchPanel extends JPanel
 
 	public void onLockChanged(LockChanged e)
 	{
-		updateTabIcon(e.getSlot(), e.getStatus());
+		filterPanel.onLockChanged(e);
 	}
 
 	private JComboBox<SortBy> createSortBox(FashionscapeConfig config)
@@ -245,15 +244,7 @@ public class SearchPanel extends JPanel
 
 	public void chooseSlot(KitType slot)
 	{
-		PanelEquipSlot panelSlot = Arrays.stream(PanelEquipSlot.values())
-			.filter(p -> p.getKitType() == slot)
-			.findFirst()
-			.orElse(PanelEquipSlot.ALL);
-		MaterialTab tab = tabMap.get(panelSlot);
-		if (tab != null)
-		{
-			slotFilter.select(tab);
-		}
+		filterPanel.selectSlot(slot);
 	}
 
 	public void clearSearch()
@@ -270,42 +261,11 @@ public class SearchPanel extends JPanel
 		});
 	}
 
-	private Map<PanelEquipSlot, MaterialTab> setUpSlotFilters()
+	private void onSlotChanged(@Nullable KitType newSlot)
 	{
-		ImmutableMap.Builder<PanelEquipSlot, MaterialTab> builder = new ImmutableMap.Builder<>();
-		slotFilter.setLayout(new GridLayout(2, 5, 5, 5));
-		slotFilter.setBorder(new EmptyBorder(0, 0, 10, 0));
-		MaterialTab allTab = null;
-		for (PanelEquipSlot filterSlot : PanelEquipSlot.values())
-		{
-			MaterialTab tab = new MaterialTab(new ImageIcon(), slotFilter, null);
-			builder.put(filterSlot, tab);
-			boolean isLocked = false;
-			if (filterSlot.getKitType() == null)
-			{
-				allTab = tab;
-			}
-			else
-			{
-				isLocked = fashionManager.isItemLocked(filterSlot.getKitType());
-			}
-			ImageIcon icon = iconFor(filterSlot, isLocked);
-			tab.setIcon(icon);
-			tab.setToolTipText(filterSlot.getDisplayName());
-			tab.addMouseListener(PanelUtil.hoverCursor(this));
-			tab.setOnSelectEvent(() -> {
-				slot = filterSlot.getKitType();
-				// reset scroll position
-				updateSearchDebounced(() -> resultsScrollPane.getVerticalScrollBar().setValue(0));
-				return true;
-			});
-			slotFilter.addTab(tab);
-		}
-		if (allTab != null)
-		{
-			slotFilter.select(allTab);
-		}
-		return builder.build();
+		slot = newSlot;
+		// reset scroll position
+		updateSearchDebounced(() -> resultsScrollPane.getVerticalScrollBar().setValue(0));
 	}
 
 	private void setUpSearchBar()
@@ -437,29 +397,5 @@ public class SearchPanel extends JPanel
 			searchInProgress.set(false);
 			postExec.run();
 		});
-	}
-
-	private void updateTabIcon(KitType slot, @Nullable LockStatus status)
-	{
-		Arrays.stream(PanelEquipSlot.values())
-			.filter(p -> p.getKitType() == slot)
-			.findFirst()
-			.ifPresent(panelEquipSlot -> updateTabIcon(panelEquipSlot, status != null));
-	}
-
-	private void updateTabIcon(PanelEquipSlot panelSlot, boolean isLocked)
-	{
-		MaterialTab tab = tabMap.get(panelSlot);
-		if (tab != null)
-		{
-			tab.setIcon(iconFor(panelSlot, isLocked));
-		}
-	}
-
-	private ImageIcon iconFor(PanelEquipSlot panelSlot, boolean isLocked)
-	{
-		String lockStr = isLocked ? "-lock" : "";
-		String iconName = panelSlot.getDisplayName().toLowerCase() + lockStr;
-		return PanelUtil.icon(iconName);
 	}
 }
