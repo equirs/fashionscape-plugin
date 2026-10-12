@@ -10,8 +10,10 @@ import java.awt.BorderLayout;
 import java.awt.CardLayout;
 import java.awt.Color;
 import java.awt.Dimension;
+import java.awt.FlowLayout;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
+import java.awt.GridLayout;
 import java.awt.event.ItemEvent;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
@@ -68,6 +70,7 @@ public class SearchPanel extends JPanel
 	private final JScrollPane resultsScrollPane;
 	private final JPanel centerPanel = new JPanel(cardLayout);
 	private final PluginErrorPanel errorPanel = new PluginErrorPanel();
+	private final JButton resetFiltersButton = new JButton("Reset filters");
 	private final JLabel resultCount = new JLabel();
 	private final FilterPanel filterPanel;
 	private final List<SearchItemPanel> searchPanels = new ArrayList<>();
@@ -159,11 +162,13 @@ public class SearchPanel extends JPanel
 
 		// selects the "all" slot initially, which runs the first search
 		filterPanel = new FilterPanel(fashionManager, filters, this::onSlotChanged, this::onFiltersChanged);
+		infoWrapper.add(createResetFiltersRow(), BorderLayout.CENTER);
 
-		JPanel filterBar = new JPanel(new BorderLayout());
+		JPanel filterBar = new JPanel(new GridLayout(1, 2, 5, 0));
 		filterBar.setBorder(new EmptyBorder(5, 0, 0, 0));
 		filterBar.setBackground(ColorScheme.DARK_GRAY_COLOR);
-		filterBar.add(filterPanel.getToggle(), BorderLayout.CENTER);
+		filterBar.add(filterPanel.getSlotToggle());
+		filterBar.add(filterPanel.getFiltersToggle());
 
 		// label takes up natural width, combo box fills, direction button is fixed-width
 		JPanel sortBar = new JPanel(new BorderLayout(5, 0));
@@ -364,13 +369,15 @@ public class SearchPanel extends JPanel
 		}
 		SortBy searchSort = sort;
 		boolean inverted = sortInverted;
+		boolean filtered = searchFilters.activeCount() > 0;
 		if (searchSort == SortBy.COLOR_MATCH)
 		{
-			executor.submit(() -> showResults(itemSearch.sort(found, searchSort, inverted), searchSlot, postExec));
+			executor.submit(() ->
+				showResults(itemSearch.sort(found, searchSort, inverted), searchSlot, filtered, postExec));
 		}
 		else
 		{
-			showResults(itemSearch.sort(found, searchSort, inverted), searchSlot, postExec);
+			showResults(itemSearch.sort(found, searchSort, inverted), searchSlot, filtered, postExec);
 		}
 		return true;
 	}
@@ -382,6 +389,7 @@ public class SearchPanel extends JPanel
 			SwingUtil.fastRemoveAll(resultsPanel);
 			resultsPanel.updateUI();
 			resultCount.setVisible(false);
+			resetFiltersButton.setVisible(false);
 			errorPanel.setContent("Too many results", QuantityFormatter.formatNumber(count) +
 				" items match. Pick a slot, add filters or try a longer search.");
 			cardLayout.show(centerPanel, ERROR_PANEL);
@@ -390,12 +398,13 @@ public class SearchPanel extends JPanel
 	}
 
 	// only to be called from updateSearch
-	private void showResults(List<SearchResult> results, @Nullable KitType searchSlot, Runnable postExec)
+	private void showResults(List<SearchResult> results, @Nullable KitType searchSlot, boolean filtered,
+							 Runnable postExec)
 	{
 		SwingUtilities.invokeLater(() -> {
 			try
 			{
-				displayResults(results, searchSlot);
+				displayResults(results, searchSlot, filtered);
 				postExec.run();
 			}
 			finally
@@ -405,7 +414,7 @@ public class SearchPanel extends JPanel
 		});
 	}
 
-	private void displayResults(List<SearchResult> results, @Nullable KitType searchSlot)
+	private void displayResults(List<SearchResult> results, @Nullable KitType searchSlot, boolean filtered)
 	{
 		searchPanels.clear();
 		SwingUtil.fastRemoveAll(resultsPanel);
@@ -414,9 +423,8 @@ public class SearchPanel extends JPanel
 			(results.size() == 1 ? " result" : " results"));
 		if (results.isEmpty())
 		{
-			String slotName = searchSlot != null ? searchSlot.name().toLowerCase() : "any";
-			errorPanel.setContent("No results",
-				"No items match \"" + searchBar.getText() + "\" in " + slotName + " slot");
+			errorPanel.setContent("No results", noResultsMessage(searchSlot, filtered));
+			resetFiltersButton.setVisible(filtered);
 			cardLayout.show(centerPanel, ERROR_PANEL);
 		}
 		else
@@ -439,6 +447,38 @@ public class SearchPanel extends JPanel
 			cardLayout.show(centerPanel, RESULTS_PANEL);
 			resultsPanel.updateUI();
 		}
+	}
+
+	// e.g. No items match "abc" in the head slot with the current filters
+	private String noResultsMessage(@Nullable KitType searchSlot, boolean filtered)
+	{
+		String query = searchBar.getText();
+		if (query.isEmpty() && searchSlot == null && !filtered)
+		{
+			return "No items found";
+		}
+		StringBuilder message = new StringBuilder(query.isEmpty() ? "No items" : "No items match \"" + query + "\"");
+		if (searchSlot != null)
+		{
+			message.append(" in the ").append(searchSlot.name().toLowerCase()).append(" slot");
+		}
+		if (filtered)
+		{
+			message.append(query.isEmpty() ? " match" : " with").append(" the current filters");
+		}
+		return message.toString();
+	}
+
+	private JPanel createResetFiltersRow()
+	{
+		resetFiltersButton.setFocusPainted(false);
+		resetFiltersButton.setVisible(false);
+		resetFiltersButton.addMouseListener(PanelUtil.hoverCursor(resetFiltersButton));
+		resetFiltersButton.addActionListener(e -> filterPanel.resetFilters());
+		JPanel row = new JPanel(new FlowLayout(FlowLayout.CENTER));
+		row.setBackground(ColorScheme.DARK_GRAY_COLOR);
+		row.add(resetFiltersButton);
+		return row;
 	}
 
 	private BufferedImage iconFor(SearchResult result)

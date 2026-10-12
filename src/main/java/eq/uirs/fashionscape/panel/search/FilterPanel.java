@@ -12,6 +12,7 @@ import java.awt.Color;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
+import java.awt.LayoutManager;
 import java.awt.event.ItemEvent;
 import java.util.ArrayList;
 import java.util.List;
@@ -30,16 +31,21 @@ import javax.swing.border.EmptyBorder;
 import lombok.Getter;
 import net.runelite.api.kit.KitType;
 import net.runelite.client.ui.ColorScheme;
+import net.runelite.client.util.Text;
 
 /**
- * Expandable panel of search filters. Toggle button is placed by the parent panel.
+ * Expandable slot and filter sections, each opened by its own toggle. Toggle buttons are placed by the parent panel.
  */
 class FilterPanel extends JPanel
 {
 	private static final Color BACKGROUND = ColorScheme.DARKER_GRAY_HOVER_COLOR;
 
 	@Getter
-	private final JToggleButton toggle = new JToggleButton();
+	private final JToggleButton slotToggle = new JToggleButton();
+	@Getter
+	private final JToggleButton filtersToggle = new JToggleButton();
+	private final JPanel slotSection = createSection(new BorderLayout());
+	private final JPanel filterSection = createSection(new BorderLayout(0, 10));
 	private final SlotTabs slotTabs;
 	private final ValueRangeFields range;
 	private final JPanel rows = new JPanel(new GridBagLayout());
@@ -67,25 +73,22 @@ class FilterPanel extends JPanel
 		setBackground(ColorScheme.DARK_GRAY_COLOR);
 		setBorder(new EmptyBorder(5, 0, 0, 0));
 
-		JPanel content = new JPanel(new BorderLayout(0, 10));
-		content.setBackground(BACKGROUND);
-		content.setBorder(new EmptyBorder(5, 5, 5, 5));
-		add(content, BorderLayout.CENTER);
+		// sections share a background, so both open look like one panel
+		add(slotSection, BorderLayout.NORTH);
+		add(filterSection, BorderLayout.CENTER);
 
 		slotTabs = new SlotTabs(fashionManager, this::setSlot);
 		slotTabs.setBackground(BACKGROUND);
-		content.add(slotTabs, BorderLayout.NORTH);
+		slotSection.add(slotTabs, BorderLayout.CENTER);
 
 		range = new ValueRangeFields((min, max) -> setFilters(filters.withMinValue(min).withMaxValue(max)));
 		rows.setOpaque(false);
 		addFilterRows();
-		content.add(rows, BorderLayout.CENTER);
-		content.add(createResetButton(), BorderLayout.SOUTH);
+		filterSection.add(rows, BorderLayout.CENTER);
+		filterSection.add(createResetButton(), BorderLayout.SOUTH);
 
-		toggle.setFocusPainted(false);
-		toggle.setHorizontalTextPosition(SwingConstants.LEADING);
-		toggle.addMouseListener(PanelUtil.hoverCursor(toggle));
-		toggle.addActionListener(e -> refreshExpanded());
+		setUpToggle(slotToggle);
+		setUpToggle(filtersToggle);
 		refreshExpanded();
 
 		sync(initialFilters);
@@ -102,11 +105,11 @@ class FilterPanel extends JPanel
 		slotTabs.onLockChanged(e);
 	}
 
-	void reset()
+	// leaves the slot as is
+	void resetFilters()
 	{
 		sync(ItemFilters.DEFAULT);
 		setFilters(ItemFilters.DEFAULT);
-		slotTabs.selectSlot(null);
 	}
 
 	private void addFilterRows()
@@ -165,10 +168,10 @@ class FilterPanel extends JPanel
 
 	private JButton createResetButton()
 	{
-		JButton button = new JButton("Reset");
+		JButton button = new JButton("Reset filters");
 		button.setFocusPainted(false);
 		button.addMouseListener(PanelUtil.hoverCursor(button));
-		button.addActionListener(e -> reset());
+		button.addActionListener(e -> resetFilters());
 		return button;
 	}
 
@@ -203,17 +206,42 @@ class FilterPanel extends JPanel
 		onSlotChange.accept(newSlot);
 	}
 
+	private void setUpToggle(JToggleButton toggle)
+	{
+		toggle.setFocusPainted(false);
+		toggle.setHorizontalTextPosition(SwingConstants.LEADING);
+		toggle.addMouseListener(PanelUtil.hoverCursor(toggle));
+		toggle.addActionListener(e -> refreshExpanded());
+	}
+
 	private void refreshExpanded()
 	{
+		slotSection.setVisible(slotToggle.isSelected());
+		filterSection.setVisible(filtersToggle.isSelected());
+		setVisible(slotToggle.isSelected() || filtersToggle.isSelected());
+		refreshToggleIcon(slotToggle, "slots");
+		refreshToggleIcon(filtersToggle, "filters");
+	}
+
+	private static void refreshToggleIcon(JToggleButton toggle, String sectionName)
+	{
 		boolean expanded = toggle.isSelected();
-		setVisible(expanded);
 		toggle.setIcon(PanelUtil.icon(expanded ? "up" : "down"));
-		toggle.setToolTipText(expanded ? "Hide filters" : "Show filters");
+		toggle.setToolTipText((expanded ? "Hide " : "Show ") + sectionName);
 	}
 
 	private void refreshToggleText()
 	{
-		int count = (slot != null ? 1 : 0) + filters.activeCount();
-		toggle.setText(count == 0 ? "Filters" : "Filters (" + count + ")");
+		slotToggle.setText(slot != null ? Text.titleCase(slot) : "All slots");
+		int count = filters.activeCount();
+		filtersToggle.setText(count == 0 ? "Filters" : count + (count == 1 ? " filter" : " filters"));
+	}
+
+	private static JPanel createSection(LayoutManager layout)
+	{
+		JPanel section = new JPanel(layout);
+		section.setBackground(BACKGROUND);
+		section.setBorder(new EmptyBorder(5, 5, 5, 5));
+		return section;
 	}
 }
