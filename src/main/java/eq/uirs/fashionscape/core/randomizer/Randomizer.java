@@ -228,7 +228,8 @@ public class Randomizer
 	@VisibleForTesting
 	JawIcon findIcon()
 	{
-		if (locks.isIcon() || config.excludeBaseModels())
+		// icons are members-only items
+		if (locks.isIcon() || config.excludeBaseModels() || config.excludeMembersItems())
 		{
 			return null;
 		}
