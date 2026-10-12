@@ -1,11 +1,11 @@
 package eq.uirs.fashionscape.core;
 
 import com.google.common.collect.ImmutableSet;
-import eq.uirs.fashionscape.FashionscapeConfig;
 import eq.uirs.fashionscape.core.utils.ItemSlotUtil;
 import eq.uirs.fashionscape.data.MiscData;
 import eq.uirs.fashionscape.data.kit.BootsKit;
 import eq.uirs.fashionscape.remote.RemoteData;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -46,7 +46,6 @@ public class Exclusions
 
 	private final Client client;
 	private final ItemManager itemManager;
-	private final FashionscapeConfig config;
 	private final IdleAnimations idleAnimations;
 
 	@Value
@@ -138,15 +137,17 @@ public class Exclusions
 		return true;
 	}
 
+	// returns a new set of excluded item ids
 	public Set<Integer> getAll()
 	{
 		Set<Integer> result = new HashSet<>(bad);
 		result.addAll(dupes);
-		if (config.excludeMembersItems())
-		{
-			result.addAll(members);
-		}
 		return result;
+	}
+
+	public Set<Integer> getMembers()
+	{
+		return Collections.unmodifiableSet(members);
 	}
 
 	private String stripName(String name)

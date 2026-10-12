@@ -18,17 +18,6 @@ public interface FashionscapeConfig extends Config
 	String KEY_REAL_KITS = "realKitIds";
 
 	@ConfigItem(
-		position = 1,
-		keyName = KEY_EXCLUDE_MEMBERS,
-		name = "Exclude members items",
-		description = "Filters out members-only objects"
-	)
-	default boolean excludeMembersItems()
-	{
-		return false;
-	}
-
-	@ConfigItem(
 		position = 2,
 		keyName = KEY_IMPORT_MENU_ENTRY,
 		name = "\"Copy-fashion\" entry",
@@ -77,6 +66,18 @@ public interface FashionscapeConfig extends Config
 		section = randomizerSettings
 	)
 	default boolean excludeBaseModels()
+	{
+		return false;
+	}
+
+	@ConfigItem(
+		position = 2,
+		keyName = KEY_EXCLUDE_MEMBERS,
+		name = "Exclude members items",
+		description = "Randomizer will only pick free-to-play items if checked",
+		section = randomizerSettings
+	)
+	default boolean excludeMembersItems()
 	{
 		return false;
 	}

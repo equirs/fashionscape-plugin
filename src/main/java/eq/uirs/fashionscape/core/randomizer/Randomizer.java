@@ -108,6 +108,10 @@ public class Randomizer
 	{
 		slotToItemsMemo.clear();
 		Set<Integer> skips = exclusions.getAll();
+		if (config.excludeMembersItems())
+		{
+			skips.addAll(exclusions.getMembers());
+		}
 		for (int i = 0; i < client.getItemCount(); i++)
 		{
 			int canonical = itemManager.canonicalize(i);

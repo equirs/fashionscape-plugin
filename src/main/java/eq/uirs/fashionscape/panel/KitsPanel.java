@@ -1,6 +1,5 @@
 package eq.uirs.fashionscape.panel;
 
-import eq.uirs.fashionscape.FashionscapeConfig;
 import eq.uirs.fashionscape.core.CompositionHelper;
 import eq.uirs.fashionscape.core.FashionManager;
 import eq.uirs.fashionscape.core.event.ColorChanged;
@@ -44,7 +43,6 @@ public class KitsPanel extends JPanel
 	private final FashionManager fashionManager;
 	private final ClientThread clientThread;
 	private final ItemManager itemManager;
-	private final FashionscapeConfig config;
 	private final CompositionHelper compositionHelper;
 
 	private final JPanel resultsPanel = new JPanel();
@@ -91,12 +89,11 @@ public class KitsPanel extends JPanel
 	}
 
 	@Inject
-	public KitsPanel(FashionManager fashionManager, ClientThread clientThread, FashionscapeConfig config,
-	                 ItemManager itemManager, CompositionHelper compositionHelper)
+	public KitsPanel(FashionManager fashionManager, ClientThread clientThread, ItemManager itemManager,
+	                 CompositionHelper compositionHelper)
 	{
 		this.fashionManager = fashionManager;
 		this.clientThread = clientThread;
-		this.config = config;
 		this.itemManager = itemManager;
 		this.compositionHelper = compositionHelper;
 
@@ -134,21 +131,7 @@ public class KitsPanel extends JPanel
 			List<KitColorResult> results = new ArrayList<>();
 			for (PanelKitSlot slot : PanelKitSlot.values())
 			{
-				KitType kitType = slot.getKitType();
-				ColorType colorType = slot.getColorType();
-
-				if (kitType == null && colorType == null)
-				{
-					if (config.excludeMembersItems())
-					{
-						continue;
-					}
-					results.add(new KitColorResult(null, null));
-				}
-				else
-				{
-					results.add(new KitColorResult(kitType, colorType));
-				}
+				results.add(new KitColorResult(slot.getKitType(), slot.getColorType()));
 			}
 			SwingUtilities.invokeLater(() -> addKitSlotPanels(results));
 		});

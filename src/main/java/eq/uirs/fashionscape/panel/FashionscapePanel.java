@@ -286,14 +286,6 @@ public class FashionscapePanel extends PluginPanel
 		}
 	}
 
-	public void refreshKitsPanel()
-	{
-		if (kitsPanel != null)
-		{
-			kitsPanel.populateKitSlots();
-		}
-	}
-
 	private JPanel setUpButtonPanel()
 	{
 		JPanel buttonContainer = new JPanel();

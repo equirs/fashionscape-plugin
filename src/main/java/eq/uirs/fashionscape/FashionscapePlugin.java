@@ -249,12 +249,7 @@ public class FashionscapePlugin extends Plugin
 		}
 		if (event.getKey().equals(FashionscapeConfig.KEY_EXCLUDE_MEMBERS))
 		{
-			// reload displayed results
-			clientThread.invokeLater(() -> {
-				panel.reloadResults();
-				panel.refreshKitsPanel();
-				randomizer.repopulateMemo();
-			});
+			clientThread.invokeLater(randomizer::repopulateMemo);
 		}
 		else if (event.getKey().equals(FashionscapeConfig.KEY_IMPORT_MENU_ENTRY))
 		{
