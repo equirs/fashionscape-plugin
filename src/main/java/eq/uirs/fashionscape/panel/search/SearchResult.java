@@ -18,6 +18,10 @@ class SearchResult
 	@With
 	@Nullable
 	Double score;
+	// only set for GE price sort
+	@With
+	@Nullable
+	Long price;
 
 	int getId()
 	{

@@ -15,6 +15,7 @@ import java.text.DecimalFormat;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
@@ -24,6 +25,7 @@ import net.runelite.api.kit.KitType;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.ui.ColorScheme;
+import net.runelite.client.util.QuantityFormatter;
 
 /**
  * Represents an item in search results
@@ -37,11 +39,13 @@ class SearchItemPanel extends AbsItemPanel
 	private final KitType slot;
 	private final SlotInfo slotInfo;
 
-	public SearchItemPanel(int itemId, BufferedImage icon, KitType slot,
-	                       ItemManager itemManager, FashionManager fashionManager, ClientThread clientThread,
-	                       OnSelectionChangingListener listener, Double score, boolean developerMode)
+	public SearchItemPanel(SearchResult result, BufferedImage icon, ItemManager itemManager,
+						   FashionManager fashionManager, ClientThread clientThread,
+						   OnSelectionChangingListener listener, boolean developerMode)
 	{
 		super(icon, itemManager, clientThread, developerMode);
+		int itemId = result.getId();
+		KitType slot = result.getSlot();
 		this.itemId = itemId;
 		this.fashionManager = fashionManager;
 		this.slot = slot;
@@ -101,23 +105,15 @@ class SearchItemPanel extends AbsItemPanel
 		setWikiMenu(itemId);
 
 		// Item details panel
-		int rows = score == null ? 1 : 2;
-		JPanel rightPanel = new JPanel(new GridLayout(rows, 1));
+		JLabel detailLabel = createDetailLabel(result);
+		JPanel rightPanel = new JPanel(new GridLayout(detailLabel == null ? 1 : 2, 1));
 		rightPanel.setBorder(new EmptyBorder(0, 5, 0, 5));
 		highlightPanels.add(rightPanel);
 		rightPanel.setInheritsPopupMenu(true);
 		rightPanel.add(label);
-
-		if (score != null)
+		if (detailLabel != null)
 		{
-			DecimalFormat format = new DecimalFormat("#.#");
-			JLabel scoreLabel = new JLabel();
-			scoreLabel.setForeground(Color.WHITE);
-			scoreLabel.setMaximumSize(new Dimension(0, 0));
-			scoreLabel.setPreferredSize(new Dimension(0, 0));
-			scoreLabel.setText(format.format(score * 100.0) + "%");
-			scoreLabel.setForeground(getScoreColor(score));
-			rightPanel.add(scoreLabel);
+			rightPanel.add(detailLabel);
 		}
 
 		for (JPanel panel : highlightPanels)
@@ -167,7 +163,32 @@ class SearchItemPanel extends AbsItemPanel
 		return itemId < 0 ? fashionManager.isNothing(slot) : Objects.equals(itemId, fashionManager.virtualItemIdFor(slot));
 	}
 
-	private Color getScoreColor(Double score)
+	// shows the color match score or GE price, depending on the sort
+	@Nullable
+	private static JLabel createDetailLabel(SearchResult result)
+	{
+		JLabel detail = new JLabel();
+		detail.setMaximumSize(new Dimension(0, 0));
+		detail.setPreferredSize(new Dimension(0, 0));
+		if (result.getScore() != null)
+		{
+			detail.setText(new DecimalFormat("#.#").format(result.getScore() * 100.0) + "%");
+			detail.setForeground(getScoreColor(result.getScore()));
+		}
+		else if (result.getPrice() != null)
+		{
+			long price = result.getPrice();
+			detail.setText(price > 0 ? QuantityFormatter.quantityToStackSize(price) + " gp" : "No price");
+			detail.setForeground(price > 0 ? ColorScheme.GRAND_EXCHANGE_PRICE : ColorScheme.LIGHT_GRAY_COLOR);
+		}
+		else
+		{
+			return null;
+		}
+		return detail;
+	}
+
+	private static Color getScoreColor(Double score)
 	{
 		int red = (int) (255.0 * (1 - Math.pow(score, 2)));
 		int green = (int) (255.0 * Math.pow(score, 2));

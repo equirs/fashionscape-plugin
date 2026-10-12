@@ -4,6 +4,7 @@ public enum SortBy
 {
 	COLOR_MATCH,
 	ALPHABETICAL,
+	GE_PRICE,
 	ITEM_ID;
 
 	@Override
@@ -17,6 +18,8 @@ public enum SortBy
 				return "Alphabetical";
 			case COLOR_MATCH:
 				return "Colour match";
+			case GE_PRICE:
+				return "GE price";
 			default:
 				return "";
 		}

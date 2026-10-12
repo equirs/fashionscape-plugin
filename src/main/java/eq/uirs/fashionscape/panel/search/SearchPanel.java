@@ -364,7 +364,14 @@ public class SearchPanel extends JPanel
 		}
 		SortBy searchSort = sort;
 		boolean inverted = sortInverted;
-		executor.submit(() -> showResults(itemSearch.sort(found, searchSort, inverted), searchSlot, postExec));
+		if (searchSort == SortBy.COLOR_MATCH)
+		{
+			executor.submit(() -> showResults(itemSearch.sort(found, searchSort, inverted), searchSlot, postExec));
+		}
+		else
+		{
+			showResults(itemSearch.sort(found, searchSort, inverted), searchSlot, postExec);
+		}
 		return true;
 	}
 
@@ -417,8 +424,8 @@ public class SearchPanel extends JPanel
 			boolean firstItem = true;
 			for (SearchResult result : results)
 			{
-				SearchItemPanel panel = new SearchItemPanel(result.getId(), iconFor(result), result.getSlot(),
-					itemManager, fashionManager, clientThread, listener, result.getScore(), developerMode);
+				SearchItemPanel panel = new SearchItemPanel(result, iconFor(result), itemManager, fashionManager,
+					clientThread, listener, developerMode);
 				searchPanels.add(panel);
 				int topPadding = firstItem ? 0 : 5;
 				firstItem = false;

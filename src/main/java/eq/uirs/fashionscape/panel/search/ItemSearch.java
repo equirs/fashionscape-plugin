@@ -41,6 +41,9 @@ class ItemSearch
 	// best match first
 	private static final Comparator<SearchResult> BY_SCORE = Comparator.comparingDouble(r ->
 		r.getScore() == null ? 0.0 : -r.getScore());
+	// most valuable first
+	private static final Comparator<SearchResult> BY_PRICE = Comparator.comparingLong(r ->
+		r.getPrice() == null ? 0L : -r.getPrice());
 
 	private final Client client;
 	private final ItemManager itemManager;
@@ -78,7 +81,7 @@ class ItemSearch
 			KitType itemSlot = ItemSlotUtil.getSlot(i, itemManager);
 			if (itemSlot != null && (idMatch || (matchesSlot(slot, itemSlot) && matchesFilters(filters, item))))
 			{
-				results.add(new SearchResult(item, itemSlot, null));
+				results.add(new SearchResult(item, itemSlot, null, null));
 			}
 		}
 		return results;
@@ -118,11 +121,12 @@ class ItemSearch
 	}
 
 	/**
-	 * Returns results in sort order. Color match is slow; call off the client thread.
+	 * Returns results in sort order. Call on the client thread, except for color match, which is slow and
+	 * doesn't need it.
 	 */
 	List<SearchResult> sort(List<SearchResult> results, SortBy sort, boolean inverted)
 	{
-		List<SearchResult> sorted = sort == SortBy.COLOR_MATCH ? scoreColors(results) : new ArrayList<>(results);
+		List<SearchResult> sorted = withSortValues(results, sort);
 		Comparator<SearchResult> comparator = comparatorFor(sort);
 		sorted.sort(inverted ? comparator.reversed() : comparator);
 		return sorted;
@@ -136,8 +140,26 @@ class ItemSearch
 				return BY_NAME;
 			case COLOR_MATCH:
 				return BY_SCORE;
+			case GE_PRICE:
+				return BY_PRICE;
 			default:
 				return BY_ID;
+		}
+	}
+
+	// returns a mutable copy of the results, with the score or price that the sort needs
+	private List<SearchResult> withSortValues(List<SearchResult> results, SortBy sort)
+	{
+		switch (sort)
+		{
+			case COLOR_MATCH:
+				return scoreColors(results);
+			case GE_PRICE:
+				return results.stream()
+					.map(r -> r.withPrice(r.getItemComposition() != null ? itemManager.getItemPrice(r.getId()) : 0))
+					.collect(Collectors.toList());
+			default:
+				return new ArrayList<>(results);
 		}
 	}
 
@@ -169,7 +191,7 @@ class ItemSearch
 		if (slot != null && FashionManager.ALLOWS_NOTHING_ITEMS.contains(slot) &&
 			NothingItemComposition.NAME.toLowerCase().contains(query))
 		{
-			results.add(new SearchResult(null, slot, null));
+			results.add(new SearchResult(null, slot, null, null));
 		}
 	}
 
