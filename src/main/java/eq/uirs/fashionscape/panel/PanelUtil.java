@@ -4,6 +4,7 @@ import java.awt.Component;
 import java.awt.Cursor;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.awt.image.BufferedImage;
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import net.runelite.client.util.ImageUtil;
@@ -11,10 +12,16 @@ import net.runelite.client.util.ImageUtil;
 // for reusing stuff in fashionscape panels
 public class PanelUtil
 {
+	// returns image `name`.png from panel resources
+	public static BufferedImage image(String name)
+	{
+		return ImageUtil.loadImageResource(PanelUtil.class, name + ".png");
+	}
+
 	// returns image icon `name`.png from panel resources
 	public static ImageIcon icon(String name)
 	{
-		return new ImageIcon(ImageUtil.loadImageResource(PanelUtil.class, name + ".png"));
+		return new ImageIcon(image(name));
 	}
 
 	// show hand cursor while hovering, default cursor otherwise

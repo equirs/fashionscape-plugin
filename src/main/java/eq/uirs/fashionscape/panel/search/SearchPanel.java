@@ -62,7 +62,6 @@ import net.runelite.client.ui.components.PluginErrorPanel;
 import net.runelite.client.ui.components.materialtabs.MaterialTab;
 import net.runelite.client.ui.components.materialtabs.MaterialTabGroup;
 import net.runelite.client.util.AsyncBufferedImage;
-import net.runelite.client.util.ImageUtil;
 import net.runelite.client.util.SwingUtil;
 
 /**
@@ -490,7 +489,7 @@ public class SearchPanel extends JPanel
 			if (selectedSlot != null && FashionManager.ALLOWS_NOTHING_ITEMS.contains(selectedSlot) &&
 				NothingItemComposition.NAME.toLowerCase().contains(search))
 			{
-				BufferedImage image = ImageUtil.loadImageResource(getClass(), selectedSlot.name().toLowerCase() + ".png");
+				BufferedImage image = PanelUtil.image(selectedSlot.name().toLowerCase());
 				results.add(0, new Result(null, image, selectedSlot));
 			}
 
@@ -614,7 +613,7 @@ public class SearchPanel extends JPanel
 	private ImageIcon iconFor(PanelEquipSlot panelSlot, boolean isLocked)
 	{
 		String lockStr = isLocked ? "-lock" : "";
-		String iconName = panelSlot.getDisplayName().toLowerCase() + lockStr + ".png";
-		return new ImageIcon(ImageUtil.loadImageResource(getClass(), iconName));
+		String iconName = panelSlot.getDisplayName().toLowerCase() + lockStr;
+		return PanelUtil.icon(iconName);
 	}
 }
