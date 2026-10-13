@@ -14,7 +14,6 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import javax.inject.Inject;
 import javax.inject.Singleton;
-import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import lombok.extern.slf4j.Slf4j;
@@ -41,8 +40,6 @@ public class Exclusions
 	private final Set<Integer> bad = new HashSet<>();
 	private final Set<Integer> dupes = new HashSet<>();
 	private final Set<Integer> members = new HashSet<>();
-	@Getter
-	private boolean loaded;
 
 	private final Client client;
 	private final ItemManager itemManager;
@@ -133,7 +130,6 @@ public class Exclusions
 				itemUniques.add(itemDupeData);
 			}
 		}
-		loaded = true;
 		return true;
 	}
 

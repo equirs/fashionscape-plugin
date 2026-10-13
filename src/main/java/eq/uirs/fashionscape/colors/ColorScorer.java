@@ -120,6 +120,22 @@ public class ColorScorer
 	}
 
 	/**
+	 * whether this item id is present color data. newly-released items may not be.
+	 */
+	public boolean hasColors(int itemId)
+	{
+		return !colorsFor(itemId).isEmpty();
+	}
+
+	/**
+	 * whether the outfit has colors outside the excluded slot. items in that slot always score 0 otherwise.
+	 */
+	public boolean hasColorsExcept(KitType exclude)
+	{
+		return !getPlayerRgbInfo(exclude, null).isEmpty();
+	}
+
+	/**
 	 * scores color similarity between a Colorable and the current player's outfit:
 	 * 1 is a perfect match, 0 is a complete mismatch
 	 */

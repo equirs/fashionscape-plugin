@@ -41,6 +41,9 @@ class ItemSearch
 	// best match first
 	private static final Comparator<SearchResult> BY_SCORE = Comparator.comparingDouble(r ->
 		r.getScore() == null ? 0.0 : -r.getScore());
+	// items without color data stay last in either sort direction
+	private static final Comparator<SearchResult> UNSCORED_LAST = Comparator.comparing(r ->
+		r.getScore() == null);
 	// most valuable first
 	private static final Comparator<SearchResult> BY_PRICE = Comparator.comparingLong(r ->
 		r.getPrice() == null ? 0L : -r.getPrice());
@@ -49,8 +52,6 @@ class ItemSearch
 	private final ItemManager itemManager;
 	private final Exclusions exclusions;
 	private final ColorScorer colorScorer;
-
-	private int largestSlotSize = 0;
 
 	/**
 	 * Returns valid items for the case-insensitive query in the given slot (null for any) that pass the filters.
@@ -88,47 +89,14 @@ class ItemSearch
 	}
 
 	/**
-	 * Returns the item count of the slot with the most items, with no query or filters. Call on the client thread.
-	 */
-	int largestSlotSize()
-	{
-		if (largestSlotSize > 0)
-		{
-			return largestSlotSize;
-		}
-		Map<KitType, Integer> counts = new EnumMap<>(KitType.class);
-		Set<Integer> skips = exclusions.getAll();
-		for (int i = 0; i < client.getItemCount(); i++)
-		{
-			ItemComposition item = canonicalComposition(i);
-			if (item == null || skips.contains(i) || !nameMatches(item, ""))
-			{
-				continue;
-			}
-			KitType itemSlot = ItemSlotUtil.getSlot(i, itemManager);
-			if (itemSlot != null && VALID_SLOTS.contains(itemSlot))
-			{
-				counts.merge(itemSlot, 1, Integer::sum);
-			}
-		}
-		int size = counts.values().stream().max(Integer::compare).orElse(0);
-		// counts change until exclusions and the remote slot data they depend on have loaded
-		if (exclusions.isLoaded())
-		{
-			largestSlotSize = size;
-		}
-		return size;
-	}
-
-	/**
-	 * Returns results in sort order. Call on the client thread, except for color match, which is slow and
-	 * doesn't need it.
+	 * Returns results in sort order
 	 */
 	List<SearchResult> sort(List<SearchResult> results, SortBy sort, boolean inverted)
 	{
 		List<SearchResult> sorted = withSortValues(results, sort);
 		Comparator<SearchResult> comparator = comparatorFor(sort);
-		sorted.sort(inverted ? comparator.reversed() : comparator);
+		comparator = inverted ? comparator.reversed() : comparator;
+		sorted.sort(sort == SortBy.COLOR_MATCH ? UNSCORED_LAST.thenComparing(comparator) : comparator);
 		return sorted;
 	}
 
@@ -167,11 +135,26 @@ class ItemSearch
 	private List<SearchResult> scoreColors(List<SearchResult> results)
 	{
 		colorScorer.updatePlayerInfo();
+		Map<KitType, Boolean> comparableSlots = new EnumMap<>(KitType.class);
 		List<SearchResult> scored = results.stream()
-			.map(r -> r.withScore(colorScorer.score(r.getId(), r.getSlot())))
+			.map(r -> r.withScore(colorScore(r, comparableSlots)))
 			.collect(Collectors.toList());
 		boolean anyScored = scored.stream().anyMatch(r -> r.getScore() != null && r.getScore() != 0.0);
 		return anyScored ? scored : new ArrayList<>(results);
+	}
+
+	// "Nothing" scores 0 so it stays reachable in color sort; null for items without color data or anything to
+	// compare in the rest of the outfit
+	@Nullable
+	private Double colorScore(SearchResult result, Map<KitType, Boolean> comparableSlots)
+	{
+		if (result.getItemComposition() == null)
+		{
+			return 0.0;
+		}
+		boolean comparable = comparableSlots.computeIfAbsent(result.getSlot(), colorScorer::hasColorsExcept);
+		return comparable && colorScorer.hasColors(result.getId()) ?
+			colorScorer.score(result.getId(), result.getSlot()) : null;
 	}
 
 	static boolean matchesSlot(@Nullable KitType slot, KitType itemSlot)

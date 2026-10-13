@@ -24,6 +24,7 @@ import static org.mockito.Mockito.when;
 public class ItemSearchTest
 {
 	private final ItemManager itemManager = mock(ItemManager.class);
+	private final ColorScorer colorScorer = mock(ColorScorer.class);
 	private final ItemSearch itemSearch = createItemSearch();
 
 	private ItemSearch createItemSearch()
@@ -31,7 +32,7 @@ public class ItemSearchTest
 		// no items, so only the "Nothing" result can match
 		Exclusions exclusions = mock(Exclusions.class);
 		when(exclusions.getAll()).thenReturn(Collections.emptySet());
-		return new ItemSearch(mock(Client.class), itemManager, exclusions, mock(ColorScorer.class));
+		return new ItemSearch(mock(Client.class), itemManager, exclusions, colorScorer);
 	}
 
 	@Test
@@ -85,6 +86,53 @@ public class ItemSearchTest
 		assertEquals(0L, sorted.get(2).getPrice());
 		List<SearchResult> inverted = itemSearch.sort(Arrays.asList(cheap, nothing, pricey), SortBy.GE_PRICE, true);
 		assertEquals(Arrays.asList(NothingItemComposition.ID, 1, 2), ids(inverted));
+	}
+
+	@Test
+	public void colorSortPutsItemsWithoutColorDataLast()
+	{
+		SearchResult unknown = itemResult(1, 0);
+		SearchResult poor = itemResult(2, 0);
+		SearchResult good = itemResult(3, 0);
+		when(colorScorer.hasColorsExcept(KitType.HEAD)).thenReturn(true);
+		when(colorScorer.hasColors(2)).thenReturn(true);
+		when(colorScorer.hasColors(3)).thenReturn(true);
+		when(colorScorer.score(2, KitType.HEAD)).thenReturn(0.1);
+		when(colorScorer.score(3, KitType.HEAD)).thenReturn(0.9);
+		List<SearchResult> input = Arrays.asList(unknown, poor, good);
+		List<SearchResult> sorted = itemSearch.sort(input, SortBy.COLOR_MATCH, false);
+		assertEquals(Arrays.asList(3, 2, 1), ids(sorted));
+		assertNull(sorted.get(2).getScore());
+		assertEquals(Arrays.asList(2, 3, 1), ids(itemSearch.sort(input, SortBy.COLOR_MATCH, true)));
+	}
+
+	@Test
+	public void colorSortScoresNothingAsZero()
+	{
+		SearchResult good = itemResult(1, 0);
+		SearchResult nothing = new SearchResult(null, KitType.HEAD, null, null);
+		when(colorScorer.hasColorsExcept(KitType.HEAD)).thenReturn(true);
+		when(colorScorer.hasColors(1)).thenReturn(true);
+		when(colorScorer.score(1, KitType.HEAD)).thenReturn(0.5);
+		List<SearchResult> sorted = itemSearch.sort(Arrays.asList(nothing, good), SortBy.COLOR_MATCH, false);
+		assertEquals(Arrays.asList(1, NothingItemComposition.ID), ids(sorted));
+		assertEquals(0.0, sorted.get(1).getScore());
+	}
+
+	@Test
+	public void colorSortLeavesSlotsWithNothingToCompareUnscored()
+	{
+		SearchResult head = itemResult(1, 0);
+		ItemComposition capeItem = mock(ItemComposition.class);
+		when(capeItem.getId()).thenReturn(2);
+		SearchResult cape = new SearchResult(capeItem, KitType.CAPE, null, null);
+		when(colorScorer.hasColorsExcept(KitType.HEAD)).thenReturn(true);
+		when(colorScorer.hasColors(1)).thenReturn(true);
+		when(colorScorer.hasColors(2)).thenReturn(true);
+		when(colorScorer.score(1, KitType.HEAD)).thenReturn(0.5);
+		List<SearchResult> sorted = itemSearch.sort(Arrays.asList(cape, head), SortBy.COLOR_MATCH, false);
+		assertEquals(Arrays.asList(1, 2), ids(sorted));
+		assertNull(sorted.get(1).getScore());
 	}
 
 	@Test

@@ -16,7 +16,6 @@ import java.awt.GridBagLayout;
 import java.awt.GridLayout;
 import java.awt.event.ItemEvent;
 import java.awt.image.BufferedImage;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.Future;
@@ -30,7 +29,6 @@ import javax.swing.JButton;
 import javax.swing.JComboBox;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
-import javax.swing.JScrollPane;
 import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
 import javax.swing.event.DocumentEvent;
@@ -44,7 +42,6 @@ import net.runelite.client.ui.FontManager;
 import net.runelite.client.ui.components.IconTextField;
 import net.runelite.client.ui.components.PluginErrorPanel;
 import net.runelite.client.util.QuantityFormatter;
-import net.runelite.client.util.SwingUtil;
 
 /**
  * Tab panel that houses the search UI: bar, filters, sort, results, etc.
@@ -62,20 +59,15 @@ public class SearchPanel extends JPanel
 	private final ScheduledExecutorService executor;
 	private final ItemSearch itemSearch;
 	private final FilterStore filterStore;
-	private final boolean developerMode;
 
-	// constrain items in the list of results
-	private final GridBagConstraints itemConstraints = new GridBagConstraints();
 	private final CardLayout cardLayout = new CardLayout();
 	private final IconTextField searchBar = new IconTextField();
-	private final JPanel resultsPanel = new JPanel();
-	private final JScrollPane resultsScrollPane;
+	private final ResultsList resultsList;
 	private final JPanel centerPanel = new JPanel(cardLayout);
 	private final PluginErrorPanel errorPanel = new PluginErrorPanel();
 	private final JButton resetFiltersButton = new JButton("Reset filters");
 	private final JLabel resultCount = new JLabel();
 	private final FilterPanel filterPanel;
-	private final List<SearchItemPanel> searchPanels = new ArrayList<>();
 
 	private final AtomicBoolean searchInProgress = new AtomicBoolean();
 	private final OnSelectionChangingListener listener = new OnSelectionChangingListener()
@@ -83,7 +75,7 @@ public class SearchPanel extends JPanel
 		@Override
 		public void onSearchSelectionChanging(KitType slot)
 		{
-			for (SearchItemPanel item : searchPanels)
+			for (SearchItemPanel item : resultsList.getItemPanels())
 			{
 				if (Objects.equals(item.itemId, fashionManager.virtualItemIdFor(slot)) ||
 					(item.itemId < 0 && fashionManager.isNothing(slot)))
@@ -114,7 +106,6 @@ public class SearchPanel extends JPanel
 		this.itemSearch = itemSearch;
 		this.filterStore = filterStore;
 		this.filters = filterStore.load();
-		this.developerMode = developerMode;
 		this.sort = config.preferredSort();
 
 		setLayout(new BorderLayout());
@@ -128,12 +119,6 @@ public class SearchPanel extends JPanel
 		groupConstraints.gridx = 0;
 		groupConstraints.gridy = 0;
 
-		itemConstraints.fill = GridBagConstraints.HORIZONTAL;
-		itemConstraints.weightx = 1;
-		itemConstraints.weighty = 0;
-		itemConstraints.gridx = 0;
-		itemConstraints.gridy = 0;
-
 		JPanel container = new JPanel();
 		container.setLayout(new GridBagLayout());
 		container.setBorder(new EmptyBorder(10, 10, 10, 10));
@@ -141,23 +126,15 @@ public class SearchPanel extends JPanel
 
 		setUpSearchBar();
 
-		resultsPanel.setLayout(new GridBagLayout());
-		resultsPanel.setBackground(ColorScheme.DARK_GRAY_COLOR);
-
-		JPanel wrapper = new JPanel(new BorderLayout());
-		wrapper.setBackground(ColorScheme.DARK_GRAY_COLOR);
-		wrapper.add(resultsPanel, BorderLayout.NORTH);
-
-		resultsScrollPane = new JScrollPane(wrapper);
-		resultsScrollPane.setBackground(ColorScheme.DARK_GRAY_COLOR);
-		resultsScrollPane.setVisible(false);
+		resultsList = new ResultsList(result -> new SearchItemPanel(result, iconFor(result), itemManager,
+			fashionManager, clientThread, listener, developerMode));
 
 		JPanel infoWrapper = new JPanel(new BorderLayout());
 		infoWrapper.setBackground(ColorScheme.DARK_GRAY_COLOR);
 		errorPanel.setContent("Equipment Search", "Items you can try on will appear here.");
 		infoWrapper.add(errorPanel, BorderLayout.NORTH);
 
-		centerPanel.add(resultsScrollPane, RESULTS_PANEL);
+		centerPanel.add(resultsList.getScrollPane(), RESULTS_PANEL);
 		centerPanel.add(infoWrapper, ERROR_PANEL);
 
 		cardLayout.show(centerPanel, ERROR_PANEL);
@@ -224,7 +201,7 @@ public class SearchPanel extends JPanel
 				SortBy selectedSort = (SortBy) sortBox.getSelectedItem();
 				config.setPreferredSort(selectedSort);
 				sort = selectedSort;
-				updateSearchDebounced();
+				updateSearchDebounced(false);
 			}
 		});
 		return sortBox;
@@ -240,7 +217,7 @@ public class SearchPanel extends JPanel
 		button.addActionListener(e -> {
 			sortInverted = !sortInverted;
 			applySortDirection(button);
-			updateSearchDebounced();
+			updateSearchDebounced(false);
 		});
 		return button;
 	}
@@ -253,13 +230,12 @@ public class SearchPanel extends JPanel
 
 	public void clearResults()
 	{
-		searchPanels.clear();
-		SwingUtil.fastRemoveAll(resultsPanel);
+		resultsList.clear();
 	}
 
 	public void reloadResults()
 	{
-		updateSearchDebounced();
+		updateSearchDebounced(false);
 		SwingUtilities.invokeLater(searchBar::requestFocusInWindow);
 	}
 
@@ -274,10 +250,8 @@ public class SearchPanel extends JPanel
 		{
 			searchBar.setText("");
 		}
-		searchPanels.clear();
 		SwingUtilities.invokeLater(() -> {
-			SwingUtil.fastRemoveAll(resultsPanel);
-			resultsPanel.updateUI();
+			resultsList.clear();
 			searchBar.requestFocusInWindow();
 		});
 	}
@@ -285,19 +259,14 @@ public class SearchPanel extends JPanel
 	private void onSlotChanged(@Nullable KitType newSlot)
 	{
 		slot = newSlot;
-		updateSearchFromTop();
+		updateSearchDebounced(true);
 	}
 
 	private void onFiltersChanged(ItemFilters newFilters)
 	{
 		filters = newFilters;
 		filterStore.save(newFilters);
-		updateSearchFromTop();
-	}
-
-	private void updateSearchFromTop()
-	{
-		updateSearchDebounced(() -> resultsScrollPane.getVerticalScrollBar().setValue(0));
+		updateSearchDebounced(true);
 	}
 
 	private void setUpSearchBar()
@@ -306,38 +275,32 @@ public class SearchPanel extends JPanel
 		searchBar.setPreferredSize(new Dimension(100, 30));
 		searchBar.setBackground(ColorScheme.DARKER_GRAY_COLOR);
 		searchBar.setHoverBackgroundColor(ColorScheme.DARK_GRAY_HOVER_COLOR);
-		searchBar.addActionListener(e -> updateSearchDebounced());
+		searchBar.addActionListener(e -> updateSearchDebounced(false));
 		searchBar.addClearListener(this::clearSearch);
 		searchBar.getDocument().addDocumentListener(new DocumentListener()
 		{
 			@Override
 			public void insertUpdate(DocumentEvent e)
 			{
-				updateSearchDebounced();
+				updateSearchDebounced(false);
 			}
 
 			@Override
 			public void removeUpdate(DocumentEvent e)
 			{
-				updateSearchDebounced();
+				updateSearchDebounced(false);
 			}
 
 			@Override
 			public void changedUpdate(DocumentEvent e)
 			{
-				updateSearchDebounced();
+				updateSearchDebounced(false);
 			}
 		});
 	}
 
-	private void updateSearchDebounced()
-	{
-		updateSearchDebounced(() -> {
-			// no-op
-		});
-	}
-
-	private void updateSearchDebounced(Runnable postExec)
+	// fromTop resets the scroll position and the number of rows shown
+	private void updateSearchDebounced(boolean fromTop)
 	{
 		Future<?> future = searchFuture;
 		if (searchFuture != null)
@@ -345,48 +308,42 @@ public class SearchPanel extends JPanel
 			future.cancel(false);
 		}
 		searchFuture = executor.schedule(() -> clientThread.invokeLater(() -> {
-			if (!updateSearch(postExec))
+			if (!updateSearch(fromTop))
 			{
 				// search was in progress; try again later
-				updateSearchDebounced(postExec);
+				updateSearchDebounced(fromTop);
 			}
 		}), DEBOUNCE_DELAY_MS, TimeUnit.MILLISECONDS);
 	}
 
 	// should only be called from debouncer and on client thread
-	private boolean updateSearch(Runnable postExec)
+	private boolean updateSearch(boolean fromTop)
 	{
 		if (!searchInProgress.compareAndSet(false, true))
 		{
 			return false;
 		}
-		guardSearch(() -> startSearch(postExec));
+		guardSearch(() -> startSearch(fromTop));
 		return true;
 	}
 
-	private void startSearch(Runnable postExec)
+	private void startSearch(boolean fromTop)
 	{
 		String query = searchBar.getText().toLowerCase();
 		KitType searchSlot = slot;
 		ItemFilters searchFilters = filters;
 		List<SearchResult> found = itemSearch.find(query, searchSlot, searchFilters);
-		// "any slot" can show as many results as the largest slot tab, but no more
-		if (searchSlot == null && found.size() > itemSearch.largestSlotSize())
-		{
-			showTooManyResults(found.size());
-			return;
-		}
 		SortBy searchSort = sort;
 		boolean inverted = sortInverted;
 		boolean filtered = searchFilters.activeCount() > 0;
 		if (searchSort == SortBy.COLOR_MATCH)
 		{
 			executor.submit(() -> guardSearch(() ->
-				showResults(itemSearch.sort(found, searchSort, inverted), searchSlot, filtered, postExec)));
+				showResults(itemSearch.sort(found, searchSort, inverted), searchSlot, filtered, fromTop)));
 		}
 		else
 		{
-			showResults(itemSearch.sort(found, searchSort, inverted), searchSlot, filtered, postExec);
+			showResults(itemSearch.sort(found, searchSort, inverted), searchSlot, filtered, fromTop);
 		}
 	}
 
@@ -404,30 +361,14 @@ public class SearchPanel extends JPanel
 		}
 	}
 
-	private void showTooManyResults(int count)
-	{
-		SwingUtilities.invokeLater(() -> {
-			searchPanels.clear();
-			SwingUtil.fastRemoveAll(resultsPanel);
-			resultsPanel.updateUI();
-			resultCount.setVisible(false);
-			resetFiltersButton.setVisible(false);
-			errorPanel.setContent("Too many results", QuantityFormatter.formatNumber(count) +
-				" items match. Pick a slot, add filters or try a longer search.");
-			cardLayout.show(centerPanel, ERROR_PANEL);
-			searchInProgress.set(false);
-		});
-	}
-
 	// only to be called from updateSearch
 	private void showResults(List<SearchResult> results, @Nullable KitType searchSlot, boolean filtered,
-							 Runnable postExec)
+							 boolean fromTop)
 	{
 		SwingUtilities.invokeLater(() -> {
 			try
 			{
-				displayResults(results, searchSlot, filtered);
-				postExec.run();
+				displayResults(results, searchSlot, filtered, fromTop);
 			}
 			finally
 			{
@@ -436,38 +377,27 @@ public class SearchPanel extends JPanel
 		});
 	}
 
-	private void displayResults(List<SearchResult> results, @Nullable KitType searchSlot, boolean filtered)
+	private void displayResults(List<SearchResult> results, @Nullable KitType searchSlot, boolean filtered,
+								boolean fromTop)
 	{
-		searchPanels.clear();
-		SwingUtil.fastRemoveAll(resultsPanel);
 		resultCount.setVisible(!results.isEmpty());
 		resultCount.setText(QuantityFormatter.formatNumber(results.size()) +
 			(results.size() == 1 ? " result" : " results"));
 		if (results.isEmpty())
 		{
+			resultsList.clear();
 			errorPanel.setContent("No results", noResultsMessage(searchSlot, filtered));
 			resetFiltersButton.setVisible(filtered);
 			cardLayout.show(centerPanel, ERROR_PANEL);
 		}
 		else
 		{
-			boolean firstItem = true;
-			for (SearchResult result : results)
+			resultsList.show(results, !fromTop);
+			if (fromTop)
 			{
-				SearchItemPanel panel = new SearchItemPanel(result, iconFor(result), itemManager, fashionManager,
-					clientThread, listener, developerMode);
-				searchPanels.add(panel);
-				int topPadding = firstItem ? 0 : 5;
-				firstItem = false;
-				JPanel marginWrapper = new JPanel(new BorderLayout());
-				marginWrapper.setBackground(ColorScheme.DARK_GRAY_COLOR);
-				marginWrapper.setBorder(new EmptyBorder(topPadding, 10, 0, 10));
-				marginWrapper.add(panel, BorderLayout.NORTH);
-				resultsPanel.add(marginWrapper, itemConstraints);
-				itemConstraints.gridy++;
+				resultsList.scrollToTop();
 			}
 			cardLayout.show(centerPanel, RESULTS_PANEL);
-			resultsPanel.updateUI();
 		}
 	}
 
