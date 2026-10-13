@@ -2,51 +2,46 @@ package eq.uirs.fashionscape.panel.search;
 
 import com.formdev.flatlaf.FlatClientProperties;
 import java.awt.BorderLayout;
-import java.awt.GridBagConstraints;
-import java.awt.GridBagLayout;
+import java.awt.Rectangle;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.function.Function;
-import javax.swing.BoundedRangeModel;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
-import javax.swing.SwingUtilities;
-import javax.swing.border.EmptyBorder;
 import lombok.Getter;
 import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.util.SwingUtil;
 
 /**
- * Scrollable list of search result rows, built in batches as the scroll bar nears the bottom
+ * Scrollable list of search result rows. Space is reserved for every result, but rows are only built as they
+ * scroll into view.
  */
 class ResultsList
 {
-	private static final int BATCH_SIZE = 200;
-	// distance from the bottom that starts the next batch
-	private static final int LOAD_THRESHOLD_PX = 500;
-	// 16px high instead of 7px. long result lists are hard to scroll using the thumb otherwise
+	// SearchItemPanel's height: 32px icon + 5px padding each side
+	private static final int ROW_HEIGHT = 42;
+	private static final int ROW_GAP = 5;
+	private static final int SIDE_MARGIN = 10;
+	// builds rows this far outside the visible area, so they're ready before they scroll in
+	private static final int BUFFER_PX = 500;
+	// 16px high instead of 7px. long result lists are hard to scroll using the thumb with the default
 	private static final String SCROLL_BAR_STYLE = "minimumThumbSize: 7,16";
 
 	@Getter
 	private final JScrollPane scrollPane;
-	private final JPanel rows = new JPanel(new GridBagLayout());
-	private final GridBagConstraints constraints = new GridBagConstraints();
+	private final FixedRowLayout layout = new FixedRowLayout(ROW_HEIGHT, ROW_GAP, SIDE_MARGIN);
+	private final JPanel rows = new JPanel(layout);
 	private final Function<SearchResult, SearchItemPanel> rowFactory;
 	@Getter
 	private final List<SearchItemPanel> itemPanels = new ArrayList<>();
 	private List<SearchResult> results = Collections.emptyList();
-	private boolean layoutPending;
+	// built rows by result index, null until scrolled into view
+	private SearchItemPanel[] builtRows = new SearchItemPanel[0];
 
 	ResultsList(Function<SearchResult, SearchItemPanel> rowFactory)
 	{
 		this.rowFactory = rowFactory;
-
-		constraints.fill = GridBagConstraints.HORIZONTAL;
-		constraints.weightx = 1;
-		constraints.weighty = 0;
-		constraints.gridx = 0;
-		constraints.gridy = 0;
 
 		rows.setBackground(ColorScheme.DARK_GRAY_COLOR);
 
@@ -58,27 +53,30 @@ class ResultsList
 		scrollPane.setBackground(ColorScheme.DARK_GRAY_COLOR);
 		scrollPane.setVisible(false);
 		scrollPane.getVerticalScrollBar().putClientProperty(FlatClientProperties.STYLE, SCROLL_BAR_STYLE);
-		scrollPane.getVerticalScrollBar().addAdjustmentListener(e -> loadMoreIfNearBottom());
+		// fires on scroll and when the list or viewport changes size
+		scrollPane.getViewport().addChangeListener(e -> buildVisibleRows());
 	}
 
 	/**
-	 * Replaces the rows with the first batch of results. When keepRows is set, builds at least as many rows as before
-	 * so the scroll position holds. Call on the EDT.
+	 * Replaces results, keeps scroll position. Call on the EDT.
 	 */
-	void show(List<SearchResult> results, boolean keepRows)
+	void show(List<SearchResult> results)
 	{
-		int rowCount = keepRows ? Math.max(BATCH_SIZE, itemPanels.size()) : BATCH_SIZE;
 		clear();
 		this.results = results;
-		addRows(rowCount);
+		builtRows = new SearchItemPanel[results.size()];
+		layout.setRowCount(results.size());
+		rows.revalidate();
+		buildVisibleRows();
 	}
 
 	void clear()
 	{
 		results = Collections.emptyList();
+		builtRows = new SearchItemPanel[0];
 		itemPanels.clear();
+		layout.setRowCount(0);
 		SwingUtil.fastRemoveAll(rows);
-		constraints.gridy = 0;
 		rows.revalidate();
 		rows.repaint();
 	}
@@ -88,42 +86,29 @@ class ResultsList
 		scrollPane.getVerticalScrollBar().setValue(0);
 	}
 
-	// the scroll bar is stale until the last batch is laid out, which only happens while showing
-	private void loadMoreIfNearBottom()
+	private void buildVisibleRows()
 	{
-		if (!layoutPending && itemPanels.size() < results.size() && scrollPane.isShowing() && isNearBottom())
+		Rectangle view = scrollPane.getViewport().getViewRect();
+		int first = Math.max(0, (view.y - BUFFER_PX) / layout.stride());
+		int last = Math.min(results.size() - 1, (view.y + view.height + BUFFER_PX) / layout.stride());
+		boolean added = false;
+		for (int i = first; i <= last; i++)
 		{
-			addRows(BATCH_SIZE);
+			if (builtRows[i] == null)
+			{
+				SearchItemPanel row = rowFactory.apply(results.get(i));
+				FixedRowLayout.setIndex(row, i);
+				builtRows[i] = row;
+				itemPanels.add(row);
+				rows.add(row);
+				added = true;
+			}
 		}
-	}
-
-	private boolean isNearBottom()
-	{
-		BoundedRangeModel model = scrollPane.getVerticalScrollBar().getModel();
-		return model.getValue() + model.getExtent() >= model.getMaximum() - LOAD_THRESHOLD_PX;
-	}
-
-	private void addRows(int count)
-	{
-		int end = Math.min(results.size(), itemPanels.size() + count);
-		for (int i = itemPanels.size(); i < end; i++)
+		if (added)
 		{
-			SearchItemPanel panel = rowFactory.apply(results.get(i));
-			itemPanels.add(panel);
-			JPanel marginWrapper = new JPanel(new BorderLayout());
-			marginWrapper.setBackground(ColorScheme.DARK_GRAY_COLOR);
-			marginWrapper.setBorder(new EmptyBorder(i == 0 ? 0 : 5, 10, 0, 10));
-			marginWrapper.add(panel, BorderLayout.NORTH);
-			rows.add(marginWrapper, constraints);
-			constraints.gridy++;
+			// lay out new rows now so they don't flash in blank. list height won't change
+			rows.validate();
+			rows.repaint();
 		}
-		rows.revalidate();
-		rows.repaint();
-		// runs after the layout from revalidate and re-checks scroll events skipped in the meantime
-		layoutPending = true;
-		SwingUtilities.invokeLater(() -> {
-			layoutPending = false;
-			loadMoreIfNearBottom();
-		});
 	}
 }

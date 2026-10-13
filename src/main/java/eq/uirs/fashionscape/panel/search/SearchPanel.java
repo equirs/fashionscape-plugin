@@ -299,7 +299,7 @@ public class SearchPanel extends JPanel
 		});
 	}
 
-	// fromTop resets the scroll position and the number of rows shown
+	// fromTop resets the scroll position
 	private void updateSearchDebounced(boolean fromTop)
 	{
 		Future<?> future = searchFuture;
@@ -392,7 +392,7 @@ public class SearchPanel extends JPanel
 		}
 		else
 		{
-			resultsList.show(results, !fromTop);
+			resultsList.show(results);
 			if (fromTop)
 			{
 				resultsList.scrollToTop();
