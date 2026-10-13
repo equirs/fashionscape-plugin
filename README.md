@@ -18,11 +18,10 @@ The search tab now supports **filters**, so you can narrow results down by more 
 * Filters include f2p/members, whether the item has combat stats, tradeability (on the GE), and value (GE price or
   high alch, with a min/max range). Filters are saved between sessions.
 * There's a new **"GE price"** sort option, which shows each item's price.
-* The "all" slot now shows results for an empty search, as long as there aren't too many of them. Results also show
-  how many items match your query + filters.
-* "Exclude members items" now only affects the randomizer. Search uses the "membership" filter instead. If you had the
-  setting on, the filter starts on F2P.
-* The jaw icon slot in the "base" tab is always available now.
+* The "all" slot now shows results for an empty search. Results also show how many items match your query + filters.
+* "Exclude members items" now only affects the randomizer (in a future update, the randomizer will take filters into
+  account). Search now uses a separate "membership" filter instead.
+* The jaw icon slot in the "base" tab is always shown now.
 
 See the [changelog](https://github.com/equirs/fashionscape-plugin/blob/master/CHANGELOG.md) for earlier updates.
 
@@ -93,13 +92,11 @@ which slot you're browsing. The filters button shows how many filters are active
   value, enter a min and/or max, such as `10k` or `1.5m`. "Reset filters" sets every filter back to "any".
   Filters are saved between sessions.
 
-Leaving the search bar empty shows every result for the selected slot. In "all", results aren't shown if there would
-be more items than the max shown for any single slot, in which case it asks you to narrow the search. Searching an
-exact item ID always shows that item, regardless of slot / filters. Hovering over an item will show a preview of what
-it looks like on your character. When clicked, the item will update and will display as part of your outfit. If the
-item is already worn, clicking it again removes it. If you have locks enabled, the result text will appear grey instead
-of white, and hovering over the result shows a tooltip indicating which locked slots are preventing you from equipping
-the item.
+Leaving the search bar empty shows every result for the selected slot. Searching an exact item ID always shows that
+item, regardless of slot / filters. Hovering over an item will show a preview of what it looks like on your character.
+When clicked, the item will update and will display as part of your outfit. If the item is already worn, clicking it
+again removes it. If you have locks enabled, the result text will appear grey instead of white, and hovering over the
+result shows a tooltip indicating which locked slots are preventing you from equipping the item.
 
 There are four sorting options:
 

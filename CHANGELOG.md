@@ -8,11 +8,10 @@ The search tab now supports **filters**, so you can narrow results down by more 
 * Filters include f2p/members, whether the item has combat stats, tradeability (on the GE), and value (GE price or
   high alch, with a min/max range). Filters are saved between sessions.
 * There's a new **"GE price"** sort option, which shows each item's price.
-* The "all" slot now shows results for an empty search, as long as there aren't too many of them. Results also show
-  how many items match your query + filters.
-* "Exclude members items" now only affects the randomizer. Search uses the "membership" filter instead. If you had the
-  setting on, the filter starts on F2P.
-* The jaw icon slot in the "base" tab is always available now.
+* The "all" slot now shows results for an empty search. Results also show how many items match your query + filters.
+* "Exclude members items" now only affects the randomizer (in a future update, the randomizer will take filters into
+  account). Search now uses a separate "membership" filter instead.
+* The jaw icon slot in the "base" tab is always shown now.
 
 ## Update 2026 October: loadouts
 
