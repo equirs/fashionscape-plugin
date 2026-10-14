@@ -239,6 +239,23 @@ public class SearchPanel extends JPanel
 		SwingUtilities.invokeLater(searchBar::requestFocusInWindow);
 	}
 
+	/**
+	 * Updates results after the outfit changes. Only color sort needs to search again.
+	 */
+	public void onLookChanged()
+	{
+		SwingUtilities.invokeLater(() -> {
+			if (sort == SortBy.COLOR_MATCH)
+			{
+				updateSearchDebounced(false);
+			}
+			else
+			{
+				resultsList.refreshRows();
+			}
+		});
+	}
+
 	public void chooseSlot(KitType slot)
 	{
 		filterPanel.selectSlot(slot);

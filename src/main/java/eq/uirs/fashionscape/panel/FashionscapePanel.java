@@ -278,11 +278,11 @@ public class FashionscapePanel extends PluginPanel
 		}
 	}
 
-	public void reloadResults()
+	public void onLookChanged()
 	{
 		if (searchPanel != null)
 		{
-			searchPanel.reloadResults();
+			searchPanel.onLookChanged();
 		}
 	}
 
@@ -305,7 +305,7 @@ public class FashionscapePanel extends PluginPanel
 		undo.setToolTipText("Undo");
 		undo.addActionListener(e -> clientThread.invokeLater(() -> {
 			fashionManager.undo();
-			reloadResults();
+			onLookChanged();
 		}));
 		checkButtonEnabled(undo);
 		undo.addMouseListener(PanelUtil.hoverCursor(this));
@@ -317,7 +317,7 @@ public class FashionscapePanel extends PluginPanel
 		redo.setToolTipText("Redo");
 		redo.addActionListener(e -> clientThread.invokeLater(() -> {
 			fashionManager.redo();
-			reloadResults();
+			onLookChanged();
 		}));
 		checkButtonEnabled(redo);
 		redo.addMouseListener(PanelUtil.hoverCursor(this));
@@ -330,7 +330,7 @@ public class FashionscapePanel extends PluginPanel
 		shuffle.setToolTipText("Randomize");
 		shuffle.addActionListener(e -> clientThread.invokeLater(() -> {
 			fashionManager.shuffle();
-			reloadResults();
+			onLookChanged();
 		}));
 		checkButtonEnabled(shuffle);
 		shuffle.setFocusPainted(false);
@@ -360,7 +360,7 @@ public class FashionscapePanel extends PluginPanel
 		JMenuItem softClear = new JMenuItem("Soft clear");
 		softClear.addActionListener(e -> clientThread.invokeLater(() -> {
 			fashionManager.clear(false);
-			reloadResults();
+			onLookChanged();
 		}));
 		softClearMenu.add(softClear);
 
@@ -368,7 +368,7 @@ public class FashionscapePanel extends PluginPanel
 		clear.setToolTipText("Clear all");
 		clear.addActionListener(e -> clientThread.invokeLater(() -> {
 			fashionManager.clear(true);
-			reloadResults();
+			onLookChanged();
 		}));
 		clear.setFocusPainted(false);
 		clear.addMouseListener(PanelUtil.hoverCursor(this));
@@ -392,7 +392,7 @@ public class FashionscapePanel extends PluginPanel
 		loadoutsPanel.endPreview();
 		((CardLayout) cards.getLayout()).show(cards, TABS_CARD);
 		// results may be stale after applying a loadout
-		clientThread.invokeLater(this::reloadResults);
+		clientThread.invokeLater(this::onLookChanged);
 	}
 
 	private boolean hasVirtuals()

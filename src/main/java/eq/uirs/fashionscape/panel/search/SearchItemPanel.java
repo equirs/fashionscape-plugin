@@ -116,13 +116,20 @@ class SearchItemPanel extends AbsItemPanel
 			rightPanel.add(detailLabel);
 		}
 
+		setItemName(itemId);
+		add(rightPanel, BorderLayout.CENTER);
+		refreshState();
+	}
+
+	/**
+	 * Updates the selection highlight and lock tooltip to match the current outfit
+	 */
+	void refreshState()
+	{
 		for (JPanel panel : highlightPanels)
 		{
 			matchComponentBackground(panel, defaultBackgroundColor());
 		}
-
-		setItemName(itemId);
-		add(rightPanel, BorderLayout.CENTER);
 		checkLockTooltip();
 	}
 

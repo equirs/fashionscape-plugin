@@ -81,6 +81,11 @@ class ResultsList
 		rows.repaint();
 	}
 
+	void refreshRows()
+	{
+		itemPanels.forEach(SearchItemPanel::refreshState);
+	}
+
 	void scrollToTop()
 	{
 		scrollPane.getVerticalScrollBar().setValue(0);

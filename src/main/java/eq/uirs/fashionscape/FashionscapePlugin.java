@@ -282,7 +282,7 @@ public class FashionscapePlugin extends Plugin
 				return;
 			}
 			fashionManager.importPlayer(p);
-			panel.reloadResults();
+			panel.onLookChanged();
 		}
 	}
 
